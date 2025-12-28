@@ -4261,10 +4261,11 @@ function proceedToNextPeriod() {
             gameState.periodStarted = true;
             updateDisplay();
             alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理により2行目からゲーム開始です。`);
-            
+
             // 強制的にもう一度updateDisplay()を呼んで確実に2行目表示
             setTimeout(() => {
                 updateDisplay();
+                saveGame();  // 期首を自動セーブ
                 showTurnStartOptions();
             }, 100);
         } else {
@@ -4369,6 +4370,7 @@ function startPeriodWithoutBorrowing() {
     gameState.periodStarted = true;
     closeModal();
     updateDisplay();
+    saveGame();  // 期首を自動セーブ
     alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理完了で3行目からゲームスタートです。`);
     showTurnStartOptions();
 }
@@ -4410,15 +4412,16 @@ function showBorrowModal() {
 function processBorrowing() {
     const company = gameState.companies[0];
     const loanAmount = parseInt(document.getElementById('loanAmount').value || 0);
-    
+
     if (loanAmount > 0) {
         company.loans += loanAmount;
         company.cash += loanAmount;
         alert(`¥${loanAmount}を借入しました`);
     }
-    
+
     closeModal();
     updateDisplay();
+    saveGame();  // 借入後を自動セーブ
     showTurnStartOptions();
 }
 
@@ -4801,14 +4804,17 @@ function incrementRow(companyIndex) {
 // End turn
 function endTurn() {
     const company = gameState.companies[gameState.currentPlayerIndex];
-    
+
     // 行数を増やす（資源変更があったため）
     if (incrementRow(gameState.currentPlayerIndex)) {
         return;  // 期末処理が始まったので終了
     }
-    
+
     gameState.doNothingCount[gameState.currentPlayerIndex] = 0;
-    
+
+    // 自動セーブ
+    saveGame();
+
     nextTurn();
 }
 
@@ -6319,15 +6325,149 @@ function endGame() {
     showModal('ゲーム終了 - 最終結果', resultHtml);
 }
 
+// ============================================
+// セーブ・ロード機能
+// ============================================
+const SAVE_KEY = 'mg_game_save';
+
+function saveGame() {
+    const saveData = {
+        version: 1,
+        timestamp: Date.now(),
+        currentPeriod: gameState.currentPeriod,
+        currentRow: gameState.currentRow,
+        maxRows: gameState.maxRows,
+        currentPlayerIndex: gameState.currentPlayerIndex,
+        turnOrder: gameState.turnOrder,
+        skipTurns: gameState.skipTurns,
+        doNothingCount: gameState.doNothingCount,
+        usedRiskCards: gameState.usedRiskCards,
+        usedDecisionCards: gameState.usedDecisionCards,
+        reverseOrder: gameState.reverseOrder,
+        turnReversed: gameState.turnReversed,
+        periodStarted: gameState.periodStarted,
+        cardDeck: gameState.cardDeck,
+        deckInitialized: gameState.deckInitialized,
+        markets: gameState.markets,
+        companies: gameState.companies
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+    console.log('ゲームを自動保存しました（期' + gameState.currentPeriod + '）');
+}
+
+function loadGame() {
+    const savedData = localStorage.getItem(SAVE_KEY);
+    if (!savedData) return null;
+    try {
+        return JSON.parse(savedData);
+    } catch (e) {
+        console.error('セーブデータの読み込みに失敗:', e);
+        return null;
+    }
+}
+
+function hasSavedGame() {
+    return localStorage.getItem(SAVE_KEY) !== null;
+}
+
+function deleteSavedGame() {
+    localStorage.removeItem(SAVE_KEY);
+}
+
+function restoreGame(saveData) {
+    gameState.currentPeriod = saveData.currentPeriod;
+    gameState.currentRow = saveData.currentRow;
+    gameState.maxRows = saveData.maxRows;
+    gameState.currentPlayerIndex = saveData.currentPlayerIndex;
+    gameState.turnOrder = saveData.turnOrder;
+    gameState.skipTurns = saveData.skipTurns;
+    gameState.doNothingCount = saveData.doNothingCount;
+    gameState.usedRiskCards = saveData.usedRiskCards;
+    gameState.usedDecisionCards = saveData.usedDecisionCards;
+    gameState.reverseOrder = saveData.reverseOrder;
+    gameState.turnReversed = saveData.turnReversed;
+    gameState.periodStarted = saveData.periodStarted;
+    gameState.cardDeck = saveData.cardDeck;
+    gameState.deckInitialized = saveData.deckInitialized;
+    gameState.markets = saveData.markets;
+    gameState.companies = saveData.companies;
+}
+
+function showStartMenu() {
+    const hasSave = hasSavedGame();
+    const saveData = hasSave ? loadGame() : null;
+    const saveInfo = saveData ? `（${saveData.currentPeriod}期、${new Date(saveData.timestamp).toLocaleString('ja-JP')}）` : '';
+
+    const menuHtml = `
+        <div class="modal active" style="z-index: 2000;">
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <h2 style="margin-bottom: 20px; color: #1e40af;">🎮 MG（マネジメントゲーム）</h2>
+                <p style="margin-bottom: 20px; color: #666;">自主練モード - 6人対戦</p>
+
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    ${hasSave ? `
+                        <button onclick="resumeGame()" class="action-btn primary" style="padding: 15px; font-size: 16px;">
+                            ▶ 続きから始める${saveInfo}
+                        </button>
+                    ` : ''}
+                    <button onclick="startNewGame()" class="action-btn success" style="padding: 15px; font-size: 16px;">
+                        🆕 2期から新しく始める
+                    </button>
+                    ${hasSave ? `
+                        <button onclick="confirmDeleteSave()" class="action-btn secondary" style="padding: 10px; font-size: 14px;">
+                            🗑 セーブデータを削除
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('modalContainer').innerHTML = menuHtml;
+}
+
+function resumeGame() {
+    const saveData = loadGame();
+    if (saveData) {
+        restoreGame(saveData);
+        document.getElementById('modalContainer').innerHTML = '';
+        updateDisplay();
+        alert('ゲームを再開しました（' + gameState.currentPeriod + '期）');
+    }
+}
+
+function startNewGame() {
+    deleteSavedGame();
+    initializeCompanies();
+    initializeCardDeck();
+    document.getElementById('modalContainer').innerHTML = '';
+    updateDisplay();
+    saveGame(); // 初期状態を保存
+}
+
+function confirmDeleteSave() {
+    if (confirm('セーブデータを削除しますか？この操作は取り消せません。')) {
+        deleteSavedGame();
+        showStartMenu();
+    }
+}
+
 // Initialize game
 function initGame() {
     console.log("initGame started");
     try {
+        // まず会社とデッキを初期化（デフォルト状態）
         initializeCompanies();
         console.log("Companies initialized");
         initializeCardDeck();
         console.log("Card deck initialized (75 cards)");
-        updateDisplay();
+
+        // セーブデータがあればスタートメニューを表示
+        if (hasSavedGame()) {
+            showStartMenu();
+        } else {
+            updateDisplay();
+            saveGame(); // 初期状態を保存
+        }
         console.log("Display updated");
     } catch(e) {
         console.error("Error in initGame:", e);
