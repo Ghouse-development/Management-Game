@@ -1643,45 +1643,56 @@ function drawCard() {
     }
 }
 
-// Show decision card
+// Show decision card (会社盤が見える状態で表示)
 function showDecisionCard() {
     const company = gameState.companies[0];
     const mfgCapacity = getManufacturingCapacity(company);
     const salesCapacity = getSalesCapacity(company);
-    
-    const content = `
-        <div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-            <h4 style="margin: 0 0 10px 0;">あなたの会社盤</h4>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
-                <div>現金: ¥${company.cash}</div>
-                <div>製造能力: ${mfgCapacity}</div>
-                <div>販売能力: ${salesCapacity}</div>
-                <div>材料: ${company.materials}</div>
-                <div>仕掛品: ${company.wip}</div>
-                <div>製品: ${company.products}</div>
-                <div>ワーカー: ${company.workers}</div>
-                <div>セールス: ${company.salesmen}</div>
-                <div>機械: ${company.machines.length}</div>
-                <div>研究: ${company.chips.research}</div>
-                <div>教育: ${company.chips.education}</div>
-                <div>広告: ${company.chips.advertising}</div>
+
+    // モーダルではなく、画面上部にオーバーレイ表示（会社盤は見える）
+    const overlayHtml = `
+        <div id="decisionCardOverlay" style="
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+            border: 3px solid #fbbf24;
+            border-radius: 12px;
+            padding: 15px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        ">
+            <div style="text-align: center; color: #fff; margin-bottom: 10px;">
+                <h3 style="margin: 0; color: #fbbf24;">意思決定カード</h3>
+                <p style="margin: 5px 0; font-size: 12px;">アクションを選択してください</p>
+                <div style="font-size: 11px; color: #a7f3d0;">
+                    製造能力: ${mfgCapacity} | 販売能力: ${salesCapacity}
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                ${gameState.decisionCards.map(card => `
+                    <button onclick="selectDecisionCard(${card.id})" style="
+                        background: ${card.id === 7 ? '#6b7280' : '#fff'};
+                        color: ${card.id === 7 ? '#fff' : '#1e293b'};
+                        border: 2px solid #fbbf24;
+                        border-radius: 8px;
+                        padding: 10px 8px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        font-weight: bold;
+                        transition: transform 0.1s;
+                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        ${card.name}
+                    </button>
+                `).join('')}
             </div>
         </div>
-        <div class="decision-card">
-            <h3>意思決定カード</h3>
-            <p>アクションを選択してください</p>
-        </div>
-        <div class="decision-options">
-            ${gameState.decisionCards.map(card => `
-                <div class="decision-option" onclick="selectDecisionCard(${card.id})">
-                    <strong>${card.name}</strong><br>
-                    <small>${card.description}</small>
-                </div>
-            `).join('')}
-        </div>
     `;
-    
-    showModal('意思決定カード', content);
+
+    document.getElementById('modalContainer').innerHTML = overlayHtml;
 }
 
 // Select decision card
