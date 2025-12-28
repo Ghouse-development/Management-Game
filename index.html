@@ -20,12 +20,100 @@
         .info-value.negative { color: #f87171; }
 
         /* ============================================ */
-        /* メインレイアウト */
+        /* ゲームエリアレイアウト（市場中央、他社周囲） */
         /* ============================================ */
-        .main-layout { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .game-area {
+            margin-bottom: 10px;
+        }
+        .other-companies-top {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .center-area {
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 8px;
+        }
+        .other-companies-left,
+        .other-companies-right {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: center;
+        }
+        .market-center {
+            flex: 1;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* 他社カード（小さく表示） */
+        .other-company-mini {
+            background: rgba(255,255,255,0.08);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 10px;
+            min-width: 80px;
+            text-align: center;
+        }
+        .other-company-mini.current-turn {
+            background: rgba(251, 191, 36, 0.2);
+            border: 1px solid #fbbf24;
+        }
+        .other-company-mini .oc-name { font-weight: bold; font-size: 11px; }
+        .other-company-mini .oc-cash { color: #4ade80; font-size: 10px; }
+        .other-company-mini .oc-inv {
+            display: flex;
+            gap: 2px;
+            justify-content: center;
+            margin-top: 3px;
+        }
+        .other-company-mini .oc-block {
+            width: 8px; height: 8px;
+            border-radius: 2px;
+        }
+        .other-company-mini .oc-block.m { background: #7c3aed; }
+        .other-company-mini .oc-block.w { background: #8b5cf6; }
+        .other-company-mini .oc-block.p { background: #6366f1; }
+
+        /* 手元エリア（プレイヤーの会社盤） */
+        .player-area {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: start;
+        }
+
+        /* 次繰盤 */
+        .next-period-board {
+            background: linear-gradient(135deg, #581c87 0%, #6b21a8 100%);
+            border-radius: 8px;
+            padding: 8px;
+            margin-top: 10px;
+        }
+        .next-period-content {
+            padding: 6px;
+        }
+        .next-chips {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .next-chip-item {
+            background: rgba(255,255,255,0.1);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
 
         /* ============================================ */
-        /* カードを引くボタン（中央） */
+        /* カードを引くボタン（市場盤の上） */
         /* ============================================ */
         .card-draw-section {
             background: linear-gradient(135deg, #065f46 0%, #047857 100%);
@@ -366,6 +454,12 @@
             .info-label { font-size: 9px; }
             .info-value { font-size: 12px; }
 
+            /* スマホ：縦積みレイアウト */
+            .center-area { flex-direction: column; }
+            .other-companies-left,
+            .other-companies-right { flex-direction: row; justify-content: center; }
+            .market-center { max-width: 100%; }
+
             .card-draw-section { padding: 10px; }
             .draw-card-btn { padding: 15px 30px; font-size: 16px; }
 
@@ -398,9 +492,13 @@
             .panel-title { font-size: 12px; }
             .cost-breakdown { font-size: 10px; }
 
-            .other-companies-section { padding: 8px; }
-            .other-companies-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
-            .other-company-card { padding: 6px; font-size: 10px; }
+            /* 手元エリア：スマホでは縦積み */
+            .player-area { grid-template-columns: 1fr; }
+
+            /* 他社：スマホでは小さく */
+            .other-company-mini { min-width: 60px; padding: 4px 6px; }
+            .other-company-mini .oc-name { font-size: 9px; }
+            .other-company-mini .oc-cash { font-size: 9px; }
 
             /* モーダル - スマホ最適化 */
             .modal-content { width: 95%; max-height: 90vh; padding: 12px; }
@@ -412,29 +510,17 @@
 
         /* タブレット向け（481px〜768px） */
         @media (min-width: 481px) and (max-width: 768px) {
-            .main-layout {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-            }
-            .card-draw-section { grid-column: 1 / -1; }
-            .company-board { grid-column: 1 / -1; }
             .markets-grid { grid-template-columns: repeat(4, 1fr); }
+            .market-center { max-width: 350px; }
+            .player-area { grid-template-columns: 1fr 200px; }
         }
 
         /* PC向け（769px以上） */
         @media (min-width: 769px) {
-            .main-layout {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 12px;
-            }
-            .card-draw-section { grid-column: 1 / -1; }
-            .company-board { grid-column: 1 / -1; }
-            .markets-board { }
-            .fixed-cost-panel { }
-            .other-companies-section { grid-column: 1 / -1; }
-            .other-companies-grid { grid-template-columns: repeat(6, 1fr); }
+            .market-center { max-width: 450px; }
+            .markets-grid { grid-template-columns: repeat(4, 1fr); }
+            .player-area { grid-template-columns: 1fr 250px; }
+            .other-company-mini { min-width: 100px; }
         }
 
         /* タッチデバイス用のタップ領域拡大 */
@@ -472,14 +558,36 @@
             </div>
         </div>
 
-        <!-- カードを引くボタン -->
-        <div class="card-draw-section" id="cardDrawSection">
-            <button class="draw-card-btn" onclick="drawCard()">カードを引く</button>
-            <div class="turn-info" id="turnInfo">あなたのターンです</div>
+        <!-- ゲームエリア：市場盤中央、他社周囲 -->
+        <div class="game-area">
+            <!-- 上部：他社（1-3） -->
+            <div class="other-companies-top" id="otherCompaniesTop"></div>
+
+            <!-- 中央エリア：左の他社 | 市場盤+カードデッキ | 右の他社 -->
+            <div class="center-area">
+                <!-- 左の他社 -->
+                <div class="other-companies-left" id="otherCompaniesLeft"></div>
+
+                <!-- 市場盤（中央）とカードデッキ -->
+                <div class="market-center">
+                    <div class="card-draw-section" id="cardDrawSection">
+                        <button class="draw-card-btn" onclick="drawCard()">カードを引く</button>
+                        <div class="turn-info" id="turnInfo">あなたのターンです</div>
+                    </div>
+                    <div class="markets-board">
+                        <div class="board-title" style="background: #047857;">市場盤</div>
+                        <div class="markets-grid" id="marketsDisplay"></div>
+                    </div>
+                </div>
+
+                <!-- 右の他社 -->
+                <div class="other-companies-right" id="otherCompaniesRight"></div>
+            </div>
         </div>
 
-        <div class="main-layout">
-            <!-- 会社盤 -->
+        <!-- 手元エリア：プレイヤーの会社盤 + 固定費 + 次繰盤 -->
+        <div class="player-area">
+            <!-- 会社盤（大きく表示） -->
             <div class="company-board" id="companyBoard">
                 <div class="board-title">会社盤 - <span id="companyName">あなた</span></div>
 
@@ -540,22 +648,22 @@
                 </div>
             </div>
 
-            <!-- 市場盤 -->
-            <div class="markets-board">
-                <div class="board-title" style="background: #047857;">市場盤</div>
-                <div class="markets-grid" id="marketsDisplay"></div>
-            </div>
-
-            <!-- 固定費内訳 -->
+            <!-- 固定費内訳パネル -->
             <div class="fixed-cost-panel">
-                <div class="panel-title">固定費内訳（自社）</div>
+                <div class="panel-title">固定費内訳</div>
                 <div class="cost-breakdown" id="fixedCostBreakdown"></div>
             </div>
 
-            <!-- 他社一覧 -->
-            <div class="other-companies-section">
-                <div class="board-title" style="background: #475569;">他社</div>
-                <div class="other-companies-grid" id="otherCompaniesDisplay"></div>
+            <!-- 次繰盤（3期以降のみ表示） -->
+            <div class="next-period-board" id="nextPeriodBoard" style="display: none;">
+                <div class="board-title" style="background: #6b21a8;">次繰盤</div>
+                <div class="next-period-content">
+                    <div class="next-chips">
+                        <span class="next-chip-item">研究: <span id="nextResearch">0</span></span>
+                        <span class="next-chip-item">教育: <span id="nextEducation">0</span></span>
+                        <span class="next-chip-item">広告: <span id="nextAdvertising">0</span></span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -581,6 +689,10 @@ const gameState = {
     waitingForBids: false,
     currentBids: [],
     bidMarkets: [],
+
+    // カードデッキ（75枚：60枚意思決定 + 15枚リスク）
+    cardDeck: [],
+    deckInitialized: false,
     
     markets: [
         {name: '仙台', buyPrice: 10, sellPrice: 40, maxStock: 3, currentStock: 3, needsBid: true},
@@ -1155,17 +1267,28 @@ function startPeriod() {
     // 3期以降は借入と無災害倉庫の選択
     if (gameState.currentPeriod >= 3) {
         const company = gameState.companies[0];
-        const maxLoan = Math.round(company.equity * 0.5);
-        
+        // 借入上限：3期は0.5倍、4期以降で自己資本300超なら1倍
+        const loanMultiplier = (gameState.currentPeriod >= 4 && company.equity > 300) ? 1.0 : 0.5;
+        const maxLoanTotal = Math.round(company.equity * loanMultiplier);
+        const availableLoan = Math.max(0, maxLoanTotal - company.loans);
+        const loanRuleText = (gameState.currentPeriod >= 4 && company.equity > 300)
+            ? `自己資本の1倍まで（300超のため）`
+            : `自己資本の0.5倍まで`;
+
         content += `
             <div class="form-group">
-                <label class="form-label">長期借入（自己資本の0.5倍まで: ¥${maxLoan}）</label>
+                <label class="form-label">長期借入（${loanRuleText}）</label>
+                <div style="font-size: 11px; color: #666; margin-bottom: 5px;">
+                    上限: ¥${maxLoanTotal} - 既存借入¥${company.loans} = 追加可能¥${availableLoan}
+                </div>
                 <select id="loanAmount" class="form-control">
                     <option value="0">借りない</option>
-                    <option value="50">¥50</option>
-                    <option value="100">¥100</option>
-                    ${maxLoan >= 150 ? '<option value="150">¥150</option>' : ''}
-                    ${maxLoan >= 200 ? '<option value="200">¥200</option>' : ''}
+                    ${availableLoan >= 50 ? '<option value="50">¥50</option>' : ''}
+                    ${availableLoan >= 100 ? '<option value="100">¥100</option>' : ''}
+                    ${availableLoan >= 150 ? '<option value="150">¥150</option>' : ''}
+                    ${availableLoan >= 200 ? '<option value="200">¥200</option>' : ''}
+                    ${availableLoan >= 250 ? '<option value="250">¥250</option>' : ''}
+                    ${availableLoan >= 300 ? '<option value="300">¥300</option>' : ''}
                 </select>
             </div>
             <div class="form-group">
@@ -1345,10 +1468,44 @@ function viewGameState() {
 }
 
 // Draw card (80% decision, 20% risk)
+// カードデッキを初期化（75枚：60枚意思決定 + 15枚リスク）
+function initializeCardDeck() {
+    gameState.cardDeck = [];
+
+    // 60枚の意思決定カード（'decision'）
+    for (let i = 0; i < 60; i++) {
+        gameState.cardDeck.push('decision');
+    }
+
+    // 15枚のリスクカード（'risk'）
+    for (let i = 0; i < 15; i++) {
+        gameState.cardDeck.push('risk');
+    }
+
+    // シャッフル（Fisher-Yates）
+    for (let i = gameState.cardDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [gameState.cardDeck[i], gameState.cardDeck[j]] = [gameState.cardDeck[j], gameState.cardDeck[i]];
+    }
+
+    gameState.deckInitialized = true;
+    console.log('カードデッキを初期化しました（75枚）');
+}
+
+// Draw card from deck
 function drawCard() {
     closeModal();
-    
-    if (Math.random() < 0.8) {
+
+    // デッキがない、または空の場合は初期化
+    if (!gameState.deckInitialized || gameState.cardDeck.length === 0) {
+        initializeCardDeck();
+    }
+
+    // デッキからカードを引く
+    const cardType = gameState.cardDeck.pop();
+    console.log(`カードを引きました: ${cardType}（残り${gameState.cardDeck.length}枚）`);
+
+    if (cardType === 'decision') {
         showDecisionCard();
     } else {
         drawRiskCard();
@@ -2592,6 +2749,17 @@ function updateDisplay() {
 
     // 他社一覧を更新
     renderOtherCompanies();
+
+    // 次繰盤の表示（3期以降のみ）
+    const nextPeriodBoard = document.getElementById('nextPeriodBoard');
+    if (gameState.currentPeriod >= 3) {
+        nextPeriodBoard.style.display = 'block';
+        document.getElementById('nextResearch').textContent = player.nextPeriodChips.research || 0;
+        document.getElementById('nextEducation').textContent = player.nextPeriodChips.education || 0;
+        document.getElementById('nextAdvertising').textContent = player.nextPeriodChips.advertising || 0;
+    } else {
+        nextPeriodBoard.style.display = 'none';
+    }
 }
 
 // 会社盤を描画
@@ -2710,24 +2878,45 @@ function renderFixedCostBreakdown(company) {
     document.getElementById('fixedCostBreakdown').innerHTML = html;
 }
 
-// 他社一覧を描画
+// 他社一覧を描画（市場盤の周囲に配置）
 function renderOtherCompanies() {
-    let html = '';
-    gameState.companies.slice(1).forEach((company, idx) => {
+    const others = gameState.companies.slice(1);
+
+    // 他社カードのHTML生成関数
+    function createCompanyCard(company, idx) {
         const isCurrent = gameState.currentPlayerIndex === idx + 1;
-        html += `
-            <div class="other-company-card ${isCurrent ? 'current-turn' : ''}">
-                <div class="company-name">${company.name}</div>
-                <div class="company-cash">¥${company.cash}</div>
-                <div class="mini-inv">
-                    ${Array(Math.min(company.materials, 5)).fill('<div class="mini-block m"></div>').join('')}
-                    ${Array(Math.min(company.wip, 5)).fill('<div class="mini-block w"></div>').join('')}
-                    ${Array(Math.min(company.products, 5)).fill('<div class="mini-block p"></div>').join('')}
+        return `
+            <div class="other-company-mini ${isCurrent ? 'current-turn' : ''}">
+                <div class="oc-name">${company.name}</div>
+                <div class="oc-cash">¥${company.cash}</div>
+                <div class="oc-inv">
+                    ${Array(Math.min(company.materials, 3)).fill('<div class="oc-block m"></div>').join('')}
+                    ${Array(Math.min(company.wip, 3)).fill('<div class="oc-block w"></div>').join('')}
+                    ${Array(Math.min(company.products, 3)).fill('<div class="oc-block p"></div>').join('')}
                 </div>
             </div>
         `;
+    }
+
+    // 6社を上3・左1・右2に配置
+    let topHtml = '';
+    let leftHtml = '';
+    let rightHtml = '';
+
+    others.forEach((company, idx) => {
+        const card = createCompanyCard(company, idx);
+        if (idx < 3) {
+            topHtml += card;
+        } else if (idx === 3) {
+            leftHtml += card;
+        } else {
+            rightHtml += card;
+        }
     });
-    document.getElementById('otherCompaniesDisplay').innerHTML = html;
+
+    document.getElementById('otherCompaniesTop').innerHTML = topHtml;
+    document.getElementById('otherCompaniesLeft').innerHTML = leftHtml;
+    document.getElementById('otherCompaniesRight').innerHTML = rightHtml;
 }
 
 // Modal functions
@@ -3768,62 +3957,77 @@ function processBidsWithAllCompanies(marketIndex) {
 }
 
 // Show financial summary with detailed calculations
+// 横軸：メンバー、縦軸：項目の表形式
 function showFinancialSummary(financialData) {
+    // 各社の自己資本を取得
+    const equities = gameState.companies.map(c => c.equity);
+
+    // 項目定義（縦軸）
+    const items = [
+        { key: 'equity', label: '自己資本', format: v => `¥${v}` },
+        { key: 'p', label: '平均P', format: v => v.toFixed(1) },
+        { key: 'v', label: '平均V', format: v => v.toFixed(1) },
+        { key: 'm', label: '平均M', format: v => v.toFixed(1) },
+        { key: 'q', label: 'Q', format: v => v },
+        { key: 'pq', label: 'PQ', format: v => `¥${v}` },
+        { key: 'vq', label: 'VQ', format: v => `¥${v}` },
+        { key: 'mq', label: 'MQ', format: v => `¥${v}` },
+        { key: 'f', label: 'F', format: v => `¥${v}` },
+        { key: 'g', label: 'G', format: v => `¥${v}`, highlight: true }
+    ];
+
+    // ヘッダー行（会社名）
     let html = `
         <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                 <thead>
-                    <tr style="background: #f8f9fa;">
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: left;">会社名</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">P<br>(単価)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">V<br>(単価)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">M<br>(単価)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">Q<br>(合計)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">PQ<br>(売上高)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">VQ<br>(変動費)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">MQ<br>(付加価値)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">F<br>(固定費)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">G<br>(利益)</th>
-                        <th style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">詳細</th>
-                    </tr>
-                </thead>
-                <tbody>
+                    <tr style="background: #1e40af; color: white;">
+                        <th style="border: 1px solid #3b82f6; padding: 6px; text-align: left;">項目</th>
     `;
-    
+
     financialData.forEach((data, index) => {
         const isPlayer = index === 0;
-        const company = gameState.companies[index];
-        html += `
-            <tr style="background: ${isPlayer ? '#e7f3ff' : 'white'};">
-                <td style="border: 1px solid #dee2e6; padding: 8px; font-weight: ${isPlayer ? 'bold' : 'normal'};">${data.name}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">${data.p.toFixed(1)}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">${data.v.toFixed(1)}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">${data.m.toFixed(1)}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; font-weight: bold;">${data.q}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">¥${data.pq}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">¥${data.vq}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; font-weight: bold;">¥${data.mq}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">¥${data.f}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; font-weight: bold; color: ${data.g >= 0 ? '#28a745' : '#dc3545'};">¥${data.g}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">
-                    <button onclick="showFinancialDetails(${index})" style="padding: 2px 8px; font-size: 11px; cursor: pointer;">🔍</button>
-                </td>
-            </tr>
-        `;
+        html += `<th style="border: 1px solid #3b82f6; padding: 6px; text-align: center; background: ${isPlayer ? '#2563eb' : '#1e40af'}; min-width: 60px;">${data.name.replace('社', '')}</th>`;
     });
-    
+    html += '</tr></thead><tbody>';
+
+    // 各項目の行を生成
+    items.forEach(item => {
+        html += `<tr>
+            <td style="border: 1px solid #dee2e6; padding: 6px; background: #f1f5f9; font-weight: bold;">${item.label}</td>`;
+
+        financialData.forEach((data, index) => {
+            const isPlayer = index === 0;
+            let value;
+            if (item.key === 'equity') {
+                value = equities[index];
+            } else {
+                value = data[item.key];
+            }
+
+            const formatted = item.format(value);
+            let style = `border: 1px solid #dee2e6; padding: 6px; text-align: right;`;
+            if (isPlayer) style += ' background: #e0f2fe;';
+            if (item.highlight) {
+                style += value >= 0 ? ' color: #16a34a; font-weight: bold;' : ' color: #dc2626; font-weight: bold;';
+            }
+
+            html += `<td style="${style}">${formatted}</td>`;
+        });
+        html += '</tr>';
+    });
+
     html += `
                 </tbody>
             </table>
         </div>
-        <div style="margin-top: 10px; font-size: 11px; color: #666;">
-            <p><strong>計算式の説明：</strong></p>
-            <p>P = PQ ÷ Q（売上単価）、V = VQ ÷ Q（変動費単価）、M = MQ ÷ Q（付加価値単価）</p>
-            <p>MQ = PQ - VQ（付加価値総額）、G = MQ - F（利益）</p>
+        <div style="margin-top: 10px; font-size: 10px; color: #666;">
+            <p>平均P = PQ÷Q、平均V = VQ÷Q、平均M = MQ÷Q</p>
+            <p>MQ = PQ - VQ、G = MQ - F</p>
         </div>
         <button class="submit-btn" onclick="closeModal(); proceedToNextPeriod();" style="margin-top: 15px;">次期へ進む</button>
     `;
-    
+
     showModal(`第${gameState.currentPeriod}期 決算結果`, html);
 }
 
@@ -3912,6 +4116,13 @@ function proceedToNextPeriod() {
     gameState.periodStarted = false;
     gameState.doNothingCount = {};
     gameState.last5RowWarningShown = false;  // ラスト5行警告フラグをリセット
+
+    // カードデッキをリセット（毎期シャッフル）
+    initializeCardDeck();
+    console.log(`第${gameState.currentPeriod}期開始：カードデッキをリセットしました`);
+
+    // 使用済みリスクカードもリセット
+    gameState.usedRiskCards = [];
     
     // Set max rows based on period
     if (gameState.currentPeriod === 3) {
@@ -4073,22 +4284,33 @@ function startPeriodWithoutBorrowing() {
 // Show borrowing modal
 function showBorrowModal() {
     const company = gameState.companies[0];
-    const maxLoan = Math.round(company.equity * 0.5);
-    
+    // 借入上限：3期は0.5倍、4期以降で自己資本300超なら1倍
+    const loanMultiplier = (gameState.currentPeriod >= 4 && company.equity > 300) ? 1.0 : 0.5;
+    const maxLoanTotal = Math.round(company.equity * loanMultiplier);
+    const availableLoan = Math.max(0, maxLoanTotal - company.loans);
+    const loanRuleText = (gameState.currentPeriod >= 4 && company.equity > 300)
+        ? `自己資本の1倍まで（300超のため）`
+        : `自己資本の0.5倍まで`;
+
     const content = `
         <div class="form-group">
-            <label class="form-label">長期借入（自己資本の0.5倍まで: ¥${maxLoan}）</label>
+            <label class="form-label">長期借入（${loanRuleText}）</label>
+            <div style="font-size: 11px; color: #666; margin-bottom: 5px;">
+                上限: ¥${maxLoanTotal} - 既存借入¥${company.loans} = 追加可能¥${availableLoan}
+            </div>
             <select id="loanAmount" class="form-control">
                 <option value="0">借りない</option>
-                <option value="50">¥50</option>
-                <option value="100">¥100</option>
-                ${maxLoan >= 150 ? '<option value="150">¥150</option>' : ''}
-                ${maxLoan >= 200 ? '<option value="200">¥200</option>' : ''}
+                ${availableLoan >= 50 ? '<option value="50">¥50</option>' : ''}
+                ${availableLoan >= 100 ? '<option value="100">¥100</option>' : ''}
+                ${availableLoan >= 150 ? '<option value="150">¥150</option>' : ''}
+                ${availableLoan >= 200 ? '<option value="200">¥200</option>' : ''}
+                ${availableLoan >= 250 ? '<option value="250">¥250</option>' : ''}
+                ${availableLoan >= 300 ? '<option value="300">¥300</option>' : ''}
             </select>
         </div>
         <button class="submit-btn" onclick="processBorrowing()">借入を実施</button>
     `;
-    
+
     showModal('借入処理', content);
 }
 
@@ -4931,39 +5153,43 @@ function processAICommonPurchase() {
     nextTurn();
 }
 
-// Execute AI turn  
+// Execute AI turn
 function executeAITurn() {
     const company = gameState.companies[gameState.currentPlayerIndex];
-    
+
     if (company.skipTurns > 0) {
         company.skipTurns--;
         nextTurn();
         return;
     }
-    
-    // リスクカード確率（性格により変動）
-    let riskChance = 0.2;
-    if (company.strategy === 'aggressive') riskChance = 0.25;  // A社：リスク高め
-    if (company.strategy === 'conservative') riskChance = 0.15; // C社：リスク低め
-    
-    if (Math.random() < riskChance) {
+
+    // カードデッキから引く（プレイヤーと同様）
+    if (!gameState.deckInitialized || gameState.cardDeck.length === 0) {
+        initializeCardDeck();
+    }
+
+    const cardType = gameState.cardDeck.pop();
+    console.log(`${company.name}がカードを引きました: ${cardType}（残り${gameState.cardDeck.length}枚）`);
+
+    if (cardType === 'risk') {
         const availableCards = gameState.riskCards.filter(card => {
             if (gameState.currentPeriod === 2 && card.period2Exempt) return false;
             return !gameState.usedRiskCards.includes(card.id);
         });
-        
+
         if (availableCards.length > 0) {
             const card = availableCards[Math.floor(Math.random() * availableCards.length)];
             gameState.usedRiskCards.push(card.id);
             console.log(`${company.name}がリスクカード「${card.name}」を引きました`);
-            
+
             // Apply risk card effect to AI
             applyRiskCardToAI(company, card);
-            
+
             // リスクカードを引いたことを通知
             alert(`${company.name}がリスクカード「${card.name}」を引きました\n${card.description}`);
             return; // リスクカードを引いたらターン終了
         }
+        // 利用可能なリスクカードがない場合は意思決定へ
     }
     
     // 緊急採用チェック（ワーカーまたはセールスマンが0人）
@@ -5019,11 +5245,74 @@ function executeAITurn() {
     const mfgCapacity = getManufacturingCapacity(company);
     const salesCapacity = getSalesCapacity(company);
     
-    executeAIStrategyByType(company, mfgCapacity, salesCapacity);
+    // AI分析データを取得
+    const analysis = getAIFinancialAnalysis(company);
+    executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis);
+}
+
+// AI財務分析（賢い判断のためのデータ収集）
+function getAIFinancialAnalysis(company) {
+    const period = gameState.currentPeriod;
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+
+    // 期末必要資金（給料 + 借入返済）
+    const periodEndCost = calculatePeriodPayment(company);
+    const fixedCost = calculateFixedCost(company);
+
+    // 他社との比較
+    const rivals = gameState.companies.filter(c => c !== company);
+    const avgRivalEquity = rivals.reduce((sum, c) => sum + c.equity, 0) / rivals.length;
+    const maxRivalEquity = Math.max(...rivals.map(c => c.equity));
+    const equityRank = gameState.companies.filter(c => c.equity > company.equity).length + 1;
+
+    // MQ推定（現在の販売能力と製品から）
+    const salesCapacity = getSalesCapacity(company);
+    const potentialSales = Math.min(company.products, salesCapacity);
+    const estimatedPQ = potentialSales * 28; // 平均販売価格推定
+    const estimatedMQ = estimatedPQ - (potentialSales * 15); // 材料費差し引き
+
+    // 在庫状況
+    const totalInventory = company.materials + company.wip + company.products;
+    const needsMaterials = company.materials < 3;
+    const needsProduction = company.wip > 0 || company.materials > company.wip;
+    const canSell = company.products > 0 && salesCapacity > 0;
+
+    // 資金余裕度
+    const cashSafety = company.cash - periodEndCost;
+    const isCashTight = cashSafety < 50;
+
+    // 長期借入可能額（3期は0.5倍、4期以降で300超なら1倍）
+    const loanMultiplier = (period >= 4 && company.equity > 300) ? 1.0 : 0.5;
+    const maxLongLoan = Math.round(company.equity * loanMultiplier);
+    const availableLoan = Math.max(0, maxLongLoan - company.loans);
+    const canBorrow = period >= 3 && availableLoan > 0;
+
+    return {
+        period,
+        rowsRemaining,
+        periodEndCost,
+        fixedCost,
+        avgRivalEquity,
+        maxRivalEquity,
+        equityRank,
+        estimatedMQ,
+        totalInventory,
+        needsMaterials,
+        needsProduction,
+        canSell,
+        cashSafety,
+        isCashTight,
+        maxLongLoan,
+        canBorrow,
+        // 推奨アクション優先度
+        shouldSellFirst: canSell && (isCashTight || rowsRemaining < 5),
+        shouldInvest: !isCashTight && rowsRemaining > 10 && equityRank > 2,
+        shouldBeAggressive: equityRank > 3 && rowsRemaining > 5
+    };
 }
 
 // AI性格別の戦略実行
-function executeAIStrategyByType(company, mfgCapacity, salesCapacity) {
+function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) {
     switch(company.strategy) {
         case 'aggressive':    // A社：積極的
             executeAggressiveStrategy(company, mfgCapacity, salesCapacity);
@@ -5944,6 +6233,8 @@ function initGame() {
     try {
         initializeCompanies();
         console.log("Companies initialized");
+        initializeCardDeck();
+        console.log("Card deck initialized (75 cards)");
         updateDisplay();
         console.log("Display updated");
     } catch(e) {
