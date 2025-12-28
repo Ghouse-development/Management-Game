@@ -60,13 +60,15 @@
             border-radius: 8px;
             padding: 8px;
             font-size: 11px;
-            min-width: 140px;
+            min-width: 160px;
+            max-width: 200px;
             color: #fff;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         .other-company-board.current-turn {
             border-color: #fbbf24;
-            box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+            border-width: 3px;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.7);
         }
         .other-company-board .oc-header {
             display: flex;
@@ -108,36 +110,73 @@
         .other-company-board .oc-block.w { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
         .other-company-board .oc-block.p { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
 
-        /* 他社ミニカード（コンパクト表示） */
-        .other-company-mini {
-            background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
-            border: 2px solid #3b82f6;
-            border-radius: 8px;
-            padding: 6px 10px;
+        /* 他社会社盤（フル表示 - コンパクト版） */
+        .board-title-mini {
+            text-align: center;
             font-size: 11px;
-            min-width: 80px;
-            color: #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            font-weight: bold;
+            padding: 3px;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1e293b;
+            border-radius: 4px;
+            margin-bottom: 6px;
         }
-        .other-company-mini.current-turn {
-            border-color: #fbbf24;
-            box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+        .production-flow-mini {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 3px;
+            margin-bottom: 6px;
         }
-        .other-company-mini .oc-name { font-weight: bold; font-size: 11px; color: #fbbf24; margin-bottom: 2px; }
-        .other-company-mini .oc-cash { font-weight: bold; color: #4ade80; font-size: 12px; margin-bottom: 4px; }
-        .other-company-mini .oc-inv {
-            display: flex;
+        .flow-box-mini {
+            background: rgba(255,255,255,0.9);
+            border: 2px solid #fbbf24;
+            border-radius: 4px;
+            padding: 3px;
+            text-align: center;
+        }
+        .flow-box-mini.factory { background: rgba(219,234,254,0.9); border-color: #60a5fa; }
+        .flow-box-title-mini { font-size: 8px; color: #1e293b; font-weight: bold; }
+        .flow-box-content-mini { display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; min-height: 16px; }
+        .flow-box-content-mini .inv-block { width: 12px; height: 12px; }
+
+        .personnel-row-mini {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 3px;
+            margin-bottom: 6px;
+        }
+        .personnel-box-mini {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #fbbf24;
+            border-radius: 4px;
+            padding: 2px;
+            text-align: center;
+        }
+        .personnel-box-title-mini { font-size: 8px; color: #1e293b; font-weight: bold; }
+        .personnel-dots-mini { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; min-height: 14px; }
+        .personnel-dots-mini .person-dot { width: 14px; height: 14px; font-size: 7px; }
+        .personnel-dots-mini .machine-dot { width: 16px; height: 14px; font-size: 7px; }
+
+        .chips-row-mini {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
             gap: 2px;
+        }
+        .chip-box-mini {
+            background: rgba(255,255,255,0.9);
+            border-radius: 3px;
+            padding: 2px;
+            text-align: center;
+            min-height: 16px;
+            display: flex;
             justify-content: center;
+            align-items: center;
             flex-wrap: wrap;
+            gap: 1px;
+            font-size: 8px;
+            color: #666;
         }
-        .other-company-mini .oc-block {
-            width: 10px; height: 10px;
-            border-radius: 2px;
-        }
-        .other-company-mini .oc-block.m { background: #7c3aed; }
-        .other-company-mini .oc-block.w { background: #a855f7; }
-        .other-company-mini .oc-block.p { background: #6366f1; }
+        .chip-box-mini .chip { width: 10px; height: 10px; }
 
         /* 手元エリア（プレイヤーの会社盤） */
         .player-area {
@@ -2970,21 +3009,80 @@ function renderFixedCostBreakdown(company) {
     document.getElementById('fixedCostBreakdown').innerHTML = html;
 }
 
-// 他社一覧を描画（市場盤の周囲に配置）
+// 他社一覧を描画（市場盤の周囲に配置）- プレイヤーと同じフル会社盤表示
 function renderOtherCompanies() {
     const others = gameState.companies.slice(1);
 
-    // 他社カードのHTML生成関数
-    function createCompanyCard(company, idx) {
+    // 他社会社盤のHTML生成関数（プレイヤーと同じ形式）
+    function createCompanyBoard(company, idx) {
         const isCurrent = gameState.currentPlayerIndex === idx + 1;
+
+        // 材料ブロック
+        const materialsHtml = Array(company.materials).fill('<div class="inv-block material"></div>').join('');
+        // 仕掛品ブロック
+        const wipHtml = Array(company.wip).fill('<div class="inv-block wip"></div>').join('');
+        // 製品ブロック
+        const productsHtml = Array(company.products).fill('<div class="inv-block product"></div>').join('');
+
+        // ワーカー
+        const workersHtml = Array(company.workers).fill('<div class="person-dot worker">W</div>').join('');
+        // 機械
+        const machinesHtml = company.machines.map(m =>
+            `<div class="machine-dot ${m.type === 'large' ? 'large' : ''}">${m.type === 'large' ? '大' : '小'}${m.attachments > 0 ? '+' : ''}</div>`
+        ).join('');
+        // セールスマン
+        const salesmenHtml = Array(company.salesmen).fill('<div class="person-dot salesman">S</div>').join('');
+
+        // チップ
+        const researchHtml = Array(company.chips.research || 0).fill('<div class="chip research"></div>').join('');
+        const educationHtml = Array(company.chips.education || 0).fill('<div class="chip education"></div>').join('');
+        const advertisingHtml = Array(company.chips.advertising || 0).fill('<div class="chip advertising"></div>').join('');
+        const computerHtml = Array(company.chips.computer || 0).fill('<div class="chip computer"></div>').join('');
+        const insuranceHtml = Array(company.chips.insurance || 0).fill('<div class="chip insurance"></div>').join('');
+
         return `
-            <div class="other-company-mini ${isCurrent ? 'current-turn' : ''}">
-                <div class="oc-name">${company.name}</div>
-                <div class="oc-cash">¥${company.cash}</div>
-                <div class="oc-inv">
-                    ${Array(Math.min(company.materials, 3)).fill('<div class="oc-block m"></div>').join('')}
-                    ${Array(Math.min(company.wip, 3)).fill('<div class="oc-block w"></div>').join('')}
-                    ${Array(Math.min(company.products, 3)).fill('<div class="oc-block p"></div>').join('')}
+            <div class="other-company-board ${isCurrent ? 'current-turn' : ''}">
+                <div class="board-title-mini">${company.name} <span style="color: #4ade80;">¥${company.cash}</span></div>
+
+                <!-- 生産フロー -->
+                <div class="production-flow-mini">
+                    <div class="flow-box-mini">
+                        <div class="flow-box-title-mini">材料</div>
+                        <div class="flow-box-content-mini">${materialsHtml || '-'}</div>
+                    </div>
+                    <div class="flow-box-mini factory">
+                        <div class="flow-box-title-mini">仕掛</div>
+                        <div class="flow-box-content-mini">${wipHtml || '-'}</div>
+                    </div>
+                    <div class="flow-box-mini">
+                        <div class="flow-box-title-mini">製品</div>
+                        <div class="flow-box-content-mini">${productsHtml || '-'}</div>
+                    </div>
+                </div>
+
+                <!-- 人員・機械 -->
+                <div class="personnel-row-mini">
+                    <div class="personnel-box-mini">
+                        <div class="personnel-box-title-mini">W</div>
+                        <div class="personnel-dots-mini">${workersHtml || '-'}</div>
+                    </div>
+                    <div class="personnel-box-mini">
+                        <div class="personnel-box-title-mini">機</div>
+                        <div class="personnel-dots-mini">${machinesHtml || '-'}</div>
+                    </div>
+                    <div class="personnel-box-mini">
+                        <div class="personnel-box-title-mini">S</div>
+                        <div class="personnel-dots-mini">${salesmenHtml || '-'}</div>
+                    </div>
+                </div>
+
+                <!-- チップ -->
+                <div class="chips-row-mini">
+                    <div class="chip-box-mini" title="研究">${researchHtml || '-'}</div>
+                    <div class="chip-box-mini" title="教育">${educationHtml || '-'}</div>
+                    <div class="chip-box-mini" title="広告">${advertisingHtml || '-'}</div>
+                    <div class="chip-box-mini" title="PC">${computerHtml || '-'}</div>
+                    <div class="chip-box-mini" title="保険">${insuranceHtml || '-'}</div>
                 </div>
             </div>
         `;
@@ -2996,13 +3094,13 @@ function renderOtherCompanies() {
     let rightHtml = '';
 
     others.forEach((company, idx) => {
-        const card = createCompanyCard(company, idx);
+        const board = createCompanyBoard(company, idx);
         if (idx < 2) {
-            topHtml += card;  // A社、B社
+            topHtml += board;  // A社、B社
         } else if (idx === 2) {
-            leftHtml += card;  // C社
+            leftHtml += board;  // C社
         } else {
-            rightHtml += card;  // D社、E社
+            rightHtml += board;  // D社、E社
         }
     });
 
