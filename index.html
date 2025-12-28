@@ -1504,9 +1504,14 @@ function getManufacturingCapacity(company) {
 
 // Calculate sales capacity
 function getSalesCapacity(company) {
+    // セールスマン0人なら販売能力0（教育チップがあっても無効）
+    if (company.salesmen === 0) {
+        return 0;
+    }
+
     // セールスマン×2
     const baseCapacity = company.salesmen * 2;
-    
+
     // 広告チップ効果
     let adBonus = 0;
     if (company.type === 'ai' || company.type === 'player') {
@@ -1514,17 +1519,17 @@ function getSalesCapacity(company) {
         // ただしセールスマン1人あたり最大2枚まで
         adBonus = Math.min(company.chips.advertising * 2, company.salesmen * 2 * 2);
     }
-    
+
     // 基本販売能力
     let salesCapacity = baseCapacity + adBonus;
-    
-    // 教育チップで販売能力自体に+1（2期は最大1）
+
+    // 教育チップで販売能力+1（セールスマンがいる場合のみ）
     let educationBonus = company.chips.education || 0;
     if (gameState.currentPeriod === 2 && educationBonus > 1) {
         educationBonus = 1;  // 2期は教育チップ2枚でも効果は1
     }
     salesCapacity += educationBonus;
-    
+
     return salesCapacity;
 }
 
@@ -2617,32 +2622,32 @@ function applyRiskCard(cardId) {
             alert('社長、病気で倒れる！\n1回休み');
             rowUsed = false;
             break;
-        case 61: // 不良在庫発生
+        case 61: // 不良在庫発生（保険対象外）
         case 62:
             let totalInventory = company.materials + company.wip + company.products;
             if (totalInventory > 20) {
                 let excess = totalInventory - 20;
-                let compensation = 0;
-                // 製品から順に処理
+                let lostValue = 0;
+                // 製品から順に処理（保険金なし）
                 if (company.products > 0 && excess > 0) {
                     const remove = Math.min(company.products, excess);
                     company.products -= remove;
-                    compensation += remove * 10;
+                    lostValue += remove * 15;  // 製品1個=15円
                     excess -= remove;
                 }
                 if (company.wip > 0 && excess > 0) {
                     const remove = Math.min(company.wip, excess);
                     company.wip -= remove;
-                    compensation += remove * 10;
+                    lostValue += remove * 14;  // 仕掛品1個=14円
                     excess -= remove;
                 }
                 if (company.materials > 0 && excess > 0) {
                     const remove = Math.min(company.materials, excess);
                     company.materials -= remove;
-                    compensation += remove * 10;
+                    lostValue += remove * 13;  // 材料1個=13円
                 }
-                company.cash += compensation;
-                alert(`不良在庫発生！\n総在庫20個超過分をストッカーへ\n保険金¥${compensation}を受け取りました`);
+                company.specialLoss = (company.specialLoss || 0) + lostValue;
+                alert(`不良在庫発生！\n総在庫20個超過分をストッカーへ\n特別損失: ¥${lostValue}（保険対象外）`);
             } else {
                 alert('不良在庫発生！\n（総在庫が20個以下のため効果なし）');
                 rowUsed = false;
@@ -6748,30 +6753,30 @@ function applyRiskCardToAI(company, card) {
             company.skipTurns = 1;
             rowUsed = false;
             break;
-        case 61: // 不良在庫発生
+        case 61: // 不良在庫発生（保険対象外）
         case 62:
             let totalInv = company.materials + company.wip + company.products;
             if (totalInv > 20) {
                 let excess = totalInv - 20;
-                let comp = 0;
+                let lostVal = 0;
                 if (company.products > 0 && excess > 0) {
                     const remove = Math.min(company.products, excess);
                     company.products -= remove;
-                    comp += remove * 10;
+                    lostVal += remove * 15;
                     excess -= remove;
                 }
                 if (company.wip > 0 && excess > 0) {
                     const remove = Math.min(company.wip, excess);
                     company.wip -= remove;
-                    comp += remove * 10;
+                    lostVal += remove * 14;
                     excess -= remove;
                 }
                 if (company.materials > 0 && excess > 0) {
                     const remove = Math.min(company.materials, excess);
                     company.materials -= remove;
-                    comp += remove * 10;
+                    lostVal += remove * 13;
                 }
-                company.cash += comp;
+                company.specialLoss = (company.specialLoss || 0) + lostVal;
             }
             break;
         case 63: // 機械故障
