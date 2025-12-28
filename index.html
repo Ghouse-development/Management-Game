@@ -6,18 +6,18 @@
     <title>MG (Management Game) - Ultimate Edition</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #1a1a2e; min-height: 100vh; color: #fff; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; min-height: 100vh; color: #333; }
         .container { max-width: 100%; margin: 0 auto; padding: 8px; }
 
         /* ============================================ */
         /* ヘッダー - ゲーム情報 */
         /* ============================================ */
-        .header { background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%); border-radius: 8px; padding: 10px 15px; margin-bottom: 10px; }
+        .header { background: #fff; border: 2px solid #1e40af; border-radius: 8px; padding: 10px 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .period-info { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
-        .info-item { background: rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 20px; display: flex; gap: 8px; align-items: center; }
-        .info-label { font-size: 11px; color: #888; }
-        .info-value { font-size: 14px; font-weight: bold; color: #4ade80; }
-        .info-value.negative { color: #f87171; }
+        .info-item { background: #e0f2fe; padding: 6px 12px; border-radius: 20px; display: flex; gap: 8px; align-items: center; border: 1px solid #0284c7; }
+        .info-label { font-size: 11px; color: #0369a1; }
+        .info-value { font-size: 14px; font-weight: bold; color: #0f766e; }
+        .info-value.negative { color: #dc2626; }
 
         /* ============================================ */
         /* ゲームエリアレイアウト（市場中央、他社周囲） */
@@ -53,33 +53,90 @@
             gap: 8px;
         }
 
-        /* 他社カード（小さく表示） */
-        .other-company-mini {
-            background: rgba(255,255,255,0.08);
-            border-radius: 6px;
-            padding: 6px 8px;
-            font-size: 10px;
-            min-width: 80px;
+        /* 他社会社盤（フル表示 - 青いデザイン統一） */
+        .other-company-board {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 11px;
+            min-width: 140px;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .other-company-board.current-turn {
+            border-color: #fbbf24;
+            box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+        }
+        .other-company-board .oc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+        }
+        .other-company-board .oc-name { font-weight: bold; font-size: 12px; color: #fbbf24; }
+        .other-company-board .oc-cash { font-weight: bold; color: #4ade80; }
+        .other-company-board .oc-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+        .other-company-board .oc-stat {
+            background: rgba(255,255,255,0.15);
+            padding: 3px;
+            border-radius: 4px;
             text-align: center;
+            font-size: 10px;
+        }
+        .other-company-board .oc-stat-label { color: #93c5fd; }
+        .other-company-board .oc-stat-value { font-weight: bold; color: #fff; }
+        .other-company-board .oc-inv {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .other-company-board .oc-block {
+            width: 12px; height: 12px;
+            border-radius: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .other-company-board .oc-block.m { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+        .other-company-board .oc-block.w { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
+        .other-company-board .oc-block.p { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+
+        /* 他社ミニカード（コンパクト表示） */
+        .other-company-mini {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 11px;
+            min-width: 80px;
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
         .other-company-mini.current-turn {
-            background: rgba(251, 191, 36, 0.2);
-            border: 1px solid #fbbf24;
+            border-color: #fbbf24;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
         }
-        .other-company-mini .oc-name { font-weight: bold; font-size: 11px; }
-        .other-company-mini .oc-cash { color: #4ade80; font-size: 10px; }
+        .other-company-mini .oc-name { font-weight: bold; font-size: 11px; color: #fbbf24; margin-bottom: 2px; }
+        .other-company-mini .oc-cash { font-weight: bold; color: #4ade80; font-size: 12px; margin-bottom: 4px; }
         .other-company-mini .oc-inv {
             display: flex;
             gap: 2px;
             justify-content: center;
-            margin-top: 3px;
+            flex-wrap: wrap;
         }
         .other-company-mini .oc-block {
-            width: 8px; height: 8px;
+            width: 10px; height: 10px;
             border-radius: 2px;
         }
         .other-company-mini .oc-block.m { background: #7c3aed; }
-        .other-company-mini .oc-block.w { background: #8b5cf6; }
+        .other-company-mini .oc-block.w { background: #a855f7; }
         .other-company-mini .oc-block.p { background: #6366f1; }
 
         /* 手元エリア（プレイヤーの会社盤） */
@@ -92,7 +149,8 @@
 
         /* 次繰盤 */
         .next-period-board {
-            background: linear-gradient(135deg, #581c87 0%, #6b21a8 100%);
+            background: #faf5ff;
+            border: 2px solid #9333ea;
             border-radius: 8px;
             padding: 8px;
             margin-top: 10px;
@@ -105,25 +163,28 @@
             gap: 12px;
             justify-content: center;
             font-size: 12px;
+            color: #581c87;
         }
         .next-chip-item {
-            background: rgba(255,255,255,0.1);
+            background: #e9d5ff;
             padding: 4px 10px;
             border-radius: 12px;
+            border: 1px solid #a855f7;
         }
 
         /* ============================================ */
-        /* カードを引くボタン（市場盤の上） */
+        /* カードデッキ（実際のカードデザイン） */
         /* ============================================ */
         .card-draw-section {
-            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+            background: #fff;
+            border: 3px solid #059669;
             border-radius: 12px;
             padding: 15px;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
         .draw-card-btn {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
             color: white;
             border: none;
             padding: 20px 40px;
@@ -131,52 +192,56 @@
             font-weight: bold;
             border-radius: 12px;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
             transition: transform 0.2s, box-shadow 0.2s;
         }
-        .draw-card-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5); }
+        .draw-card-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(5, 150, 105, 0.5); }
         .draw-card-btn:active { transform: translateY(0); }
-        .turn-info { margin-top: 10px; font-size: 14px; color: #a7f3d0; }
+        .turn-info { margin-top: 10px; font-size: 14px; color: #059669; font-weight: bold; }
 
         /* ============================================ */
-        /* 会社盤（物理盤風デザイン） */
+        /* 会社盤（物理盤風デザイン - 青い盤） */
         /* ============================================ */
         .company-board {
-            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #2563eb 100%);
             border-radius: 12px;
             padding: 12px;
-            color: #1e293b;
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3), inset 0 2px 10px rgba(255,255,255,0.1);
+            border: 3px solid #1e40af;
         }
         .board-title {
             text-align: center;
             font-size: 16px;
             font-weight: bold;
             padding: 5px;
-            background: #1e40af;
-            color: white;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1e293b;
             border-radius: 6px;
             margin-bottom: 10px;
+            text-shadow: none;
         }
 
-        /* 生産フロー */
+        /* 生産フロー（材料倉庫→工場→営業所） */
         .production-flow {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 8px;
             margin-bottom: 10px;
+            position: relative;
         }
         .flow-box {
-            background: white;
-            border: 2px solid #3b82f6;
+            background: rgba(255,255,255,0.95);
+            border: 3px solid #fbbf24;
             border-radius: 8px;
             padding: 8px;
             text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        .flow-box.factory { background: #dbeafe; }
-        .flow-box-title { font-size: 11px; color: #64748b; margin-bottom: 5px; }
+        .flow-box.factory { background: rgba(219,234,254,0.95); border-color: #60a5fa; }
+        .flow-box-title { font-size: 11px; color: #1e293b; margin-bottom: 5px; font-weight: bold; }
         .flow-box-content { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; min-height: 30px; }
-        .flow-arrow { display: flex; align-items: center; justify-content: center; font-size: 20px; color: #3b82f6; }
+        .flow-arrow { display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fbbf24; }
 
         /* 在庫ブロック */
         .inv-block {
@@ -196,13 +261,14 @@
             margin-bottom: 10px;
         }
         .personnel-box {
-            background: white;
-            border: 2px solid #64748b;
+            background: rgba(255,255,255,0.95);
+            border: 2px solid #fbbf24;
             border-radius: 8px;
             padding: 8px;
             text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
-        .personnel-box-title { font-size: 10px; color: #64748b; margin-bottom: 4px; }
+        .personnel-box-title { font-size: 10px; color: #1e293b; margin-bottom: 4px; font-weight: bold; }
         .personnel-dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
         .person-dot {
             width: 24px; height: 24px;
@@ -228,12 +294,14 @@
             gap: 6px;
         }
         .chip-box {
-            background: white;
+            background: rgba(255,255,255,0.95);
             border-radius: 6px;
             padding: 6px;
             text-align: center;
+            border: 2px solid rgba(251,191,36,0.5);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .chip-box-title { font-size: 9px; color: #64748b; margin-bottom: 3px; }
+        .chip-box-title { font-size: 9px; color: #1e293b; margin-bottom: 3px; font-weight: bold; }
         .chip-dots { display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; }
         .chip { width: 18px; height: 18px; border-radius: 50%; }
         .chip.research { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
@@ -243,32 +311,50 @@
         .chip.insurance { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
 
         /* ============================================ */
-        /* 市場盤 */
+        /* 市場盤（六角形デザイン） */
         /* ============================================ */
         .markets-board {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            border-radius: 12px;
-            padding: 12px;
-        }
-        .markets-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-        }
-        .market-tile {
-            background: linear-gradient(135deg, #047857 0%, #065f46 100%);
-            border-radius: 8px;
-            padding: 8px;
-            text-align: center;
+            background: linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            padding: 30px 20px;
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             position: relative;
         }
-        .market-tile.closed { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); opacity: 0.6; }
-        .market-name { font-size: 12px; font-weight: bold; color: white; }
-        .market-prices { display: flex; justify-content: center; gap: 6px; margin: 4px 0; }
+        .markets-board::before {
+            content: '';
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            background: linear-gradient(180deg, #065f46 0%, #047857 100%);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            z-index: -1;
+        }
+        .markets-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px;
+            max-width: 100%;
+        }
+        .market-tile {
+            background: #fff;
+            border: 2px solid #047857;
+            border-radius: 8px;
+            padding: 6px 8px;
+            text-align: center;
+            min-width: 70px;
+        }
+        .market-tile.closed { background: #d1d5db; border-color: #6b7280; opacity: 0.7; }
+        .market-name { font-size: 11px; font-weight: bold; color: #065f46; }
+        .market-prices { display: flex; justify-content: center; gap: 4px; margin: 3px 0; }
         .price-badge {
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 11px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-size: 10px;
             font-weight: bold;
         }
         .price-badge.buy { background: #22c55e; color: white; }
@@ -286,16 +372,17 @@
         .stock-cube { width: 14px; height: 14px; background: #a78bfa; border-radius: 2px; }
 
         /* ============================================ */
-        /* 固定費内訳パネル */
+        /* F（固定費）内訳パネル */
         /* ============================================ */
         .fixed-cost-panel {
             background: linear-gradient(135deg, #7c2d12 0%, #9a3412 100%);
             border-radius: 12px;
             padding: 12px;
+            color: #fff;
         }
         .panel-title { font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #fed7aa; }
-        .cost-breakdown { font-size: 12px; }
-        .cost-item { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .cost-breakdown { font-size: 12px; color: #fef3c7; }
+        .cost-item { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); color: #fef3c7; }
         .cost-item:last-child { border-bottom: none; }
         .cost-total { font-weight: bold; color: #fbbf24; margin-top: 5px; padding-top: 5px; border-top: 2px solid rgba(255,255,255,0.3); }
 
@@ -648,9 +735,9 @@
                 </div>
             </div>
 
-            <!-- 固定費内訳パネル -->
+            <!-- F内訳パネル -->
             <div class="fixed-cost-panel">
-                <div class="panel-title">固定費内訳</div>
+                <div class="panel-title">F内訳</div>
                 <div class="cost-breakdown" id="fixedCostBreakdown"></div>
             </div>
 
@@ -2873,7 +2960,7 @@ function renderFixedCostBreakdown(company) {
         <div class="cost-item"><span>期中最大(${maxPersonnel}×${halfCost})</span><span>¥${maxPersonnelCost}</span></div>
         <div class="cost-item"><span>減価償却</span><span>¥${depreciationCost}</span></div>
         ${extraLabor > 0 ? `<div class="cost-item"><span>その他人件費</span><span>¥${extraLabor}</span></div>` : ''}
-        <div class="cost-item cost-total"><span>固定費合計</span><span>¥${totalFixed}</span></div>
+        <div class="cost-item cost-total"><span>F合計</span><span>¥${totalFixed}</span></div>
     `;
     document.getElementById('fixedCostBreakdown').innerHTML = html;
 }
@@ -4075,7 +4162,7 @@ function showFinancialDetails(companyIndex) {
             <div class="breakdown-item breakdown-total"><span>【MQ：付加価値総額】</span><span>¥${mq}</span></div>
             <div class="breakdown-item" style="font-size: 11px; color: #28a745;"><span>　MQ = PQ - VQ</span><span>¥${pq} - ¥${vq}</span></div>
             
-            <div class="breakdown-item breakdown-total"><span>【F：固定費】</span><span>¥${fixedCosts}</span></div>
+            <div class="breakdown-item breakdown-total"><span>【F】</span><span>¥${fixedCosts}</span></div>
             <div class="breakdown-item" style="font-size: 11px;"><span>　給料</span><span>¥${calculateSalaryCost(company, gameState.currentPeriod)}</span></div>
             <div class="breakdown-item" style="font-size: 11px;"><span>　チップ費用</span><span>¥${calculateChipCost(company, gameState.currentPeriod)}</span></div>
             <div class="breakdown-item" style="font-size: 11px;"><span>　減価償却費</span><span>¥${calculateDepreciation(company, gameState.currentPeriod)}</span></div>
