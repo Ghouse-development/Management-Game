@@ -912,16 +912,21 @@ function handleCashShortage(company, neededAmount) {
     return { materialsSold, materialRevenue, loanAmount };
 }
 
-// Initialize companies
+// Initialize companies (6人: プレイヤー1人 + AI 5人、ランダム戦略)
 function initializeCompanies() {
+    // AI戦略をランダムに選択
+    const strategies = ['aggressive', 'balanced', 'conservative', 'price_focused', 'tech_focused', 'unpredictable'];
+    const shuffledStrategies = strategies.sort(() => Math.random() - 0.5);
+
+    const companyNames = ['A社', 'B社', 'C社', 'D社', 'E社'];
+
     const companyTypes = [
         {name: 'あなた', type: 'player', strategy: 'player'},
-        {name: 'アグレス社', type: 'ai', strategy: 'aggressive'},     // 積極的：生産・販売重視、戦略チップ積極購入
-        {name: 'バランス社', type: 'ai', strategy: 'balanced'},       // バランス型：全体的に平均的
-        {name: '堅実社', type: 'ai', strategy: 'conservative'},       // 保守的：リスク回避、現金重視
-        {name: '価格破壊社', type: 'ai', strategy: 'price_focused'},  // 価格競争：低価格入札重視  
-        {name: 'テクノ社', type: 'ai', strategy: 'tech_focused'},     // 技術重視：機械・チップ投資積極的
-        {name: '奇策社', type: 'ai', strategy: 'unpredictable'}       // 予測不能：ランダムな戦略、意外な行動
+        ...companyNames.map((name, i) => ({
+            name: name,
+            type: 'ai',
+            strategy: shuffledStrategies[i % shuffledStrategies.length]
+        }))
     ];
     
     gameState.companies = companyTypes.map(ct => ({
@@ -2985,19 +2990,19 @@ function renderOtherCompanies() {
         `;
     }
 
-    // 6社を上3・左1・右2に配置
+    // 5社を上2・左1・右2に配置
     let topHtml = '';
     let leftHtml = '';
     let rightHtml = '';
 
     others.forEach((company, idx) => {
         const card = createCompanyCard(company, idx);
-        if (idx < 3) {
-            topHtml += card;
-        } else if (idx === 3) {
-            leftHtml += card;
+        if (idx < 2) {
+            topHtml += card;  // A社、B社
+        } else if (idx === 2) {
+            leftHtml += card;  // C社
         } else {
-            rightHtml += card;
+            rightHtml += card;  // D社、E社
         }
     });
 
