@@ -1,0 +1,13 @@
+# Credentials and sensitive files
+credentials.txt
+
+# Development notes
+*.md
+!README.md
+
+# Reference materials
+sankoushiryou/
+
+# OS files
+.DS_Store
+Thumbs.db
