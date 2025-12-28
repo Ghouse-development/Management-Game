@@ -257,9 +257,29 @@
             background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
             color: #1e293b;
             border-radius: 6px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-shadow: none;
         }
+        /* 能力サマリー（製造・販売・価格競争力） */
+        .capacity-summary {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .capacity-item {
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            padding: 6px 12px;
+            text-align: center;
+            min-width: 60px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .capacity-item.mfg { border: 3px solid #f97316; }
+        .capacity-item.sales { border: 3px solid #ec4899; }
+        .capacity-item.price { border: 3px solid #3b82f6; }
+        .capacity-label { display: block; font-size: 10px; color: #64748b; font-weight: bold; }
+        .capacity-value { display: block; font-size: 18px; font-weight: bold; color: #1e293b; }
 
         /* 生産フロー（材料倉庫→工場→営業所） */
         .production-flow {
@@ -724,6 +744,22 @@
             <div class="company-board" id="companyBoard">
                 <div class="board-title">会社盤 - <span id="companyName">あなた</span></div>
 
+                <!-- 能力サマリー -->
+                <div class="capacity-summary" id="capacitySummary">
+                    <div class="capacity-item mfg">
+                        <span class="capacity-label">製造</span>
+                        <span class="capacity-value" id="mfgCapacityDisplay">1</span>
+                    </div>
+                    <div class="capacity-item sales">
+                        <span class="capacity-label">販売</span>
+                        <span class="capacity-value" id="salesCapacityDisplay">2</span>
+                    </div>
+                    <div class="capacity-item price">
+                        <span class="capacity-label">価格</span>
+                        <span class="capacity-value" id="priceCompDisplay">+0</span>
+                    </div>
+                </div>
+
                 <!-- 生産フロー -->
                 <div class="production-flow">
                     <div class="flow-box">
@@ -964,7 +1000,7 @@ function initializeCompanies() {
     const strategies = ['aggressive', 'balanced', 'conservative', 'price_focused', 'tech_focused', 'unpredictable'];
     const shuffledStrategies = strategies.sort(() => Math.random() - 0.5);
 
-    const companyNames = ['A社', 'B社', 'C社', 'D社', 'E社'];
+    const companyNames = ['青山商事', '鈴木産業', '田中製作所', '山本工業', '佐藤物産'];
 
     const companyTypes = [
         {name: 'あなた', type: 'player', strategy: 'player'},
@@ -2913,6 +2949,14 @@ function updateDisplay() {
 
 // 会社盤を描画
 function renderCompanyBoard(company) {
+    // 能力サマリーを更新
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const priceComp = getPriceCompetitiveness(company, 0);
+    document.getElementById('mfgCapacityDisplay').textContent = mfgCapacity;
+    document.getElementById('salesCapacityDisplay').textContent = salesCapacity;
+    document.getElementById('priceCompDisplay').textContent = '+' + priceComp;
+
     // 材料
     const materialsHtml = Array(company.materials).fill('<div class="inv-block material"></div>').join('');
     document.getElementById('materialsDisplay').innerHTML = materialsHtml || '<span style="color:#999;font-size:10px;">0</span>';
