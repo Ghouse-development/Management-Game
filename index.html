@@ -255,18 +255,37 @@
             border: 4px solid #1e4a7a;
             position: relative;
         }
-        .board-title {
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            padding: 6px 20px;
-            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
-            color: #1e3a5f;
-            border-radius: 4px;
-            margin-bottom: 12px;
-            border: 2px solid #1e4a7a;
-            letter-spacing: 3px;
+        /* 情報バー（期数・行数・現金・F・自己資本） */
+        .board-info-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: linear-gradient(180deg, #1e3a5f 0%, #172554 100%);
+            border-radius: 8px;
+            border: 2px solid #3b82f6;
         }
+        .info-badge {
+            flex: 1;
+            text-align: center;
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: linear-gradient(180deg, #fff 0%, #e5e7eb 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .info-badge.period { background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #3b82f6; }
+        .info-badge.row { background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%); border: 2px solid #22c55e; }
+        .info-badge.cash { background: linear-gradient(180deg, #fef9c3 0%, #fef08a 100%); border: 2px solid #eab308; }
+        .info-badge.fixed-cost { background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%); border: 2px solid #ef4444; cursor: pointer; transition: transform 0.1s; }
+        .info-badge.fixed-cost:hover { transform: scale(1.05); box-shadow: 0 4px 8px rgba(239,68,68,0.3); }
+        .info-badge.equity { background: linear-gradient(180deg, #e9d5ff 0%, #d8b4fe 100%); border: 2px solid #a855f7; }
+        .info-badge-label { display: block; font-size: 9px; color: #374151; font-weight: bold; }
+        .info-badge-value { display: block; font-size: 16px; font-weight: bold; color: #1f2937; }
+        .info-badge.cash .info-badge-value { color: #854d0e; }
+        .info-badge.fixed-cost .info-badge-value { color: #b91c1c; }
+        .info-badge.equity .info-badge-value { color: #6b21a8; }
+
         /* 能力サマリー（製造・販売・価格競争力） */
         .capacity-summary {
             display: flex;
@@ -495,7 +514,7 @@
         .market-tile.sendai { top: 20%; left: 5%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
         .market-tile.closed { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; border-color: #6b7280 !important; opacity: 0.7; }
         .market-tile.closed .market-name { color: #9ca3af; text-decoration: line-through; }
-        .market-name { font-size: 13px; font-weight: bold; color: #fff; margin-bottom: 4px; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .market-name { font-size: 14px; font-weight: bold; color: #fef08a; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5); }
         .market-prices { display: flex; justify-content: center; gap: 4px; margin: 4px 0; }
         .price-badge {
             width: 24px;
@@ -641,26 +660,76 @@
         .card-choice-container { text-align: center; padding: 20px; }
         .card-choice-btn { margin: 10px; padding: 20px 40px; font-size: 18px; border-radius: 10px; }
         
-        /* モーダル（見やすく改善） */
-        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
-        .modal.active { display: flex; }
-        .modal-content { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-radius: 16px; padding: 24px; max-width: 480px; width: 92%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); border: 3px solid #1e40af; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #1e40af; }
-        .modal-title { font-size: 20px; font-weight: bold; color: #1e40af; }
-        .close-btn { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3); transition: transform 0.2s; }
-        .close-btn:hover { transform: scale(1.05); }
-        .form-group { margin-bottom: 18px; }
-        .form-label { display: block; margin-bottom: 8px; font-size: 15px; font-weight: bold; color: #1e293b; }
-        .form-control { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 8px; font-size: 16px; background: #fff; }
-        .form-control:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
-        .submit-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; border-radius: 10px; font-size: 17px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3); transition: transform 0.2s; }
-        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); }
-        
-        /* 内訳表示 */
-        .breakdown-list { background: #f8f9fa; border-radius: 4px; padding: 10px; margin-top: 10px; font-size: 13px; }
-        .breakdown-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #dee2e6; }
-        .breakdown-item:last-child { border-bottom: none; }
-        .breakdown-total { font-weight: bold; color: #dc3545; padding-top: 8px; border-top: 2px solid #dee2e6; }
+        /* モーダル（リッチなデザイン） */
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal.active { display: flex; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content {
+            background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+            border-radius: 20px;
+            padding: 0;
+            max-width: 500px;
+            width: 94%;
+            max-height: 85vh;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+        }
+        .modal-title { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .modal-body { padding: 24px; overflow-y: auto; max-height: calc(85vh - 140px); }
+        .close-btn { background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.2s; }
+        .close-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 10px; font-size: 15px; font-weight: bold; color: #1e293b; }
+        .form-control { width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 16px; background: #fff; transition: all 0.2s; }
+        .form-control:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.15); }
+        .submit-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4); transition: all 0.2s; }
+        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(5, 150, 105, 0.5); }
+        .submit-btn:active { transform: translateY(0); }
+
+        /* アクションボタン（カード風） */
+        .action-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 15px; }
+        .action-card {
+            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .action-card:hover { border-color: #3b82f6; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(59,130,246,0.2); }
+        .action-card-icon { font-size: 28px; margin-bottom: 8px; }
+        .action-card-title { font-weight: bold; color: #1e293b; font-size: 14px; }
+        .action-card-desc { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+        /* 内訳表示（改善） */
+        .breakdown-list { background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 16px; margin-top: 15px; border: 2px solid #e2e8f0; }
+        .breakdown-item { display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; background: #fff; }
+        .breakdown-item:last-child { margin-bottom: 0; }
+        .breakdown-item-label { color: #475569; font-weight: 500; }
+        .breakdown-item-value { color: #1e293b; font-weight: bold; }
+        .breakdown-total { font-weight: bold; color: #dc2626; padding: 12px; margin-top: 10px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 10px; display: flex; justify-content: space-between; border: 2px solid #fca5a5; }
+
+        /* AI行動表示 */
+        .ai-action-display {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: 12px;
+            padding: 16px;
+            color: #fff;
+            margin-bottom: 15px;
+        }
+        .ai-action-header { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
+        .ai-action-content { font-size: 16px; font-weight: bold; }
         
         /* 意思決定カード */
         .decision-card { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0; }
@@ -775,28 +844,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- ヘッダー：ゲーム情報 -->
-        <div class="header">
-            <div class="period-info">
-                <div class="info-item">
-                    <span class="info-label">期</span>
-                    <span class="info-value" id="currentPeriod">2</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">行</span>
-                    <span class="info-value" id="currentRow">1/20</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">現金</span>
-                    <span class="info-value" id="playerCash">¥137</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">自己資本</span>
-                    <span class="info-value" id="equity">¥283</span>
-                </div>
-            </div>
-        </div>
-
         <!-- ゲームエリア：市場盤中央、他社周囲 -->
         <div class="game-area">
             <!-- 上部：他社（1-3） -->
@@ -832,7 +879,29 @@
         <div class="player-area">
             <!-- 会社盤（大きく表示） -->
             <div class="company-board" id="companyBoard">
-                <div class="board-title">会社盤 - <span id="companyName">あなた</span></div>
+                <!-- 情報バー -->
+                <div class="board-info-bar">
+                    <div class="info-badge period">
+                        <span class="info-badge-label">期</span>
+                        <span class="info-badge-value" id="currentPeriod">2</span>
+                    </div>
+                    <div class="info-badge row">
+                        <span class="info-badge-label">行</span>
+                        <span class="info-badge-value" id="currentRow">2/20</span>
+                    </div>
+                    <div class="info-badge cash">
+                        <span class="info-badge-label">現金</span>
+                        <span class="info-badge-value" id="playerCash">¥112</span>
+                    </div>
+                    <div class="info-badge fixed-cost" onclick="showFixedCostModal()">
+                        <span class="info-badge-label">F</span>
+                        <span class="info-badge-value" id="fixedCostDisplay">¥0</span>
+                    </div>
+                    <div class="info-badge equity">
+                        <span class="info-badge-label">自己資本</span>
+                        <span class="info-badge-value" id="equity">¥283</span>
+                    </div>
+                </div>
 
                 <!-- 能力サマリー -->
                 <div class="capacity-summary" id="capacitySummary">
@@ -1109,15 +1178,16 @@ function initializeCompanies() {
         }))
     ];
     
+    // 2期開始: 137円 → 期首処理（コンピュータ20円+保険5円=25円）→ 112円で2行目スタート
     gameState.companies = companyTypes.map(ct => ({
         name: ct.name,
         type: ct.type,
         strategy: ct.strategy || ct.type,  // strategyまたはtypeを使用
-        cash: 137,  // 2期開始時の現金（期初処理前）
+        cash: 112,  // 2期開始時の現金（期首処理後: 137-25=112）
         equity: 283,
         loans: 0,
         shortLoans: 0,
-        currentRow: 1,  // 各社の現在の行数
+        currentRow: 2,  // 期首処理で1行使用済み、2行目からスタート
         materials: 1,  // 2期開始時の初期在庫
         wip: 2,         // 2期開始時の初期在庫
         products: 1,    // 2期開始時の初期在庫
@@ -1127,8 +1197,8 @@ function initializeCompanies() {
         warehouses: 0,  // 無災害倉庫の数
         warehouseLocation: 'materials',  // 'materials' or 'products'
         chips: {
-            computer: 0,
-            insurance: 0,
+            computer: 1,  // 期首処理で購入済み
+            insurance: 1, // 期首処理で購入済み
             research: 0,
             education: 0,
             advertising: 0
@@ -1350,6 +1420,11 @@ function calculateChipCost(company, period) {
     }
     
     return cost;
+}
+
+// Calculate fixed costs total (固定費合計 - 簡易表示用)
+function calculateFixedCostTotal(company, period) {
+    return calculateFixedCost(company);
 }
 
 // Calculate fixed costs (固定費) - 税金除外
@@ -3047,6 +3122,16 @@ function updateDisplay() {
 
 // 会社盤を描画
 function renderCompanyBoard(company) {
+    // 情報バーを更新
+    document.getElementById('currentPeriod').textContent = gameState.currentPeriod;
+    document.getElementById('currentRow').textContent = `${company.currentRow}/${gameState.maxRows}`;
+    document.getElementById('playerCash').textContent = `¥${company.cash}`;
+    document.getElementById('equity').textContent = `¥${company.equity}`;
+
+    // 固定費を計算して表示
+    const fixedCost = calculateFixedCostTotal(company, gameState.currentPeriod);
+    document.getElementById('fixedCostDisplay').textContent = `¥${fixedCost}`;
+
     // 能力サマリーを更新
     const mfgCapacity = getManufacturingCapacity(company);
     const salesCapacity = getSalesCapacity(company);
@@ -3297,13 +3382,93 @@ function showModal(title, content) {
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title">${title}</h3>
-                    <button class="close-btn" onclick="closeModal(true)">戻る</button>
+                    <button class="close-btn" onclick="closeModal(true)">✕ 閉じる</button>
                 </div>
-                ${content}
+                <div class="modal-body">
+                    ${content}
+                </div>
             </div>
         </div>
     `;
     document.getElementById('modalContainer').innerHTML = modalHtml;
+}
+
+// 固定費内訳モーダル表示
+function showFixedCostModal() {
+    const company = gameState.companies[0];
+    const period = gameState.currentPeriod;
+    const baseCost = {2: 22, 3: 24, 4: 26, 5: 28};
+    let unitCost = baseCost[period] || 22;
+
+    if (period >= 3 && gameState.diceRoll) {
+        const multiplier = gameState.diceRoll <= 3 ? 1.1 : 1.2;
+        unitCost = Math.round(baseCost[period] * multiplier);
+    }
+
+    const halfCost = Math.round(unitCost / 2);
+    const machineCount = company.machines.length;
+    const effectiveWorkers = company.workers + (company.retiredWorkers || 0) * 0.5;
+    const effectiveSalesmen = company.salesmen + (company.retiredSalesmen || 0) * 0.5;
+    const maxPersonnel = company.maxPersonnel || (company.workers + company.salesmen);
+
+    const machineCost = machineCount * unitCost;
+    const workerCost = Math.round(effectiveWorkers * unitCost);
+    const salesmenCost = Math.round(effectiveSalesmen * unitCost);
+    const maxPersonnelCost = maxPersonnel * halfCost;
+    const salaryCost = machineCost + workerCost + salesmenCost + maxPersonnelCost;
+
+    // 減価償却
+    let depreciationCost = 0;
+    company.machines.forEach(m => {
+        if (period === 2) {
+            depreciationCost += m.type === 'large' ? 20 : 10;
+        } else {
+            if (m.type === 'large') depreciationCost += 40;
+            else depreciationCost += m.attachments > 0 ? 26 : 20;
+        }
+    });
+
+    const extraLabor = company.extraLaborCost || 0;
+    const totalFixed = salaryCost + depreciationCost + extraLabor;
+
+    const content = `
+        <div class="breakdown-list">
+            <div style="font-weight: bold; color: #1e40af; margin-bottom: 12px; font-size: 14px;">給料（単価: ¥${unitCost}）</div>
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">機械 ${machineCount}台 × ¥${unitCost}</span>
+                <span class="breakdown-item-value">¥${machineCost}</span>
+            </div>
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">ワーカー ${effectiveWorkers}人 × ¥${unitCost}</span>
+                <span class="breakdown-item-value">¥${workerCost}</span>
+            </div>
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">セールス ${effectiveSalesmen}人 × ¥${unitCost}</span>
+                <span class="breakdown-item-value">¥${salesmenCost}</span>
+            </div>
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">期中最大 ${maxPersonnel}人 × ¥${halfCost}</span>
+                <span class="breakdown-item-value">¥${maxPersonnelCost}</span>
+            </div>
+            <div style="font-weight: bold; color: #1e40af; margin: 12px 0; font-size: 14px;">その他</div>
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">減価償却</span>
+                <span class="breakdown-item-value">¥${depreciationCost}</span>
+            </div>
+            ${extraLabor > 0 ? `
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">その他人件費</span>
+                <span class="breakdown-item-value">¥${extraLabor}</span>
+            </div>
+            ` : ''}
+            <div class="breakdown-total">
+                <span>F合計</span>
+                <span>¥${totalFixed}</span>
+            </div>
+        </div>
+    `;
+
+    showModal('F（固定費）内訳', content);
 }
 
 function closeModal(returnToDecision = false) {
