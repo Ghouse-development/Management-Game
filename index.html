@@ -53,22 +53,22 @@
             gap: 8px;
         }
 
-        /* 他社会社盤（フル表示 - 青いデザイン統一） */
+        /* 他社会社盤（フル表示 - 実物再現） */
         .other-company-board {
-            background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
-            border: 2px solid #3b82f6;
+            background: linear-gradient(180deg, #4a7bb7 0%, #3a6aa5 100%);
+            border: 3px solid #1e4a7a;
             border-radius: 8px;
             padding: 8px;
             font-size: 11px;
-            min-width: 160px;
-            max-width: 200px;
+            min-width: 170px;
+            max-width: 210px;
             color: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
         }
         .other-company-board.current-turn {
             border-color: #fbbf24;
-            border-width: 3px;
-            box-shadow: 0 0 15px rgba(251, 191, 36, 0.7);
+            border-width: 4px;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
         }
         .other-company-board .oc-header {
             display: flex;
@@ -76,10 +76,10 @@
             align-items: center;
             margin-bottom: 6px;
             padding-bottom: 4px;
-            border-bottom: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 2px solid rgba(255,255,255,0.3);
         }
-        .other-company-board .oc-name { font-weight: bold; font-size: 12px; color: #fbbf24; }
-        .other-company-board .oc-cash { font-weight: bold; color: #4ade80; }
+        .other-company-board .oc-name { font-weight: bold; font-size: 12px; color: #fbbf24; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        .other-company-board .oc-cash { font-weight: bold; color: #4ade80; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
         .other-company-board .oc-stats {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -87,13 +87,13 @@
             margin-bottom: 6px;
         }
         .other-company-board .oc-stat {
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.2);
             padding: 3px;
             border-radius: 4px;
             text-align: center;
             font-size: 10px;
         }
-        .other-company-board .oc-stat-label { color: #93c5fd; }
+        .other-company-board .oc-stat-label { color: #bfdbfe; }
         .other-company-board .oc-stat-value { font-weight: bold; color: #fff; }
         .other-company-board .oc-inv {
             display: flex;
@@ -102,24 +102,26 @@
             flex-wrap: wrap;
         }
         .other-company-board .oc-block {
-            width: 12px; height: 12px;
+            width: 14px; height: 14px;
             border-radius: 2px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
-        .other-company-board .oc-block.m { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
-        .other-company-board .oc-block.w { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
-        .other-company-board .oc-block.p { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+        .other-company-board .oc-block.m { background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); }
+        .other-company-board .oc-block.w { background: linear-gradient(135deg, #a569bd 0%, #9b59b6 100%); border: 1px dashed #c39bd3; }
+        .other-company-board .oc-block.p { background: linear-gradient(135deg, #7d6ee7 0%, #6366f1 100%); }
 
         /* 他社会社盤（フル表示 - コンパクト版） */
         .board-title-mini {
             text-align: center;
             font-size: 11px;
             font-weight: bold;
-            padding: 3px;
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-            color: #1e293b;
-            border-radius: 4px;
+            padding: 4px 8px;
+            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+            color: #1e3a5f;
+            border-radius: 3px;
             margin-bottom: 6px;
+            border: 1px solid #1e4a7a;
+            letter-spacing: 1px;
         }
         .production-flow-mini {
             display: grid;
@@ -128,16 +130,16 @@
             margin-bottom: 6px;
         }
         .flow-box-mini {
-            background: rgba(255,255,255,0.9);
-            border: 2px solid #fbbf24;
+            background: linear-gradient(180deg, #faf5eb 0%, #f5efe5 100%);
+            border: 2px solid #8b7355;
             border-radius: 4px;
-            padding: 3px;
+            padding: 4px 3px;
             text-align: center;
         }
-        .flow-box-mini.factory { background: rgba(219,234,254,0.9); border-color: #60a5fa; }
-        .flow-box-title-mini { font-size: 8px; color: #1e293b; font-weight: bold; }
-        .flow-box-content-mini { display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; min-height: 16px; }
-        .flow-box-content-mini .inv-block { width: 12px; height: 12px; }
+        .flow-box-mini.factory { background: linear-gradient(180deg, #e8f4fd 0%, #d4e8f8 100%); border-color: #4a90c2; }
+        .flow-box-title-mini { font-size: 8px; color: #3d3d3d; font-weight: bold; }
+        .flow-box-content-mini { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; min-height: 18px; align-items: center; }
+        .flow-box-content-mini .inv-block { width: 13px; height: 13px; }
 
         .personnel-row-mini {
             display: grid;
@@ -146,16 +148,18 @@
             margin-bottom: 6px;
         }
         .personnel-box-mini {
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #fbbf24;
+            background: linear-gradient(180deg, #faf5eb 0%, #f5efe5 100%);
+            border: 1px solid #8b7355;
             border-radius: 4px;
-            padding: 2px;
+            padding: 3px;
             text-align: center;
         }
-        .personnel-box-title-mini { font-size: 8px; color: #1e293b; font-weight: bold; }
-        .personnel-dots-mini { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; min-height: 14px; }
-        .personnel-dots-mini .person-dot { width: 14px; height: 14px; font-size: 7px; }
-        .personnel-dots-mini .machine-dot { width: 16px; height: 14px; font-size: 7px; }
+        .personnel-box-title-mini { font-size: 8px; color: #3d3d3d; font-weight: bold; }
+        .personnel-dots-mini { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; min-height: 16px; align-items: center; }
+        .personnel-dots-mini .person-dot { width: 16px; height: 16px; font-size: 7px; }
+        .personnel-dots-mini .person-dot.worker { background: linear-gradient(180deg, #f5deb3 0%, #deb887 100%); color: #5d4037; border: 1px solid #a08060; }
+        .personnel-dots-mini .person-dot.salesman { background: linear-gradient(180deg, #ff6b6b 0%, #ee5a5a 100%); border: 1px solid #c44; }
+        .personnel-dots-mini .machine-dot { width: 18px; height: 16px; font-size: 7px; background: linear-gradient(180deg, #888 0%, #666 100%); border: 1px solid #444; }
 
         .chips-row-mini {
             display: grid;
@@ -163,20 +167,21 @@
             gap: 2px;
         }
         .chip-box-mini {
-            background: rgba(255,255,255,0.9);
+            background: linear-gradient(180deg, #faf5eb 0%, #f5efe5 100%);
+            border: 1px solid #8b7355;
             border-radius: 3px;
-            padding: 2px;
+            padding: 3px 2px;
             text-align: center;
-            min-height: 16px;
+            min-height: 18px;
             display: flex;
             justify-content: center;
             align-items: center;
             flex-wrap: wrap;
-            gap: 1px;
-            font-size: 8px;
-            color: #666;
+            gap: 2px;
+            font-size: 7px;
+            color: #3d3d3d;
         }
-        .chip-box-mini .chip { width: 10px; height: 10px; }
+        .chip-box-mini .chip { width: 12px; height: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
         /* 手元エリア（プレイヤーの会社盤） */
         .player-area {
@@ -239,112 +244,152 @@
         .turn-info { margin-top: 10px; font-size: 14px; color: #059669; font-weight: bold; }
 
         /* ============================================ */
-        /* 会社盤（物理盤風デザイン - 青い盤） */
+        /* 会社盤（物理盤風デザイン - 実物再現） */
         /* ============================================ */
         .company-board {
-            background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #2563eb 100%);
-            border-radius: 12px;
-            padding: 12px;
+            background: linear-gradient(180deg, #4a7bb7 0%, #3a6aa5 50%, #2d5a8a 100%);
+            border-radius: 10px;
+            padding: 15px;
             color: #fff;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3), inset 0 2px 10px rgba(255,255,255,0.1);
-            border: 3px solid #1e40af;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+            border: 4px solid #1e4a7a;
+            position: relative;
         }
         .board-title {
             text-align: center;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            padding: 5px;
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-            color: #1e293b;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            text-shadow: none;
+            padding: 6px 20px;
+            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+            color: #1e3a5f;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            border: 2px solid #1e4a7a;
+            letter-spacing: 3px;
         }
         /* 能力サマリー（製造・販売・価格競争力） */
         .capacity-summary {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 12px;
+            margin-bottom: 12px;
         }
         .capacity-item {
-            background: rgba(255,255,255,0.95);
-            border-radius: 8px;
-            padding: 6px 12px;
+            background: linear-gradient(180deg, #fff 0%, #f5f5f5 100%);
+            border-radius: 6px;
+            padding: 6px 14px;
             text-align: center;
-            min-width: 60px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            min-width: 65px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
-        .capacity-item.mfg { border: 3px solid #f97316; }
-        .capacity-item.sales { border: 3px solid #ec4899; }
-        .capacity-item.price { border: 3px solid #3b82f6; }
+        .capacity-item.mfg { border: 3px solid #f97316; background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%); }
+        .capacity-item.sales { border: 3px solid #ec4899; background: linear-gradient(180deg, #fdf2f8 0%, #fce7f3 100%); }
+        .capacity-item.price { border: 3px solid #3b82f6; background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%); }
         .capacity-label { display: block; font-size: 10px; color: #64748b; font-weight: bold; }
-        .capacity-value { display: block; font-size: 18px; font-weight: bold; color: #1e293b; }
+        .capacity-value { display: block; font-size: 20px; font-weight: bold; color: #1e293b; }
 
         /* 生産フロー（材料倉庫→工場→営業所） */
         .production-flow {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 10px;
-            position: relative;
+            display: flex;
+            align-items: stretch;
+            gap: 4px;
+            margin-bottom: 12px;
         }
         .flow-box {
-            background: rgba(255,255,255,0.95);
-            border: 3px solid #fbbf24;
-            border-radius: 8px;
-            padding: 8px;
+            flex: 1;
+            background: linear-gradient(180deg, #faf5eb 0%, #f5efe5 100%);
+            border: 3px solid #8b7355;
+            border-radius: 6px;
+            padding: 8px 6px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
         }
-        .flow-box.factory { background: rgba(219,234,254,0.95); border-color: #60a5fa; }
-        .flow-box-title { font-size: 11px; color: #1e293b; margin-bottom: 5px; font-weight: bold; }
-        .flow-box-content { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; min-height: 30px; }
-        .flow-arrow { display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fbbf24; }
-
-        /* 在庫ブロック */
-        .inv-block {
-            width: 20px; height: 20px;
+        .flow-box.factory {
+            background: linear-gradient(180deg, #e8f4fd 0%, #d4e8f8 100%);
+            border-color: #4a90c2;
+        }
+        .flow-box-title {
+            font-size: 11px;
+            color: #3d3d3d;
+            margin-bottom: 6px;
+            font-weight: bold;
+            background: rgba(255,255,255,0.7);
+            padding: 2px 6px;
             border-radius: 3px;
             display: inline-block;
         }
-        .inv-block.material { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
-        .inv-block.wip { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border: 2px dashed #a78bfa; }
-        .inv-block.product { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+        .flow-box-content { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; min-height: 35px; align-items: center; }
+        /* フロー矢印 */
+        .flow-arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0 2px;
+            color: #fff;
+        }
+        .flow-arrow-icon {
+            font-size: 24px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .flow-arrow-label {
+            font-size: 9px;
+            background: rgba(255,255,255,0.9);
+            color: #1e3a5f;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-top: 2px;
+            font-weight: bold;
+        }
+
+        /* 在庫ブロック */
+        .inv-block {
+            width: 22px; height: 22px;
+            border-radius: 3px;
+            display: inline-block;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .inv-block.material { background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); border: 1px solid #7b3b9b; }
+        .inv-block.wip { background: linear-gradient(135deg, #a569bd 0%, #9b59b6 100%); border: 2px dashed #c39bd3; }
+        .inv-block.product { background: linear-gradient(135deg, #7d6ee7 0%, #6366f1 100%); border: 1px solid #5651d8; }
 
         /* 人員・機械セクション */
         .personnel-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .personnel-box {
-            background: rgba(255,255,255,0.95);
-            border: 2px solid #fbbf24;
-            border-radius: 8px;
+            background: linear-gradient(180deg, #faf5eb 0%, #f5efe5 100%);
+            border: 2px solid #8b7355;
+            border-radius: 6px;
             padding: 8px;
             text-align: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
         }
-        .personnel-box-title { font-size: 10px; color: #1e293b; margin-bottom: 4px; font-weight: bold; }
-        .personnel-dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+        .personnel-box-title { font-size: 10px; color: #3d3d3d; margin-bottom: 5px; font-weight: bold; }
+        .personnel-dots { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; min-height: 28px; align-items: center; }
         .person-dot {
-            width: 24px; height: 24px;
+            width: 26px; height: 26px;
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 10px; color: white; font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
-        .person-dot.worker { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
-        .person-dot.salesman { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        .person-dot.worker { background: linear-gradient(180deg, #f5deb3 0%, #deb887 100%); color: #5d4037; border: 2px solid #a08060; }
+        .person-dot.salesman { background: linear-gradient(180deg, #ff6b6b 0%, #ee5a5a 100%); border: 2px solid #c44; }
         .machine-dot {
-            width: 28px; height: 28px;
-            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            width: 30px; height: 30px;
+            background: linear-gradient(180deg, #888 0%, #666 100%);
             border-radius: 4px;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: white;
+            border: 2px solid #444;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
-        .machine-dot.large { background: linear-gradient(135deg, #374151 0%, #1f2937 100%); width: 36px; }
+        .machine-dot.large { background: linear-gradient(180deg, #555 0%, #333 100%); width: 38px; }
 
         /* チップセクション */
         .chips-row {
@@ -353,74 +398,115 @@
             gap: 6px;
         }
         .chip-box {
-            background: rgba(255,255,255,0.95);
+            background: linear-gradient(180deg, #faf5eb 0%, #f5efe5 100%);
             border-radius: 6px;
-            padding: 6px;
+            padding: 6px 4px;
             text-align: center;
-            border: 2px solid rgba(251,191,36,0.5);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 2px solid #8b7355;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
-        .chip-box-title { font-size: 9px; color: #1e293b; margin-bottom: 3px; font-weight: bold; }
-        .chip-dots { display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; }
-        .chip { width: 18px; height: 18px; border-radius: 50%; }
-        .chip.research { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-        .chip.education { background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); }
-        .chip.advertising { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-        .chip.computer { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .chip-box-title { font-size: 8px; color: #3d3d3d; margin-bottom: 4px; font-weight: bold; }
+        .chip-dots { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; min-height: 20px; align-items: center; }
+        .chip { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .chip.research { background: linear-gradient(180deg, #4a90d9 0%, #2e6db4 100%); border: 2px solid #1e4a7a; }
+        .chip.education { background: linear-gradient(180deg, #fbbf24 0%, #d69e00 100%); border: 2px solid #9a7000; }
+        .chip.advertising { background: linear-gradient(180deg, #ef4444 0%, #c42b2b 100%); border: 2px solid #8b1c1c; }
+        .chip.computer { background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%); border: 2px solid #0d7331; }
         .chip.insurance { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
 
         /* ============================================ */
-        /* 市場盤（リアルな六角形デザイン） */
+        /* 市場盤（リアルな七角形デザイン） */
         /* ============================================ */
         .markets-board {
-            background: linear-gradient(180deg, #065f46 0%, #047857 40%, #059669 100%);
-            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-            padding: 25px 15px;
-            min-height: 350px;
+            background: #1a1a1a;
+            clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+            padding: 15px;
+            min-height: 420px;
+            width: 100%;
+            max-width: 450px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.4), inset 0 0 60px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 2px 20px rgba(255,255,255,0.1);
             position: relative;
-            border: 4px solid #064e3b;
         }
-        .markets-board::before {
-            content: '市場盤';
+        .markets-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* 中央のカードデッキエリア */
+        .card-deck-area {
             position: absolute;
-            top: 12px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #fbbf24;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #8b2424 0%, #5c1a1a 100%);
+            border-radius: 50%;
+            border: 3px solid #3a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            box-shadow: inset 0 3px 10px rgba(0,0,0,0.5);
         }
-        .markets-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            max-width: 100%;
-            margin-top: 10px;
+        .deck-cards {
+            width: 50px;
+            height: 60px;
+            background: linear-gradient(135deg, #86efac 0%, #4ade80 100%);
+            border-radius: 4px;
+            border: 2px solid #166534;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+            color: #166534;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+            transform: rotate(-5deg);
+        }
+        /* 市場タイルを円形に配置 */
+        .markets-ring {
+            position: relative;
+            width: 380px;
+            height: 380px;
         }
         .market-tile {
-            background: linear-gradient(180deg, #fff 0%, #f0fdf4 100%);
-            border: 3px solid #047857;
-            border-radius: 10px;
-            padding: 8px 6px;
+            position: absolute;
+            width: 85px;
+            padding: 6px 4px;
             text-align: center;
-            min-width: 65px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
+            border-radius: 6px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
         }
-        .market-tile:hover { transform: scale(1.05); }
-        .market-tile.closed { background: linear-gradient(180deg, #9ca3af 0%, #6b7280 100%); border-color: #4b5563; }
-        .market-tile.closed .market-name { color: #374151; }
-        .market-name { font-size: 12px; font-weight: bold; color: #065f46; margin-bottom: 4px; }
-        .market-prices { display: flex; justify-content: center; gap: 3px; margin: 4px 0; }
+        .market-tile:hover { transform: scale(1.08); box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
+        /* 各市場の位置と色 */
+        .market-tile.tokyo { top: 5%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.nagoya { top: 20%; right: 5%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.osaka { top: 55%; right: 2%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.fukuoka { bottom: 5%; right: 18%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.overseas { bottom: 5%; left: 18%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.sapporo { top: 55%; left: 2%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.sendai { top: 20%; left: 5%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.closed { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; border-color: #6b7280 !important; opacity: 0.7; }
+        .market-tile.closed .market-name { color: #9ca3af; text-decoration: line-through; }
+        .market-name { font-size: 13px; font-weight: bold; color: #fff; margin-bottom: 4px; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .market-prices { display: flex; justify-content: center; gap: 4px; margin: 4px 0; }
         .price-badge {
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 11px;
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
         .price-badge.buy { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; }
         .price-badge.sell { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
@@ -429,12 +515,12 @@
             flex-wrap: wrap;
             gap: 2px;
             justify-content: center;
-            min-height: 20px;
-            background: rgba(0,0,0,0.2);
+            min-height: 18px;
+            background: rgba(255,255,255,0.15);
             border-radius: 4px;
-            padding: 4px;
+            padding: 3px;
         }
-        .stock-cube { width: 14px; height: 14px; background: #a78bfa; border-radius: 2px; }
+        .stock-cube { width: 12px; height: 12px; background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
         /* ============================================ */
         /* F（固定費）内訳パネル */
@@ -728,8 +814,12 @@
                         <div class="turn-info" id="turnInfo">あなたのターンです</div>
                     </div>
                     <div class="markets-board">
-                        <div class="board-title" style="background: #047857;">市場盤</div>
-                        <div class="markets-grid" id="marketsDisplay"></div>
+                        <div class="markets-inner">
+                            <div class="card-deck-area">
+                                <div class="deck-cards">DECISION</div>
+                            </div>
+                            <div class="markets-ring" id="marketsDisplay"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -766,9 +856,17 @@
                         <div class="flow-box-title">材料倉庫</div>
                         <div class="flow-box-content" id="materialsDisplay"></div>
                     </div>
+                    <div class="flow-arrow">
+                        <span class="flow-arrow-icon">→</span>
+                        <span class="flow-arrow-label">投入</span>
+                    </div>
                     <div class="flow-box factory">
                         <div class="flow-box-title">工場（仕掛品）</div>
                         <div class="flow-box-content" id="wipDisplay"></div>
+                    </div>
+                    <div class="flow-arrow">
+                        <span class="flow-arrow-icon">→</span>
+                        <span class="flow-arrow-label">完成</span>
                     </div>
                     <div class="flow-box">
                         <div class="flow-box-title">営業所（製品）</div>
@@ -3003,19 +3101,40 @@ function renderCompanyBoard(company) {
 
 // 市場盤を描画
 function renderMarketsBoard() {
+    // 市場名→CSSクラス名のマッピング
+    const marketClasses = {
+        '東京': 'tokyo',
+        '名古屋': 'nagoya',
+        '大阪': 'osaka',
+        '福岡': 'fukuoka',
+        '海外': 'overseas',
+        '仙台': 'sendai',
+        '札幌': 'sapporo'
+    };
+
+    // 表示順（円形配置に合わせた順序）
+    const displayOrder = ['東京', '名古屋', '大阪', '福岡', '海外', '札幌', '仙台'];
+
     let html = '';
-    gameState.markets.forEach(market => {
-        const stockHtml = Array(Math.min(market.currentStock, 20)).fill('<div class="stock-cube"></div>').join('');
-        const stockExtra = market.currentStock > 20 ? `+${market.currentStock - 20}` : '';
+    displayOrder.forEach(marketName => {
+        const market = gameState.markets.find(m => m.name === marketName);
+        if (!market) return;
+
+        const marketClass = marketClasses[market.name] || '';
+        const stockHtml = Array(Math.min(market.currentStock, 12)).fill('<div class="stock-cube"></div>').join('');
+        const stockExtra = market.currentStock > 12 ? `+${market.currentStock - 12}` : '';
+
+        // 閉鎖中かどうか
+        const closedClass = market.closed ? 'closed' : '';
 
         html += `
-            <div class="market-tile">
+            <div class="market-tile ${marketClass} ${closedClass}">
                 <div class="market-name">${market.name}</div>
                 <div class="market-prices">
-                    <span class="price-badge buy">¥${market.buyPrice}</span>
-                    <span class="price-badge sell">¥${market.sellPrice}</span>
+                    <span class="price-badge buy">${market.buyPrice}</span>
+                    <span class="price-badge sell">${market.sellPrice}</span>
                 </div>
-                <div class="market-stock">${stockHtml}${stockExtra ? `<span style="color:#fff;font-size:10px;">${stockExtra}</span>` : ''}</div>
+                <div class="market-stock">${stockHtml}${stockExtra ? `<span style="color:#fff;font-size:10px;margin-left:2px;">${stockExtra}</span>` : ''}</div>
             </div>
         `;
     });
