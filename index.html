@@ -594,15 +594,15 @@
             cursor: pointer;
         }
         .market-tile:hover { transform: scale(1.08); box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
-        /* 各市場の位置と色（六角形内に完全収まるよう調整） */
-        /* 六角形の頂点付近は狭いため、タイルをより中央寄りに配置 */
-        .market-tile.tokyo { top: 12%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
-        .market-tile.nagoya { top: 28%; right: 12%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.osaka { top: 52%; right: 10%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.fukuoka { bottom: 18%; right: 22%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.overseas { bottom: 18%; left: 22%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
-        .market-tile.sapporo { top: 52%; left: 10%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.sendai { top: 28%; left: 12%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        /* 各市場の位置と色（六角形内に完全収まるよう調整 - left/topのみ使用） */
+        /* 六角形clip-path: 50%0%, 93%25%, 93%75%, 50%100%, 7%75%, 7%25% */
+        .market-tile.tokyo { top: 15%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.sendai { top: 30%; left: 12%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.nagoya { top: 30%; left: 66%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.sapporo { top: 50%; left: 10%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.osaka { top: 50%; left: 68%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.overseas { top: 70%; left: 22%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.fukuoka { top: 70%; left: 56%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
         .market-tile.closed { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; border-color: #6b7280 !important; opacity: 0.7; }
         .market-tile.closed .market-name { color: #9ca3af; text-decoration: line-through; }
 
