@@ -2817,17 +2817,25 @@ function renderOtherCompanies() {
     others.forEach((company, idx) => {
         const isCurrent = gameState.currentPlayerIndex === idx + 1;
         const rowWarning = (company.currentRow || 1) >= gameState.maxRows - 5;
-        // 在庫サマリー: 材/仕/製
-        const invSummary = `${company.materials}/${company.wip}/${company.products}`;
+        // チップ数
+        const chipCount = (company.chips.research || 0) + (company.chips.education || 0) +
+                         (company.chips.advertising || 0) + (company.chips.computer || 0) +
+                         (company.chips.insurance || 0);
         badgesHtml += `
             <div class="ai-badge ${isCurrent ? 'current-turn' : ''}" onclick="showAICompanyModal(${idx + 1})">
-                <div class="ai-badge-top">
+                <div class="ai-badge-row1">
                     <span class="ai-badge-name">${company.name}</span>
                     <span class="ai-badge-cash">¥${company.cash}</span>
                 </div>
-                <div class="ai-badge-bottom">
-                    <span class="ai-badge-inv" title="材料/仕掛/製品">${invSummary}</span>
-                    <span class="ai-badge-row ${rowWarning ? 'warning' : ''}">${company.currentRow || 1}/${gameState.maxRows}</span>
+                <div class="ai-badge-row2">
+                    <span class="ai-badge-label">材</span><span class="ai-badge-val">${company.materials}</span>
+                    <span class="ai-badge-label">仕</span><span class="ai-badge-val">${company.wip}</span>
+                    <span class="ai-badge-label">製</span><span class="ai-badge-val">${company.products}</span>
+                </div>
+                <div class="ai-badge-row3">
+                    <span class="ai-badge-info">W${company.workers} 機${company.machines.length} S${company.salesmen}</span>
+                    <span class="ai-badge-info">chip${chipCount}</span>
+                    <span class="ai-badge-rownum ${rowWarning ? 'warning' : ''}">${company.currentRow || 1}行</span>
                 </div>
             </div>
         `;

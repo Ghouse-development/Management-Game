@@ -43,28 +43,28 @@ html, body {
     flex-direction: column;
     background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
     border-radius: 6px;
-    padding: 4px 8px;
-    min-width: 70px;
+    padding: 4px 6px;
+    min-width: 90px;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     border: 2px solid transparent;
+    gap: 2px;
 }
 .ai-badge:hover {
-    transform: scale(1.05);
+    transform: scale(1.03);
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .ai-badge.current-turn {
     border-color: #fbbf24;
     box-shadow: 0 0 10px rgba(251,191,36,0.5);
 }
-.ai-badge-top {
+.ai-badge-row1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 4px;
 }
 .ai-badge-name {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: bold;
     color: #fff;
 }
@@ -73,25 +73,42 @@ html, body {
     color: #4ade80;
     font-weight: bold;
 }
-.ai-badge-bottom {
+.ai-badge-row2 {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 3px;
+    padding: 1px 3px;
+}
+.ai-badge-label {
+    font-size: 8px;
+    color: #9ca3af;
+}
+.ai-badge-val {
+    font-size: 9px;
+    color: #fff;
+    font-weight: bold;
+    margin-right: 4px;
+}
+.ai-badge-row3 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 4px;
-    margin-top: 2px;
+    gap: 3px;
 }
-.ai-badge-inv {
-    font-size: 9px;
+.ai-badge-info {
+    font-size: 8px;
     color: #9ca3af;
 }
-.ai-badge-row {
-    font-size: 9px;
+.ai-badge-rownum {
+    font-size: 8px;
     color: #60a5fa;
     background: #1e40af;
-    padding: 1px 4px;
-    border-radius: 3px;
+    padding: 1px 3px;
+    border-radius: 2px;
 }
-.ai-badge-row.warning {
+.ai-badge-rownum.warning {
     background: #dc2626;
     color: #fff;
 }
