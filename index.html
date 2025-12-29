@@ -183,8 +183,8 @@
 const gameState = {
     currentPeriod: 2,
     currentRow: 2,  // 2期は期首処理後2行目から開始（廃止予定）
-    maxRows: 20,  // 現在の期の行数上限
-    maxRowsByPeriod: {2: 20, 3: 30, 4: 34, 5: 35},  // 各期の行数上限
+    maxRows: MAX_ROWS_BY_PERIOD[2],  // 現在の期の行数上限（定数から取得）
+    maxRowsByPeriod: MAX_ROWS_BY_PERIOD,  // 各期の行数上限（定数から参照）
     currentPlayerIndex: 0,
     turnOrder: [],
     skipTurns: {},
@@ -218,94 +218,17 @@ const gameState = {
     cardDeck: [],
     deckInitialized: false,
     
-    markets: [
-        {name: '仙台', buyPrice: 10, sellPrice: 40, maxStock: 3, currentStock: 3, needsBid: true},
-        {name: '札幌', buyPrice: 11, sellPrice: 36, maxStock: 4, currentStock: 4, needsBid: true},
-        {name: '福岡', buyPrice: 12, sellPrice: 32, maxStock: 6, currentStock: 6, needsBid: true},
-        {name: '名古屋', buyPrice: 13, sellPrice: 28, maxStock: 9, currentStock: 9, needsBid: true},
-        {name: '大阪', buyPrice: 14, sellPrice: 24, maxStock: 13, currentStock: 13, needsBid: true},
-        {name: '東京', buyPrice: 15, sellPrice: 20, maxStock: 20, currentStock: 20, needsBid: false},
-        {name: '海外', buyPrice: 16, sellPrice: 16, maxStock: 100, currentStock: 45, needsBid: false}
-    ],
+    // 市場データ（MARKETS定数から初期化、currentStockを追加）
+    markets: MARKETS.map(m => ({
+        ...m,
+        currentStock: m.initialStock
+    })),
     
-    decisionCards: [
-        {id: 1, name: '商品販売', description: '製品を市場に販売'},
-        {id: 2, name: '材料購入', description: '材料を市場から購入'},
-        {id: 3, name: '完成・投入', description: '材料→仕掛品→製品'},
-        {id: 4, name: '採用', description: '人材を採用（最大3名）'},
-        {id: 5, name: '設備投資', description: '機械を購入'},
-        {id: 6, name: 'チップ購入', description: '研究・教育・広告チップ'},
-        {id: 7, name: 'DO NOTHING', description: '何もしない（行消費なし）'}
-    ],
+    // 意思決定カード（定数から参照）
+    decisionCards: DECISION_CARDS,
     
-    // リスクカード（64枚のPDFに基づく正確な実装が必要）
-    // 注：材料暴落は存在しないカード
-    riskCards: [
-        {id: 1, name: 'クレーム発生', description: '本社経費▲5', type: 'cost'},
-        {id: 2, name: 'クレーム発生', description: '本社経費▲5', type: 'cost'},
-        {id: 3, name: '教育成功', description: '教育チップを持っていれば1個32円で販売（販売能力の範囲内、最高5個まで、仕入れ可）', type: 'benefit'},
-        {id: 4, name: '教育成功', description: '教育チップを持っていれば1個32円で販売（販売能力の範囲内、最高5個まで、仕入れ可）', type: 'benefit'},
-        {id: 5, name: '消費者運動発生', description: '商品の販売はできません（材料購入、完成・投入、DO NOTHINGは可能）', type: 'cost'},
-        {id: 6, name: '消費者運動発生', description: '商品の販売はできません（材料購入、完成・投入、DO NOTHINGは可能）', type: 'cost'},
-        {id: 7, name: '得意先倒産', description: '現金▲30（特別損失）', type: 'cost', period2Exempt: true},
-        {id: 8, name: '得意先倒産', description: '現金▲30（特別損失）', type: 'cost', period2Exempt: true},
-        {id: 9, name: '研究開発失敗', description: '青チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 10, name: '研究開発失敗', description: '青チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 11, name: '研究開発失敗', description: '青チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 12, name: '広告成功', description: '赤チップ1枚につき2個まで空いた市場へ独占販売可能（最高5個まで、仕入れ可）', type: 'benefit'},
-        {id: 13, name: '広告成功', description: '赤チップ1枚につき2個まで空いた市場へ独占販売可能（最高5個まで、仕入れ可）', type: 'benefit'},
-        {id: 14, name: '広告成功', description: '赤チップ1枚につき2個まで空いた市場へ独占販売可能（最高5個まで、仕入れ可）', type: 'benefit'},
-        {id: 15, name: '労災発生', description: '生産活動はできません（材料購入、商品販売・入札、DO NOTHINGは可能）', type: 'cost'},
-        {id: 16, name: '労災発生', description: '生産活動はできません（材料購入、商品販売・入札、DO NOTHINGは可能）', type: 'cost'},
-        {id: 17, name: '広告政策失敗', description: '赤チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 18, name: '広告政策失敗', description: '赤チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 19, name: '特別サービス', description: '材料購入→1個10で5個まで or 広告の特別サービス1個20で2個まで可', type: 'benefit'},
-        {id: 20, name: '特別サービス', description: '材料購入→1個10で5個まで or 広告の特別サービス1個20で2個まで可', type: 'benefit'},
-        {id: 21, name: '返品発生', description: 'ストッカーから商品1個を営業所に戻し、売上欄に（▲1個、▲20）と記入', type: 'cost', period2Exempt: true},
-        {id: 22, name: '返品発生', description: 'ストッカーから商品1個を営業所に戻し、売上欄に（▲1個、▲20）と記入', type: 'cost', period2Exempt: true},
-        {id: 23, name: '返品発生', description: 'ストッカーから商品1個を営業所に戻し、売上欄に（▲1個、▲20）と記入', type: 'cost', period2Exempt: true},
-        {id: 24, name: 'コンピュータートラブル', description: '製造経費▲10', type: 'cost'},
-        {id: 25, name: 'コンピュータートラブル', description: '製造経費▲10', type: 'cost'},
-        {id: 26, name: '商品の独占販売', description: 'セールスマン1人につき2個まで売れる 1個32でストッカーへ（最高5個まで 仕入れ可）', type: 'benefit'},
-        {id: 27, name: '商品の独占販売', description: 'セールスマン1人につき2個まで売れる 1個32でストッカーへ（最高5個まで 仕入れ可）', type: 'benefit'},
-        {id: 28, name: '商品の独占販売', description: 'セールスマン1人につき2個まで売れる 1個32でストッカーへ（最高5個まで 仕入れ可）', type: 'benefit'},
-        {id: 29, name: '製造ミス発生', description: '仕掛品1個をストッカーへ', type: 'cost'},
-        {id: 30, name: '製造ミス発生', description: '仕掛品1個をストッカーへ', type: 'cost'},
-        {id: 31, name: '倉庫火災', description: '材料を全てストッカーへ 保険に加入していれば1個8の保険金が受け取れる（再加入5）', type: 'cost'},
-        {id: 32, name: '倉庫火災', description: '材料を全てストッカーへ 保険に加入していれば1個8の保険金が受け取れる（再加入5）', type: 'cost'},
-        {id: 33, name: '縁故採用', description: '本社経費▲5', type: 'cost'},
-        {id: 34, name: '縁故採用', description: '本社経費▲5', type: 'cost'},
-        {id: 35, name: '研究開発成功', description: '青チップ1枚につき2個まで売れる 1個32でストッカーへ（販売能力の範囲内、最高5個まで 仕入れ不可）', type: 'benefit'},
-        {id: 36, name: '研究開発成功', description: '青チップ1枚につき2個まで売れる 1個32でストッカーへ（販売能力の範囲内、最高5個まで 仕入れ不可）', type: 'benefit'},
-        {id: 37, name: '研究開発成功', description: '青チップ1枚につき2個まで売れる 1個32でストッカーへ（販売能力の範囲内、最高5個まで 仕入れ不可）', type: 'benefit'},
-        {id: 38, name: '研究開発成功', description: '青チップ1枚につき2個まで売れる 1個32でストッカーへ（販売能力の範囲内、最高5個まで 仕入れ不可）', type: 'benefit'},
-        {id: 39, name: '研究開発成功', description: '青チップ1枚につき2個まで売れる 1個32でストッカーへ（販売能力の範囲内、最高5個まで 仕入れ不可）', type: 'benefit'},
-        {id: 40, name: '研究開発成功', description: '青チップ1枚につき2個まで売れる 1個32でストッカーへ（販売能力の範囲内、最高5個まで 仕入れ不可）', type: 'benefit'},
-        {id: 41, name: '各社共通', description: '3個までを1個12で購入可（まず市場から、不足分はストッカーから）', type: 'special'},
-        {id: 42, name: '各社共通', description: '3個までを1個12で購入可（まず市場から、不足分はストッカーから）', type: 'special'},
-        {id: 43, name: 'ストライキ発生', description: '1回休み', type: 'cost'},
-        {id: 44, name: 'ストライキ発生', description: '1回休み', type: 'cost'},
-        {id: 45, name: '盗難発見', description: '商品を2個ストッカーへ 保険に加入していれば1個10の保険金が受け取れる（再加入5）', type: 'cost'},
-        {id: 46, name: '盗難発見', description: '商品を2個ストッカーへ 保険に加入していれば1個10の保険金が受け取れる（再加入5）', type: 'cost'},
-        {id: 47, name: '長期労務紛争', description: '2回休み', type: 'cost'},
-        {id: 48, name: '長期労務紛争', description: '2回休み', type: 'cost'},
-        {id: 49, name: '設計トラブル発生', description: '製造経費▲10', type: 'cost'},
-        {id: 50, name: '設計トラブル発生', description: '製造経費▲10', type: 'cost'},
-        {id: 51, name: 'ワーカー退職', description: '労務費▲5', type: 'cost'},
-        {id: 52, name: 'ワーカー退職', description: '労務費▲5', type: 'cost'},
-        {id: 53, name: '景気変動', description: '逆回り', type: 'special'},
-        {id: 54, name: '景気変動', description: '逆回り', type: 'special'},
-        {id: 55, name: '教育失敗', description: '黄チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 56, name: '教育失敗', description: '黄チップ1枚返却（まず会社盤から、なければ次繰盤から）', type: 'cost'},
-        {id: 57, name: 'セールスマン退職', description: '本社人件費▲5', type: 'cost'},
-        {id: 58, name: 'セールスマン退職', description: '本社人件費▲5', type: 'cost'},
-        {id: 59, name: '社長、病気で倒れる', description: '1回休み', type: 'cost'},
-        {id: 60, name: '社長、病気で倒れる', description: '1回休み', type: 'cost'},
-        {id: 61, name: '不良在庫発生', description: '総在庫が20個を超えるものは全てストッカーへ 1個10の保険金（製品から順に）', type: 'cost'},
-        {id: 62, name: '不良在庫発生', description: '総在庫が20個を超えるものは全てストッカーへ 1個10の保険金（製品から順に）', type: 'cost'},
-        {id: 63, name: '機械故障', description: '製造経費▲5', type: 'cost'},
-        {id: 64, name: '機械故障', description: '製造経費▲5', type: 'cost'}
-    ],
+    // リスクカード（定数から参照 - 64枚）
+    riskCards: RISK_CARDS,
     
     companies: []
 };
@@ -638,14 +561,13 @@ function getPriceCompetitiveness(company, companyIndex = null) {
 function calculateSalaryCost(company, period) {
     let cost = 0;
 
-    // 基本単価（サイコロによる変動は3期以降）
-    const baseCost = {2: 22, 3: 24, 4: 26, 5: 28};
-    let unitCost = baseCost[period];
+    // 基本単価（定数から取得、サイコロによる変動は3期以降）
+    let unitCost = BASE_SALARY_BY_PERIOD[period];
     let halfCost = Math.round(unitCost / 2);
 
     // 3期以降はサイコロで単価変動
     if (period >= 3 && gameState.wageMultiplier > 1) {
-        unitCost = Math.round(baseCost[period] * gameState.wageMultiplier);
+        unitCost = Math.round(BASE_SALARY_BY_PERIOD[period] * gameState.wageMultiplier);
         halfCost = Math.round(unitCost / 2);
     }
 
@@ -668,29 +590,30 @@ function calculateSalaryCost(company, period) {
     return Math.round(cost);
 }
 
-// Calculate depreciation
+// Calculate depreciation（定数を使用）
 function calculateDepreciation(company, period) {
     let cost = 0;
-    
+    const isPeriod2 = period === 2;
+
     company.machines.forEach(machine => {
         if (machine.type === 'small') {
             if (machine.attachments > 0) {
                 // 小型+アタッチメント
-                cost += period === 2 ? 13 : 26;
+                cost += isPeriod2 ? DEPRECIATION.smallWithAttachment.period2 : DEPRECIATION.smallWithAttachment.period3plus;
             } else {
                 // 小型のみ
-                cost += period === 2 ? 10 : 20;
+                cost += isPeriod2 ? DEPRECIATION.small.period2 : DEPRECIATION.small.period3plus;
             }
         } else if (machine.type === 'large') {
             // 大型
-            cost += period === 2 ? 20 : 40;
+            cost += isPeriod2 ? DEPRECIATION.large.period2 : DEPRECIATION.large.period3plus;
         }
     });
-    
+
     return cost;
 }
 
-// Calculate period end payment (期末支払)
+// Calculate period end payment (期末支払)（定数を使用）
 function calculatePeriodPayment(company, useEndOfPeriod = false) {
     const period = gameState.currentPeriod;
     let payment = 0;
@@ -698,10 +621,9 @@ function calculatePeriodPayment(company, useEndOfPeriod = false) {
     // 給料（期末計算時は期末時点の人数を使用）
     if (useEndOfPeriod && company.endOfPeriodStats) {
         // 期末時点の人数・機械台数で計算
-        const baseCost = {2: 22, 3: 24, 4: 26, 5: 28};
-        let unitCost = baseCost[period] || 22;
+        let unitCost = BASE_SALARY_BY_PERIOD[period] || BASE_SALARY_BY_PERIOD[2];
         if (period >= 3 && gameState.wageMultiplier > 1) {
-            unitCost = Math.round(baseCost[period] * gameState.wageMultiplier);
+            unitCost = Math.round(BASE_SALARY_BY_PERIOD[period] * gameState.wageMultiplier);
         }
         const halfCost = Math.round(unitCost / 2);
 
@@ -712,44 +634,44 @@ function calculatePeriodPayment(company, useEndOfPeriod = false) {
     } else {
         payment += calculateSalaryCost(company, period);
     }
-    
+
     // 長期借入返済（元本の10%以上）
     if (company.loans > 0) {
-        payment += Math.floor(company.loans * 0.1);
+        payment += Math.floor(company.loans * INTEREST_RATES.longTerm);
     }
-    
+
     // 短期借入返済（元本の20%以上）
     if (company.shortLoans > 0) {
-        payment += Math.floor(company.shortLoans * 0.2);
+        payment += Math.floor(company.shortLoans * INTEREST_RATES.shortTerm);
     }
-    
+
     return payment;
 }
 
-// Calculate chip costs
+// Calculate chip costs（定数を使用）
 function calculateChipCost(company, period) {
     let cost = 0;
-    
+
     // コンピュータ・保険
-    cost += (company.chips.computer || 0) * 20;
-    cost += (company.chips.insurance || 0) * 5;
-    
+    cost += (company.chips.computer || 0) * CHIP_COSTS.computer;
+    cost += (company.chips.insurance || 0) * CHIP_COSTS.insurance;
+
     // 戦略チップ
     if (period === 2) {
         // 2期は各1枚分のみ固定費
-        if (company.chips.research > 0) cost += 20;
-        if (company.chips.education > 0) cost += 20;
-        if (company.chips.advertising > 0) cost += 20;
+        if (company.chips.research > 0) cost += CHIP_COSTS.normal;
+        if (company.chips.education > 0) cost += CHIP_COSTS.normal;
+        if (company.chips.advertising > 0) cost += CHIP_COSTS.normal;
     } else {
         // 3期以降
-        cost += (company.chips.research || 0) * 40;  // 特急
-        cost += (company.chips.education || 0) * 40; // 特急
-        cost += (company.chips.advertising || 0) * 40; // 特急
-        cost += (company.nextPeriodChips?.research || 0) * 20; // 繰越
-        cost += (company.nextPeriodChips?.education || 0) * 20; // 繰越
-        cost += (company.nextPeriodChips?.advertising || 0) * 20; // 繰越
+        cost += (company.chips.research || 0) * CHIP_COSTS.express;  // 特急
+        cost += (company.chips.education || 0) * CHIP_COSTS.express; // 特急
+        cost += (company.chips.advertising || 0) * CHIP_COSTS.express; // 特急
+        cost += (company.nextPeriodChips?.research || 0) * CHIP_COSTS.normal; // 繰越
+        cost += (company.nextPeriodChips?.education || 0) * CHIP_COSTS.normal; // 繰越
+        cost += (company.nextPeriodChips?.advertising || 0) * CHIP_COSTS.normal; // 繰越
     }
-    
+
     return cost;
 }
 
@@ -758,7 +680,7 @@ function calculateFixedCostTotal(company, period) {
     return calculateFixedCost(company);
 }
 
-// Calculate fixed costs (固定費) - 税金除外
+// Calculate fixed costs (固定費) - 税金除外（定数を使用）
 function calculateFixedCost(company) {
     const period = gameState.currentPeriod;
     let cost = 0;
@@ -767,42 +689,40 @@ function calculateFixedCost(company) {
     cost += calculateSalaryCost(company, period);
 
     // 借入金利（Fに含める）
-    // 長期借入：10%
-    cost += Math.round((company.loans || 0) * 0.10);
-    // 短期借入：20%
-    cost += Math.round((company.shortLoans || 0) * 0.20);
+    cost += Math.round((company.loans || 0) * INTEREST_RATES.longTerm);
+    cost += Math.round((company.shortLoans || 0) * INTEREST_RATES.shortTerm);
 
     // コンピュータ・保険費用
-    cost += (company.chips.computer || 0) * 20;
-    cost += (company.chips.insurance || 0) * 5;
+    cost += (company.chips.computer || 0) * CHIP_COSTS.computer;
+    cost += (company.chips.insurance || 0) * CHIP_COSTS.insurance;
 
     // 戦略チップ費用
     const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
 
     if (period === 2) {
         // 2期：各種1枚だけ返却 → 各種最大20円のみ
-        if (company.chips.research > 0) cost += 20;  // 1枚分のみ
-        if (company.chips.education > 0) cost += 20;  // 1枚分のみ
-        if (company.chips.advertising > 0) cost += 20; // 1枚分のみ
+        if (company.chips.research > 0) cost += CHIP_COSTS.normal;
+        if (company.chips.education > 0) cost += CHIP_COSTS.normal;
+        if (company.chips.advertising > 0) cost += CHIP_COSTS.normal;
     } else {
-        // 3-5期：繰り越し分は20円、今期購入（特急）は40円
-        // 繰り越しチップ（前期から持ち越し）= 20円/枚
-        cost += (carriedOver.research || 0) * 20;
-        cost += (carriedOver.education || 0) * 20;
-        cost += (carriedOver.advertising || 0) * 20;
+        // 3-5期：繰り越し分は通常価格、今期購入（特急）は特急価格
+        // 繰り越しチップ（前期から持ち越し）
+        cost += (carriedOver.research || 0) * CHIP_COSTS.normal;
+        cost += (carriedOver.education || 0) * CHIP_COSTS.normal;
+        cost += (carriedOver.advertising || 0) * CHIP_COSTS.normal;
 
-        // 今期特急購入分（chips - carriedOver）= 40円/枚
+        // 今期特急購入分（chips - carriedOver）
         const urgentResearch = Math.max(0, (company.chips.research || 0) - (carriedOver.research || 0));
         const urgentEducation = Math.max(0, (company.chips.education || 0) - (carriedOver.education || 0));
         const urgentAdvertising = Math.max(0, (company.chips.advertising || 0) - (carriedOver.advertising || 0));
-        cost += urgentResearch * 40;
-        cost += urgentEducation * 40;
-        cost += urgentAdvertising * 40;
+        cost += urgentResearch * CHIP_COSTS.express;
+        cost += urgentEducation * CHIP_COSTS.express;
+        cost += urgentAdvertising * CHIP_COSTS.express;
 
-        // 次期繰り越し分（来期用に購入）= 20円/枚
-        cost += (company.nextPeriodChips?.research || 0) * 20;
-        cost += (company.nextPeriodChips?.education || 0) * 20;
-        cost += (company.nextPeriodChips?.advertising || 0) * 20;
+        // 次期繰り越し分（来期用に購入）
+        cost += (company.nextPeriodChips?.research || 0) * CHIP_COSTS.normal;
+        cost += (company.nextPeriodChips?.education || 0) * CHIP_COSTS.normal;
+        cost += (company.nextPeriodChips?.advertising || 0) * CHIP_COSTS.normal;
     }
 
     // 減価償却費
@@ -823,7 +743,7 @@ function calculateFixedCost(company) {
     return cost;
 }
 
-// Calculate VQ (変動費総額)
+// Calculate VQ (変動費総額)（定数を使用）
 function calculateVQ(company) {
     // VQ = 材料購入金額 + 完成投入費用 + (期首在庫評価額 - 期末在庫評価額)
     // ※ 在庫が増えた分はコストではない、在庫が減った分がコストになる
@@ -835,15 +755,14 @@ function calculateVQ(company) {
     const productionCost = company.totalProductionCost || 0;
 
     // ③期首在庫評価額（元の材料価値）
-    // 材料:13円、仕掛品:14円、製品:15円
-    const startInventoryValue = (company.periodStartInventory.materials * 13) +
-                               (company.periodStartInventory.wip * 14) +
-                               (company.periodStartInventory.products * 15);
+    const startInventoryValue = (company.periodStartInventory.materials * INVENTORY_VALUES.material) +
+                               (company.periodStartInventory.wip * INVENTORY_VALUES.wip) +
+                               (company.periodStartInventory.products * INVENTORY_VALUES.product);
 
     // ④期末在庫評価額（今の材料価値）
-    const endInventoryValue = (company.materials * 13) +
-                             (company.wip * 14) +
-                             (company.products * 15);
+    const endInventoryValue = (company.materials * INVENTORY_VALUES.material) +
+                             (company.wip * INVENTORY_VALUES.wip) +
+                             (company.products * INVENTORY_VALUES.product);
 
     // VQ = ①+②+(③-④)
     return materialCost + productionCost + startInventoryValue - endInventoryValue;

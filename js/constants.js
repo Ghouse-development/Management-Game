@@ -25,7 +25,7 @@ const BASE_SALARY_BY_PERIOD = {
 
 /** 機械の減価償却費 */
 const DEPRECIATION = {
-    small: { period2: 6, period3plus: 13 },
+    small: { period2: 10, period3plus: 20 },
     smallWithAttachment: { period2: 13, period3plus: 26 },
     large: { period2: 20, period3plus: 40 }
 };
