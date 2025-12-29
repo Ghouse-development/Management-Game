@@ -184,3 +184,80 @@
 
 ### 25. アラートメッセージ修正
 - 期開始時: 「3行目から」→「2行目から」に修正
+
+### 26. VQ表示のラベル順序修正
+- **修正前**: ③期末在庫評価額、④期首在庫評価額（順序が逆）
+- **修正後**: ③期首在庫評価額、④期末在庫評価額（正しい順序）
+- VQ計算式: 材料購入費 + 完成投入費 + 期首在庫 - 期末在庫
+
+### 27. リスクカード費用のF計上修正
+- 以下のリスクカードがFに正しく計上されるよう修正:
+  - **クレーム発生** (case 1, 2): 5円
+  - **コンピュータートラブル** (case 24, 25): 10円
+  - **設計トラブル発生** (case 49, 50): 10円
+- プレイヤー用（processRiskCard）とAI用（applyRiskCardToAI）の両方を修正
+- `additionalFixedCost` フィールドに費用を加算
+
+### 28. プレイヤーターンバグの安全ガード追加
+- `executeAITurn()` 関数にプレイヤーターン時の実行防止ガードを追加
+- `gameState.currentPlayerIndex === 0` の場合は即座にreturn
+
+### 29. F計算詳細表示の改善
+- F内訳表示に **リスクカード費用** を追加
+- F内訳表示に **その他人件費**（配置転換費用等）を追加
+- 条件付き表示で0円の場合は非表示
+
+### 30. 重複CSSの整理
+- **`.ai-action-header`の競合解消**:
+  - `.ai-action-display .ai-action-header` （シンプルなテキストヘッダー用）
+  - `.ai-action-modal .ai-action-header` （Flexレイアウト+アバター用）
+- **`.personnel-dots`の競合解消**:
+  - メインボード用（line 481）はそのまま維持
+  - `.company-card .personnel-dots` にスコープ変更（全体表示モーダル用）
+- **`.chip-dots`の競合解消**:
+  - メインボード用（line 517）はそのまま維持
+  - `.chips-section .chip-dots` にスコープ変更（全体表示モーダル用）
+- **`.chip-dot.filled.*`** も `.chips-section` にスコープ変更
+
+### 31. コードリファクタリング（ファイル分割）
+- **フォルダ構造作成**:
+  - `css/` ディレクトリ新規作成
+  - `js/` ディレクトリ新規作成
+
+- **CSS外部化**:
+  - `css/styles.css` に全CSS抽出（約1360行）
+  - `index.html` からインラインCSS削除
+  - ファイルサイズ: 10939行 → 9579行（1360行削減）
+
+- **定数ファイル作成** (`js/constants.js`):
+  - `MAX_ROWS_BY_PERIOD`: 各期の行数上限
+  - `BASE_SALARY_BY_PERIOD`: 各期の基本人件費単価
+  - `DEPRECIATION`: 機械の減価償却費
+  - `CHIP_COSTS`: チップコスト（通常/特急/コンピュータ/保険）
+  - `INVENTORY_VALUES`: 在庫評価単価
+  - `PRODUCTION_COST`: 完成・投入コスト
+  - `MARKETS`: 市場データ（7市場分）
+  - `RISK_CARDS`: リスクカード（64枚分）
+  - `DECISION_CARDS`: 意思決定カード（7種類）
+  - `AI_STRATEGY_DESCRIPTIONS`: AI戦略説明
+
+## 今後の改善点
+
+### 優先度：高
+1. **JavaScript定数統合**: constants.jsの定数をgameStateで使用
+2. **JavaScript関数外部化**: 機能別にファイル分割
+   - `js/state.js`: ゲーム状態管理
+   - `js/game.js`: ゲームロジック
+   - `js/ai.js`: AI関連
+   - `js/ui.js`: UI更新・モーダル
+   - `js/main.js`: 初期化・イベント
+
+### 優先度：中
+3. **マジックナンバー排除**: ハードコードされた数値を定数化
+4. **重複コード削除**: 類似処理の共通関数化
+5. **エラーハンドリング強化**: try-catch追加
+
+### 優先度：低
+6. **TypeScript移行**: 型安全性向上
+7. **ユニットテスト追加**: Jest等でテスト実装
+8. **JSDoc追加**: 関数ドキュメント整備
