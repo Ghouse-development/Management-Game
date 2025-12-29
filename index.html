@@ -9961,10 +9961,12 @@ function executeDefaultProduction(company, maxQty) {
 
 // 共通関数：投資実行（G最大化・自己資本最大化志向）
 function executeDefaultInvestment(company) {
+    const companyIndex = gameState.companies.indexOf(company);
     const mfgCapacity = getManufacturingCapacity(company);
     const salesCapacity = getSalesCapacity(company);
     const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
     const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+    const periodsRemaining = 5 - gameState.currentPeriod;
 
     // 期末近くは投資しない（資金を確保）
     if (rowsRemaining < 5) {
@@ -9974,33 +9976,171 @@ function executeDefaultInvestment(company) {
 
     // 必要な余裕資金（期末支払い+αを確保）
     const periodEndCost = calculatePeriodPayment(company);
-    const safetyMargin = periodEndCost + 30;
+    let safetyMargin = periodEndCost + 30;
+
+    // === 戦略別の投資意欲 ===
+    // aggressive/tech_focused は安全マージンを小さく（積極投資）
+    if (company.strategy === 'aggressive') safetyMargin = periodEndCost + 15;
+    if (company.strategy === 'tech_focused') safetyMargin = periodEndCost + 20;
+    if (company.strategy === 'conservative') safetyMargin = periodEndCost + 50;
+
     if (company.cash <= safetyMargin) {
         nextTurn();
         return;
     }
 
-    // === 戦略的投資判断 ===
+    // === 戦略的投資判断（Fをかけて成長を目指す） ===
 
-    // 1. 研究チップ（価格競争力向上→MQ増加に直結）
+    // === 1. 戦略別の積極投資フェーズ（2-3期に集中投資） ===
+    if (gameState.currentPeriod <= 3 && rowsRemaining > 10) {
+
+        // AGGRESSIVE戦略：大胆な設備投資・人員拡大
+        if (company.strategy === 'aggressive') {
+            // 大型機械投資（一気に製造能力+4）
+            if (company.machines.length < 2 && company.workers >= 2 && company.cash >= 100 + safetyMargin) {
+                company.cash -= 100;
+                company.machines.push({type: 'large', attachments: 0});
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備投資', '🏭', '大型機械購入（製造能力+4、積極投資）');
+                return;
+            }
+            // ワーカー・セールスマン同時拡大志向
+            if (company.workers < 3 && company.cash >= 5 + safetyMargin) {
+                company.cash -= 5;
+                company.workers++;
+                company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '採用', '👷', 'ワーカー採用（拡大戦略）');
+                return;
+            }
+            if (company.salesmen < 4 && company.cash >= 5 + safetyMargin) {
+                company.cash -= 5;
+                company.salesmen++;
+                company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '採用', '💼', 'セールスマン採用（拡大戦略）');
+                return;
+            }
+        }
+
+        // TECH_FOCUSED戦略：チップ・教育への集中投資
+        if (company.strategy === 'tech_focused') {
+            // 研究チップ優先（5枚まで）
+            if (company.chips.research < 5 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
+                company.chips.research++;
+                incrementRow(companyIndex);
+                showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（技術投資）');
+                return;
+            }
+            // 教育チップ（効率向上）
+            if (company.chips.education < 2 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
+                company.chips.education++;
+                incrementRow(companyIndex);
+                showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（効率向上）');
+                return;
+            }
+            // 小型機械（効率的な投資）
+            if (company.machines.length < 2 && company.cash >= 50 + safetyMargin) {
+                company.cash -= 50;
+                company.machines.push({type: 'small', attachments: 0});
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備投資', '⚙️', '小型機械購入（技術投資）');
+                return;
+            }
+        }
+
+        // BALANCED戦略：バランスよく投資
+        if (company.strategy === 'balanced') {
+            // まず研究チップ3枚確保
+            if (company.chips.research < 3 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
+                company.chips.research++;
+                incrementRow(companyIndex);
+                showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（バランス投資）');
+                return;
+            }
+            // 人員バランス
+            if (company.workers < 2 && company.cash >= 5 + safetyMargin) {
+                company.cash -= 5;
+                company.workers++;
+                company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '採用', '👷', 'ワーカー採用（バランス投資）');
+                return;
+            }
+            if (company.salesmen < 3 && company.cash >= 5 + safetyMargin) {
+                company.cash -= 5;
+                company.salesmen++;
+                company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '採用', '💼', 'セールスマン採用（バランス投資）');
+                return;
+            }
+        }
+
+        // PRICE_FOCUSED戦略：研究チップ特化
+        if (company.strategy === 'price_focused') {
+            if (company.chips.research < 6 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
+                company.chips.research++;
+                incrementRow(companyIndex);
+                showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（価格競争力強化）');
+                return;
+            }
+        }
+
+        // UNPREDICTABLE戦略：ランダムな大型投資
+        if (company.strategy === 'unpredictable' && Math.random() > 0.4) {
+            const investmentChoice = Math.floor(Math.random() * 5);
+            if (investmentChoice === 0 && company.machines.length < 2 && company.cash >= 100 + safetyMargin) {
+                company.cash -= 100;
+                company.machines.push({type: 'large', attachments: 0});
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備投資', '🏭', '大型機械購入（予測不能な投資）');
+                return;
+            } else if (investmentChoice === 1 && company.chips.research < 5 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
+                company.chips.research++;
+                incrementRow(companyIndex);
+                showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（予測不能な投資）');
+                return;
+            } else if (investmentChoice === 2 && company.workers < 4 && company.cash >= 5 + safetyMargin) {
+                company.cash -= 5;
+                company.workers++;
+                company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '採用', '👷', 'ワーカー大量採用');
+                return;
+            } else if (investmentChoice === 3 && company.salesmen < 5 && company.cash >= 5 + safetyMargin) {
+                company.cash -= 5;
+                company.salesmen++;
+                company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '採用', '💼', 'セールスマン大量採用');
+                return;
+            }
+        }
+    }
+
+    // === 2. 基本投資（ボトルネック解消） ===
+
+    // 研究チップ（価格競争力向上→MQ増加に直結）
     if (company.chips.research < 4 && company.cash >= chipCost + safetyMargin) {
-        // 入札市場での勝率向上はGに直接貢献
         company.cash -= chipCost;
         company.chips.research++;
-        incrementRow(gameState.companies.indexOf(company));
+        incrementRow(companyIndex);
         showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（価格競争力+2）');
         return;
     }
 
-    // 2. 能力バランス調整（ボトルネック解消のみ）
-    // 製造能力 < 販売能力 → ワーカー or 機械が必要
+    // 能力バランス調整
     const needMoreMfg = mfgCapacity < salesCapacity && mfgCapacity < 6;
-    // 販売能力 < 製造能力 → セールスマンが必要
     const needMoreSales = salesCapacity < mfgCapacity && salesCapacity < 6;
 
-    // ワーカー採用（製造能力がボトルネックの場合のみ）
+    // ワーカー採用
     if (needMoreMfg && company.workers < 3 && company.cash >= 5 + safetyMargin) {
-        // 機械能力も確認（ワーカーが増えても機械能力がなければ無意味）
         const machineCapacity = company.machines.reduce((sum, m) => {
             if (m.type === 'small') return sum + (m.attachments > 0 ? 2 : 1);
             return sum + 4;
@@ -10010,37 +10150,37 @@ function executeDefaultInvestment(company) {
             company.cash -= 5;
             company.workers++;
             company.extraLaborCost = (company.extraLaborCost || 0) + 5;
-            incrementRow(gameState.companies.indexOf(company));
+            incrementRow(companyIndex);
             showAIActionModal(company, '採用', '👷', 'ワーカー採用（製造能力向上）');
             return;
         }
     }
 
-    // セールスマン採用（販売能力がボトルネックの場合のみ）
+    // セールスマン採用
     if (needMoreSales && company.salesmen < 3 && company.cash >= 5 + safetyMargin) {
         company.cash -= 5;
         company.salesmen++;
         company.extraLaborCost = (company.extraLaborCost || 0) + 5;
-        incrementRow(gameState.companies.indexOf(company));
+        incrementRow(companyIndex);
         showAIActionModal(company, '採用', '💼', 'セールスマン採用（販売能力向上）');
         return;
     }
 
-    // 3. 広告チップ（販売能力がボトルネックの場合）
+    // 広告チップ
     if (needMoreSales && company.chips.advertising < 3 && company.cash >= chipCost + safetyMargin) {
         company.cash -= chipCost;
         company.chips.advertising++;
-        incrementRow(gameState.companies.indexOf(company));
+        incrementRow(companyIndex);
         showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（販売能力向上）');
         return;
     }
 
-    // 4. 機械投資（製造能力がボトルネック、かつワーカー能力に余裕がある場合のみ）
+    // 機械投資
     const workerCapacity = company.workers + (company.chips.education || 0);
     if (needMoreMfg && company.machines.length < 2 && workerCapacity > mfgCapacity && company.cash >= 50 + safetyMargin) {
         company.cash -= 50;
         company.machines.push({type: 'small', attachments: 0});
-        incrementRow(gameState.companies.indexOf(company));
+        incrementRow(companyIndex);
         showAIActionModal(company, '設備投資', '⚙️', '小型機械購入（製造能力向上）');
         return;
     }
