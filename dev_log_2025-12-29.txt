@@ -68,10 +68,38 @@
 ### 14. 市場在庫引き継ぎ確認
 - 3期以降、市場在庫は前期を引き継ぐ（カードデッキのみリセット）
 
+### 15. 行使用ルール修正（お金の流れがあるかどうか）
+- **各社共通カード**: 購入した場合のみ1行使用（購入しなければ0行）
+- **入札キャンセル時**: 行を使わない（nextTurnに変更）
+- **入札失敗時**: 行を使わない（playerSoldInBidフラグで追跡）
+
+### 16. 入札結果表示の改善
+- **コール価格**: 勝敗判定に使用する価格（表示価格 - 価格競争力）
+- **記帳価格**: 売上に計上される価格（表示価格）
+- 両方の価格を入札結果画面で明確に表示
+
+### 17. 行動ログ機能の追加
+- 期末に「行動ログを見る」ボタンを追加
+- 各会社の行動と金銭の流れを一覧表示
+- 対象アクション:
+  - 商品販売（収入）
+  - 材料購入（支出）
+  - 完成・投入（支出）
+  - 採用（支出）
+  - 戦略チップ購入（支出）
+  - 各社共通カード購入（支出）
+
 ## 技術的変更
 
 ### 新規フィールド追加
+- `gameState.actionLog`: 行動ログ配列（companyIndex, action, details, cashChange, rowUsed等）
+- `gameState.playerSoldInBid`: 入札で販売成功したかのフラグ
 - `company.carriedOverChips`: 前期から繰り越したチップ数を追跡
+
+### 新規関数追加
+- `logAction()`: 行動ログを記録
+- `resetActionLog()`: 行動ログをリセット
+- `showActionLogModal()`: 行動ログ表示モーダル
 
 ### 関数修正
 - `calculateFixedCost()`: 金利・チップ費用の計算を修正
@@ -80,3 +108,50 @@
 - `viewGameState()`: 全会社盤・市場盤表示
 - `reassign()`: F計上・1行使用
 - `endPeriod()`: 倉庫リセット・carriedOverChips設定
+- `cancelPlayerBid()`: endTurn→nextTurnに変更
+- `cancelPlayerBidTwoMarket()`: endTurn→nextTurnに変更
+- `completeSale()`: playerSoldInBidフラグで行使用を判定
+- `completeSaleTwoMarket()`: playerSoldInBidフラグで行使用を判定
+- `processCommonPurchase()`: プレイヤー購入時のみ行使用
+- `processAICommonPurchase()`: プレイヤー購入時のみ行使用
+- `processBidsWithAllCompanies()`: コール価格/記帳価格表示、ログ記録
+- `processBidsWithAllCompaniesTwoMarket()`: コール価格/記帳価格表示、ログ記録
+- `showFinancialSummary()`: 行動ログボタン追加
+
+### 18. UI改善（カード選択形式）
+- **縁故採用モーダル**: セールスマン/ワーカーをカードタップで選択
+  - カラフルなカードUI（セールスマン：赤、ワーカー：茶）
+  - ホバー効果付き
+- **意思決定カードモーダル**: 7つのアクションをカード形式で表示
+  - 各アクションに固有の色とアイコン
+  - 会社情報（持ち金、能力、在庫）を同時表示
+  - 4列グリッドレイアウト
+
+### 19. AI強化（G最大化・自己資本最大化）
+- **投資判断の戦略化**:
+  - 期末支払いを考慮した安全マージン確保
+  - ボトルネック解消投資のみ実行（無駄な採用・機械購入を排除）
+  - 研究チップ優先（価格競争力向上→MQ増加に直結）
+
+- **各戦略の最適化**:
+  - **A社（積極的）**: 低価格入札で量を確保、研究チップ投資優先
+  - **B社（バランス）**: 7割ルール徹底、バランスのよい投資
+  - **C社（保守的）**: 安全マージン大きめ、保険チップ優先
+  - **D社（価格競争）**: 薄利多売、ボトルネック解消のみ投資
+  - **E社（技術重視）**: 研究・教育・コンピュータチップ優先
+  - **F社（予測不能）**: ランダムだが合理的な範囲内で行動
+
+- **無駄な投資の排除**:
+  - 期末近く（残り5行以下）は投資しない
+  - 製造能力がボトルネックでない場合はワーカー採用しない
+  - 販売能力がボトルネックでない場合はセールスマン採用しない
+  - ワーカー能力に余裕がなければ機械購入しない
+
+### 関数修正（追加）
+- `executeDefaultInvestment()`: G最大化・自己資本最大化志向に全面改修
+- `executeAggressiveStrategy()`: 無駄な投資を排除、7割ルール徹底
+- `executeConservativeStrategy()`: 保険チップ優先、安全マージン拡大
+- `executePriceFocusedStrategy()`: ボトルネック解消投資のみ
+- `executeTechFocusedStrategy()`: 教育チップ上限確認、戦略的投資
+- `executeBalancedStrategy()`: 7割ルール徹底、バランス投資
+- `executeUnpredictableStrategy()`: 合理的な範囲内でランダム行動

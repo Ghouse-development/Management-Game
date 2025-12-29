@@ -533,6 +533,15 @@
             opacity: 0.4;
             cursor: not-allowed;
         }
+        .markets-board.sales-mode .market-tile.selected {
+            border-color: #8b5cf6 !important;
+            box-shadow: 0 0 20px rgba(139,92,246,0.8), 0 0 40px rgba(139,92,246,0.4) !important;
+            animation: selectedGlow 1s ease-in-out infinite !important;
+        }
+        @keyframes selectedGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(139,92,246,0.8), 0 0 40px rgba(139,92,246,0.4); }
+            50% { box-shadow: 0 0 30px rgba(139,92,246,1), 0 0 60px rgba(139,92,246,0.6); }
+        }
         /* 購入モード時の市場タイル */
         .markets-board.buy-mode { animation: boardGlowBlue 1.5s ease-in-out infinite; }
         @keyframes boardGlowBlue {
@@ -773,6 +782,9 @@
         .submit-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4); transition: all 0.2s; }
         .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(5, 150, 105, 0.5); }
         .submit-btn:active { transform: translateY(0); }
+        .cancel-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(107, 114, 128, 0.4); transition: all 0.2s; }
+        .cancel-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(107, 114, 128, 0.5); }
+        .cancel-btn:active { transform: translateY(0); }
 
         /* アクションボタン（カード風） */
         .action-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 15px; }
@@ -1247,9 +1259,16 @@ const gameState = {
     currentBids: [],
     bidMarkets: [],
 
+    // 行動ログ（期末に表示）
+    actionLog: [],  // {companyIndex, companyName, action, details, cashBefore, cashAfter, rowUsed}
+    playerSoldInBid: null,  // 入札での販売成功フラグ
+
     // 市場選択モード
     salesMode: false,  // 販売モード（市場タップで販売）
     buyMode: false,    // 購入モード（市場タップで材料購入）
+    twoMarketMode: false,  // 2市場販売モード ('simultaneous' or 'separate' or false)
+    selectedMarkets: [],   // 2市場販売で選択された市場インデックス
+    pendingSeparateBids: null, // 別々販売の入札キュー
 
     // 3期以降のサイコロ結果
     diceRoll: null,  // 1-6の値
@@ -1265,7 +1284,7 @@ const gameState = {
         {name: '札幌', buyPrice: 11, sellPrice: 36, maxStock: 4, currentStock: 4, needsBid: true},
         {name: '福岡', buyPrice: 12, sellPrice: 32, maxStock: 6, currentStock: 6, needsBid: true},
         {name: '名古屋', buyPrice: 13, sellPrice: 28, maxStock: 9, currentStock: 9, needsBid: true},
-        {name: '大阪', buyPrice: 14, sellPrice: 24, maxStock: 13, currentStock: 13, needsBid: false},
+        {name: '大阪', buyPrice: 14, sellPrice: 24, maxStock: 13, currentStock: 13, needsBid: true},
         {name: '東京', buyPrice: 15, sellPrice: 20, maxStock: 20, currentStock: 20, needsBid: false},
         {name: '海外', buyPrice: 16, sellPrice: 16, maxStock: 100, currentStock: 45, needsBid: false}
     ],
@@ -1424,8 +1443,8 @@ function initializeCompanies() {
         workers: 1,
         salesmen: 1,
         machines: [{type: 'small', attachments: 0}],
-        warehouses: 0,  // 無災害倉庫の数
-        warehouseLocation: 'materials',  // 'materials' or 'products'
+        warehouses: 0,  // 無災害倉庫の数（0, 1, or 2）
+        warehouseLocation: 'materials',  // 1個の場合の設置場所 ('materials' or 'products')
         chips: {
             computer: 1,  // 期首処理で購入済み
             insurance: 1, // 期首処理で購入済み
@@ -1492,11 +1511,8 @@ function getManufacturingCapacity(company) {
     // 基本機械能力 + コンピュータチップ(+1) + 教育チップ(+1)
     let manufacturingCapacity = baseMachineCapacity + (company.chips.computer || 0);
     
-    // 教育チップで製造能力+1（2期は最大1）
-    let educationBonus = company.chips.education || 0;
-    if (gameState.currentPeriod === 2 && educationBonus > 1) {
-        educationBonus = 1;  // 2期は教育チップ2枚でも効果は1
-    }
+    // 教育チップで製造能力+1（効果は常に1枚分が上限）
+    const educationBonus = Math.min(company.chips.education || 0, 1);
     manufacturingCapacity += educationBonus;
     
     return manufacturingCapacity;
@@ -1512,25 +1528,158 @@ function getSalesCapacity(company) {
     // セールスマン×2
     const baseCapacity = company.salesmen * 2;
 
-    // 広告チップ効果
-    let adBonus = 0;
-    if (company.type === 'ai' || company.type === 'player') {
-        // AIもプレイヤーも広告チップ1枚あたり2個の販売能力
-        // ただしセールスマン1人あたり最大2枚まで
-        adBonus = Math.min(company.chips.advertising * 2, company.salesmen * 2 * 2);
-    }
+    // 広告チップ効果（1枚につき+2、セールスマン1人につき2枚まで有効）
+    const effectiveAdChips = Math.min(company.chips.advertising || 0, company.salesmen * 2);
+    const adBonus = effectiveAdChips * 2;
 
     // 基本販売能力
     let salesCapacity = baseCapacity + adBonus;
 
-    // 教育チップで販売能力+1（セールスマンがいる場合のみ）
-    let educationBonus = company.chips.education || 0;
-    if (gameState.currentPeriod === 2 && educationBonus > 1) {
-        educationBonus = 1;  // 2期は教育チップ2枚でも効果は1
-    }
+    // 教育チップで販売能力+1（効果は常に1枚分が上限）
+    const educationBonus = Math.min(company.chips.education || 0, 1);
     salesCapacity += educationBonus;
 
     return salesCapacity;
+}
+
+// 材料置場の容量を取得（倉庫位置に基づく）
+function getMaterialCapacity(company) {
+    const baseCapacity = 10;
+    const warehouseBonus = 12;
+
+    if (company.warehouses === 0) {
+        return baseCapacity;
+    } else if (company.warehouses === 1) {
+        // 1個の場合、warehouseLocationに基づく
+        return company.warehouseLocation === 'materials' ? baseCapacity + warehouseBonus : baseCapacity;
+    } else {
+        // 2個の場合、両方に設置
+        return baseCapacity + warehouseBonus;
+    }
+}
+
+// 製品置場の容量を取得（倉庫位置に基づく）
+function getProductCapacity(company) {
+    const baseCapacity = 10;
+    const warehouseBonus = 12;
+
+    if (company.warehouses === 0) {
+        return baseCapacity;
+    } else if (company.warehouses === 1) {
+        // 1個の場合、warehouseLocationに基づく
+        return company.warehouseLocation === 'products' ? baseCapacity + warehouseBonus : baseCapacity;
+    } else {
+        // 2個の場合、両方に設置
+        return baseCapacity + warehouseBonus;
+    }
+}
+
+// 材料が火災から保護されているか（無災害倉庫が材料置場にある）
+function isMaterialProtectedFromFire(company) {
+    if (company.warehouses === 0) return false;
+    if (company.warehouses === 1) {
+        return company.warehouseLocation === 'materials';
+    }
+    return true;  // 2個の場合は両方に設置
+}
+
+// 製品が盗難から保護されているか（無災害倉庫が製品置場にある）
+function isProductProtectedFromTheft(company) {
+    if (company.warehouses === 0) return false;
+    if (company.warehouses === 1) {
+        return company.warehouseLocation === 'products';
+    }
+    return true;  // 2個の場合は両方に設置
+}
+
+// 行動ログを記録する関数
+function logAction(companyIndex, action, details, cashChange = 0, rowUsed = false) {
+    const company = gameState.companies[companyIndex];
+    gameState.actionLog.push({
+        companyIndex: companyIndex,
+        companyName: company.name,
+        action: action,
+        details: details,
+        cashChange: cashChange,  // 正=収入、負=支出
+        rowUsed: rowUsed,
+        row: company.currentRow,
+        timestamp: Date.now()
+    });
+}
+
+// 行動ログをリセット（期の開始時）
+function resetActionLog() {
+    gameState.actionLog = [];
+}
+
+// 行動ログを表示するモーダル
+function showActionLogModal() {
+    const companies = gameState.companies;
+
+    let content = `
+        <div style="max-height: 70vh; overflow-y: auto; padding: 10px;">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">第${gameState.currentPeriod}期 行動ログ</div>
+            </div>
+    `;
+
+    // 各会社ごとにログをまとめる
+    for (let i = 0; i < companies.length; i++) {
+        const company = companies[i];
+        const companyLogs = gameState.actionLog.filter(log => log.companyIndex === i);
+        const emoji = i === 0 ? '👤' : ['🅰️', '🅱️', '©️', '🇩', '🇪'][i - 1] || '🏢';
+        const bgColor = i === 0 ? '#eff6ff' : '#f9fafb';
+
+        content += `
+            <div style="background: ${bgColor}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid #e5e7eb;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
+                    <span style="font-size: 24px; margin-right: 10px;">${emoji}</span>
+                    <span style="font-weight: bold; font-size: 16px; color: ${i === 0 ? '#2563eb' : '#374151'};">${company.name}</span>
+                    <span style="margin-left: auto; font-size: 12px; color: #666;">使用行数: ${company.currentRow - 1}</span>
+                </div>
+        `;
+
+        if (companyLogs.length === 0) {
+            content += `<div style="color: #999; font-size: 12px; padding: 5px;">行動記録なし</div>`;
+        } else {
+            content += '<div style="font-size: 12px;">';
+            companyLogs.forEach((log, idx) => {
+                const cashStr = log.cashChange !== 0
+                    ? `<span style="color: ${log.cashChange > 0 ? '#16a34a' : '#dc2626'}; font-weight: bold;">${log.cashChange > 0 ? '+' : ''}¥${log.cashChange}</span>`
+                    : '';
+                const rowStr = log.rowUsed ? `<span style="color: #9333ea; margin-left: 5px;">【1行】</span>` : '';
+
+                content += `
+                    <div style="display: flex; align-items: flex-start; padding: 4px 0; ${idx < companyLogs.length - 1 ? 'border-bottom: 1px dashed #e5e7eb;' : ''}">
+                        <span style="color: #9ca3af; width: 25px; flex-shrink: 0;">${log.row}行</span>
+                        <span style="color: #374151; flex: 1;">${log.action}: ${log.details}</span>
+                        <span style="min-width: 70px; text-align: right;">${cashStr}${rowStr}</span>
+                    </div>
+                `;
+            });
+            content += '</div>';
+        }
+
+        // 総計
+        const totalIncome = companyLogs.filter(l => l.cashChange > 0).reduce((sum, l) => sum + l.cashChange, 0);
+        const totalExpense = companyLogs.filter(l => l.cashChange < 0).reduce((sum, l) => sum + l.cashChange, 0);
+        content += `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1d5db; display: flex; justify-content: space-between; font-size: 11px;">
+                <span style="color: #16a34a;">収入計: +¥${totalIncome}</span>
+                <span style="color: #dc2626;">支出計: ¥${totalExpense}</span>
+                <span style="font-weight: bold;">差引: ¥${totalIncome + totalExpense}</span>
+            </div>
+        `;
+
+        content += '</div>';
+    }
+
+    content += `
+        </div>
+        <button class="submit-btn" onclick="closeModal()">閉じる</button>
+    `;
+
+    showModal('行動ログ', content);
 }
 
 // Get price competitiveness
@@ -1606,17 +1755,21 @@ function calculateDepreciation(company, period) {
 function calculatePeriodPayment(company, useEndOfPeriod = false) {
     const period = gameState.currentPeriod;
     let payment = 0;
-    
+
     // 給料（期末計算時は期末時点の人数を使用）
     if (useEndOfPeriod && company.endOfPeriodStats) {
         // 期末時点の人数・機械台数で計算
-        const costPerUnit = {2: 22, 3: 29, 4: 31, 5: 34};
-        const totalPersonnelCost = {2: 11, 3: 14, 4: 16, 5: 17};
-        
-        payment += company.endOfPeriodStats.machines * costPerUnit[period];
-        payment += company.endOfPeriodStats.workers * costPerUnit[period];
-        payment += company.endOfPeriodStats.salesmen * costPerUnit[period];
-        payment += (company.endOfPeriodStats.workers + company.endOfPeriodStats.salesmen) * totalPersonnelCost[period];
+        const baseCost = {2: 22, 3: 24, 4: 26, 5: 28};
+        let unitCost = baseCost[period] || 22;
+        if (period >= 3 && gameState.wageMultiplier > 1) {
+            unitCost = Math.round(baseCost[period] * gameState.wageMultiplier);
+        }
+        const halfCost = Math.round(unitCost / 2);
+
+        payment += company.endOfPeriodStats.machines * unitCost;
+        payment += company.endOfPeriodStats.workers * unitCost;
+        payment += company.endOfPeriodStats.salesmen * unitCost;
+        payment += (company.endOfPeriodStats.workers + company.endOfPeriodStats.salesmen) * halfCost;
     } else {
         payment += calculateSalaryCost(company, period);
     }
@@ -1733,27 +1886,28 @@ function calculateFixedCost(company) {
 
 // Calculate VQ (変動費総額)
 function calculateVQ(company) {
-    // VQ = ①材料購入費 + ②完成投入費 + ③期末在庫評価額 - ④期首在庫評価額
-    
+    // VQ = 材料購入金額 + 完成投入費用 + (期首在庫評価額 - 期末在庫評価額)
+    // ※ 在庫が増えた分はコストではない、在庫が減った分がコストになる
+
     // ①材料購入費（期中の合計）
     const materialCost = company.totalMaterialCost || 0;
-    
+
     // ②完成・投入費（期中の合計）
     const productionCost = company.totalProductionCost || 0;
-    
-    // ③期末在庫評価額
+
+    // ③期首在庫評価額（元の材料価値）
     // 材料:13円、仕掛品:14円、製品:15円
-    const endInventoryValue = (company.materials * 13) + 
-                             (company.wip * 14) + 
-                             (company.products * 15);
-    
-    // ④期首在庫評価額
-    const startInventoryValue = (company.periodStartInventory.materials * 13) + 
-                               (company.periodStartInventory.wip * 14) + 
+    const startInventoryValue = (company.periodStartInventory.materials * 13) +
+                               (company.periodStartInventory.wip * 14) +
                                (company.periodStartInventory.products * 15);
-    
-    // VQ = ①+②+③-④
-    return materialCost + productionCost + endInventoryValue - startInventoryValue;
+
+    // ④期末在庫評価額（今の材料価値）
+    const endInventoryValue = (company.materials * 13) +
+                             (company.wip * 14) +
+                             (company.products * 15);
+
+    // VQ = ①+②+(③-④)
+    return materialCost + productionCost + startInventoryValue - endInventoryValue;
 }
 
 // Show period payment breakdown
@@ -1767,19 +1921,25 @@ function showPeriodPaymentBreakdown() {
     if (company.endOfPeriodStats) {
         // 期末時点の人数・機械台数を使用
         const stats = company.endOfPeriodStats;
-        const costPerUnit = {2: 22, 3: 29, 4: 31, 5: 34};
-        const totalPersonnelCost = {2: 11, 3: 14, 4: 16, 5: 17};
-        
-        const machineCost = stats.machines * costPerUnit[period];
-        const workerCost = stats.workers * costPerUnit[period];
-        const salesmanCost = stats.salesmen * costPerUnit[period];
-        const personnelCost = (stats.workers + stats.salesmen) * totalPersonnelCost[period];
-        
+
+        // 基本単価（サイコロによる変動は3期以降）
+        const baseCost = {2: 22, 3: 24, 4: 26, 5: 28};
+        let unitCost = baseCost[period] || 22;
+        if (period >= 3 && gameState.wageMultiplier > 1) {
+            unitCost = Math.round(baseCost[period] * gameState.wageMultiplier);
+        }
+        const halfCost = Math.round(unitCost / 2);
+
+        const machineCost = stats.machines * unitCost;
+        const workerCost = stats.workers * unitCost;
+        const salesmanCost = stats.salesmen * unitCost;
+        const personnelCost = (stats.workers + stats.salesmen) * halfCost;
+
         html += `<div class="breakdown-item"><span>【給料内訳】</span><span></span></div>`;
-        html += `<div class="breakdown-item"><span>　機械費 (${stats.machines}台×¥${costPerUnit[period]})</span><span>¥${machineCost}</span></div>`;
-        html += `<div class="breakdown-item"><span>　ワーカー給料 (${stats.workers}人×¥${costPerUnit[period]})</span><span>¥${workerCost}</span></div>`;
-        html += `<div class="breakdown-item"><span>　セールスマン給料 (${stats.salesmen}人×¥${costPerUnit[period]})</span><span>¥${salesmanCost}</span></div>`;
-        html += `<div class="breakdown-item"><span>　人員合計費 (${stats.workers + stats.salesmen}人×¥${totalPersonnelCost[period]})</span><span>¥${personnelCost}</span></div>`;
+        html += `<div class="breakdown-item"><span>　機械費 (${stats.machines}台×¥${unitCost})</span><span>¥${machineCost}</span></div>`;
+        html += `<div class="breakdown-item"><span>　ワーカー給料 (${stats.workers}人×¥${unitCost})</span><span>¥${workerCost}</span></div>`;
+        html += `<div class="breakdown-item"><span>　セールスマン給料 (${stats.salesmen}人×¥${unitCost})</span><span>¥${salesmanCost}</span></div>`;
+        html += `<div class="breakdown-item"><span>　人員合計費 (${stats.workers + stats.salesmen}人×¥${halfCost})</span><span>¥${personnelCost}</span></div>`;
         html += `<div class="breakdown-item"><span>給料合計</span><span>¥${machineCost + workerCost + salesmanCost + personnelCost}</span></div>`;
     } else {
         // 通常の給料計算
@@ -2025,7 +2185,8 @@ function processPeriodStart() {
 // Show turn start options
 function showTurnStartOptions() {
     if (gameState.currentPlayerIndex !== 0) return;
-    
+
+    const company = gameState.companies[0];
     const content = `
         <div class="card-choice-container">
             <h2>あなたのターン</h2>
@@ -2037,6 +2198,7 @@ function showTurnStartOptions() {
                 <p>その他のアクション（Bルール）</p>
                 <button class="action-btn secondary" onclick="showInsurancePurchaseModal()">保険チップ購入</button>
                 <button class="action-btn secondary" onclick="showWarehouseModal()">無災害倉庫を購入</button>
+                ${company.warehouses === 1 ? '<button class="action-btn secondary" onclick="showWarehouseMoveModal()">倉庫の移動</button>' : ''}
                 <button class="action-btn secondary" onclick="showReassignModal()">配置転換</button>
                 <button class="action-btn secondary" onclick="showSellMachineModal()">機械売却</button>
             </div>
@@ -2222,43 +2384,75 @@ function showDecisionCard() {
     const salesCapacity = getSalesCapacity(company);
     const priceComp = getPriceCompetitiveness(company, 0);
 
-    // 各アクションのアイコンと色
-    const actionStyles = {
-        1: { icon: '💰', class: 'sell', label: '商品販売' },
-        2: { icon: '📦', class: 'buy', label: '材料仕入' },
-        3: { icon: '🏭', class: 'produce', label: '完成・投入' },
-        4: { icon: '👥', class: 'hire', label: '採用' },
-        5: { icon: '⚙️', class: 'machine', label: '設備投資' },
-        6: { icon: '🎯', class: 'strategy', label: '戦略チップ' },
-        7: { icon: '⏭️', class: 'skip', label: 'DO NOTHING' }
+    // 各アクションの設定
+    const actionConfig = {
+        1: { icon: '💰', label: '商品販売', color: '#22c55e', border: '#16a34a', desc: '製品を販売' },
+        2: { icon: '📦', label: '材料仕入', color: '#8b5cf6', border: '#7c3aed', desc: '材料を購入' },
+        3: { icon: '🏭', label: '完成・投入', color: '#3b82f6', border: '#2563eb', desc: '製造を実行' },
+        4: { icon: '👥', label: '採用', color: '#f59e0b', border: '#d97706', desc: '人員を採用' },
+        5: { icon: '⚙️', label: '設備投資', color: '#6366f1', border: '#4f46e5', desc: '機械を購入' },
+        6: { icon: '🎯', label: '戦略チップ', color: '#ef4444', border: '#dc2626', desc: 'チップ購入' },
+        7: { icon: '⏭️', label: 'DO NOTHING', color: '#64748b', border: '#475569', desc: 'パス' }
     };
 
-    const overlayHtml = `
-        <div class="decision-overlay">
-            <div class="decision-header">
-                <h3 class="decision-title">意思決定カード</h3>
-                <p class="decision-subtitle">アクションを選択してください</p>
-                <div class="decision-stats">
-                    <div class="decision-stat">製造 <span class="decision-stat-value">${mfgCapacity}</span></div>
-                    <div class="decision-stat">販売 <span class="decision-stat-value">${salesCapacity}</span></div>
-                    <div class="decision-stat">価格 <span class="decision-stat-value">+${priceComp}</span></div>
-                </div>
+    const cardHtml = gameState.decisionCards.map(card => {
+        const cfg = actionConfig[card.id];
+        return `
+            <div onclick="selectDecisionCard(${card.id})" style="
+                background: linear-gradient(135deg, ${cfg.color} 0%, ${cfg.border} 100%);
+                border: 3px solid ${cfg.border};
+                border-radius: 10px;
+                padding: 12px 8px;
+                text-align: center;
+                cursor: pointer;
+                color: white;
+                transition: transform 0.2s, box-shadow 0.2s;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            " onmouseover="this.style.transform='scale(1.05)'"
+               onmouseout="this.style.transform='scale(1)'">
+                <div style="font-size: 24px; margin-bottom: 4px;">${cfg.icon}</div>
+                <div style="font-weight: bold; font-size: 12px;">${cfg.label}</div>
+                <div style="font-size: 9px; opacity: 0.9;">${cfg.desc}</div>
             </div>
-            <div class="decision-grid">
-                ${gameState.decisionCards.map(card => {
-                    const style = actionStyles[card.id];
-                    return `
-                        <button class="decision-btn ${style.class}" onclick="selectDecisionCard(${card.id})">
-                            <div class="decision-btn-icon">${style.icon}</div>
-                            <div class="decision-btn-text">${style.label}</div>
-                        </button>
-                    `;
-                }).join('')}
+        `;
+    }).join('');
+
+    const content = `
+        <div style="background: #fef3c7; border-radius: 8px; padding: 8px; margin-bottom: 12px; text-align: center;">
+            <div style="font-weight: bold; color: #92400e; font-size: 14px;">💰 持ち金: ¥${company.cash}</div>
+        </div>
+        <div style="display: flex; justify-content: space-around; margin-bottom: 12px; padding: 8px; background: #f1f5f9; border-radius: 8px;">
+            <div style="text-align: center;">
+                <div style="font-size: 10px; color: #64748b;">製造</div>
+                <div style="font-size: 16px; font-weight: bold; color: #0284c7;">${mfgCapacity}</div>
             </div>
+            <div style="text-align: center;">
+                <div style="font-size: 10px; color: #64748b;">販売</div>
+                <div style="font-size: 16px; font-weight: bold; color: #dc2626;">${salesCapacity}</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 10px; color: #64748b;">価格競争力</div>
+                <div style="font-size: 16px; font-weight: bold; color: #16a34a;">+${priceComp}</div>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 12px; font-size: 11px;">
+            <div style="background: #e0e7ff; padding: 4px 10px; border-radius: 6px;">
+                <span style="color: #4338ca;">材料</span> <b>${company.materials}</b>
+            </div>
+            <div style="background: #fae8ff; padding: 4px 10px; border-radius: 6px;">
+                <span style="color: #a21caf;">仕掛品</span> <b>${company.wip}</b>
+            </div>
+            <div style="background: #dbeafe; padding: 4px 10px; border-radius: 6px;">
+                <span style="color: #1d4ed8;">製品</span> <b>${company.products}</b>
+            </div>
+        </div>
+        <p style="text-align: center; font-size: 12px; color: #666; margin-bottom: 10px;">アクションを選択してください</p>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            ${cardHtml}
         </div>
     `;
 
-    document.getElementById('modalContainer').innerHTML = overlayHtml;
+    showModal('意思決定カード', content);
 }
 
 // Select decision card
@@ -2464,7 +2658,7 @@ function applyRiskCard(cardId) {
             break;
         case 31: // 倉庫火災
         case 32:
-            if (company.warehouses > 0 && company.warehouseLocation === 'materials' && company.materials <= 12 * company.warehouses) {
+            if (isMaterialProtectedFromFire(company)) {
                 alert('倉庫火災！\n無災害倉庫により回避しました');
             } else if (company.chips.insurance > 0) {
                 const lostMaterials = company.materials;
@@ -2531,7 +2725,7 @@ function applyRiskCard(cardId) {
             break;
         case 45: // 盗難発見
         case 46:
-            if (company.warehouses > 0 && company.warehouseLocation === 'products' && company.products <= 12 * company.warehouses) {
+            if (isProductProtectedFromTheft(company)) {
                 alert('盗難発見！\n無災害倉庫により回避しました');
             } else if (company.chips.insurance > 0) {
                 const stolen = Math.min(2, company.products);
@@ -3116,40 +3310,90 @@ function showForcedActionModal() {
 
 // Show hiring choice modal for 縁故採用
 function showHiringChoiceModal() {
+    const company = gameState.companies[0];
     const content = `
-        <div class="form-group">
-            <label class="form-label">縁故採用：追加する人員を選択してください</label>
-            <p style="font-size: 12px; color: #666;">本社経費5円を支払い、固定費に5円追加されました</p>
-            <div style="margin: 10px 0;">
-                <button class="action-btn primary" onclick="executeHiring('worker')" style="width: 100%; margin: 5px 0;">
-                    ワーカーを1名追加
-                </button>
-                <button class="action-btn secondary" onclick="executeHiring('salesman')" style="width: 100%; margin: 5px 0;">
-                    セールスマンを1名追加
-                </button>
+        <div style="background: #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center;">
+            <div style="font-weight: bold; color: #92400e;">💰 持ち金: ¥${company.cash}</div>
+        </div>
+        <p style="text-align: center; margin-bottom: 15px; color: #666; font-size: 14px;">縁故採用：追加する人員を選択（本社経費¥5）</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <!-- セールスマン -->
+            <div onclick="executeHiring('salesman')" style="
+                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+                border: 3px solid #c44;
+                border-radius: 12px;
+                padding: 20px 15px;
+                text-align: center;
+                cursor: pointer;
+                color: white;
+                transition: transform 0.2s, box-shadow 0.2s;
+                box-shadow: 0 4px 12px rgba(238, 90, 90, 0.4);
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(238, 90, 90, 0.6)'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(238, 90, 90, 0.4)'">
+                <div style="font-size: 36px; margin-bottom: 8px;">💼</div>
+                <div style="font-weight: bold; font-size: 16px;">セールスマン</div>
+                <div style="font-size: 12px; margin-top: 5px;">+1名</div>
+            </div>
+
+            <!-- ワーカー -->
+            <div onclick="executeHiring('worker')" style="
+                background: linear-gradient(135deg, #f5deb3 0%, #deb887 100%);
+                border: 3px solid #a08060;
+                border-radius: 12px;
+                padding: 20px 15px;
+                text-align: center;
+                cursor: pointer;
+                color: #5d4037;
+                transition: transform 0.2s, box-shadow 0.2s;
+                box-shadow: 0 4px 12px rgba(160, 128, 96, 0.4);
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(160, 128, 96, 0.6)'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(160, 128, 96, 0.4)'">
+                <div style="font-size: 36px; margin-bottom: 8px;">👷</div>
+                <div style="font-weight: bold; font-size: 16px;">ワーカー</div>
+                <div style="font-size: 12px; margin-top: 5px;">+1名</div>
             </div>
         </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <button class="cancel-btn" onclick="closeModal(true)" style="padding: 10px 30px;">キャンセル</button>
+        </div>
     `;
-    
+
     showModal('縁故採用', content);
 }
 
 // Execute hiring from 縁故採用
 function executeHiring(type) {
     const company = gameState.companies[0];
-    
+    const cost = 5;  // 縁故採用費用
+
+    // 現金不足時は短期借入
+    if (company.cash < cost) {
+        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
+        company.shortLoans += needed;
+        company.cash += needed * 0.8;
+        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+    }
+
+    // 5円支払い
+    company.cash -= cost;
+    company.extraLaborCost = (company.extraLaborCost || 0) + cost;  // Fに計上
+
     if (type === 'worker') {
         company.workers++;
+        // 行動ログ記録
+        logAction(0, '縁故採用', 'ワーカー+1', -cost, true);
         closeModal();
-        alert('縁故採用：ワーカーを1名追加しました');
+        alert('縁故採用：ワーカーを1名追加しました（¥5）');
     } else if (type === 'salesman') {
         company.salesmen++;
+        // 行動ログ記録
+        logAction(0, '縁故採用', 'セールス+1', -cost, true);
         closeModal();
-        alert('縁故採用：セールスマンを1名追加しました');
+        alert('縁故採用：セールスマンを1名追加しました（¥5）');
     }
-    
+
     updateDisplay();
-    nextTurn();
+    endTurn();  // 5円支払いがあるので1行使用
 }
 
 // Execute common purchase for all companies (各社共通)
@@ -3180,15 +3424,16 @@ function executeAllCompaniesCommonPurchase() {
 function processCommonPurchase() {
     const playerQty = parseInt(document.getElementById('playerQuantity').value || 0);
     let purchaseLog = [];
-    
+    let playerPurchased = false;  // プレイヤーが購入したか追跡
+
     // プレイヤーの購入処理
     if (playerQty > 0) {
         const playerCompany = gameState.companies[0];
         const cost = playerQty * 12;
-        
+
         if (playerCompany.cash >= cost) {
             let purchased = 0;
-            
+
             // まず市場から購入
             for (const market of gameState.markets) {
                 if (purchased >= playerQty) break;
@@ -3198,7 +3443,7 @@ function processCommonPurchase() {
                     purchased += qty;
                 }
             }
-            
+
             // 不足分は海外市場（ストッカー）から
             const overseasMarket = gameState.markets.find(m => m.name === '海外');
             if (purchased < playerQty && overseasMarket) {
@@ -3206,11 +3451,14 @@ function processCommonPurchase() {
                 overseasMarket.currentStock = Math.max(0, overseasMarket.currentStock - qty);
                 purchased += qty;
             }
-            
+
             playerCompany.cash -= cost;
             playerCompany.materials += playerQty;
             playerCompany.totalMaterialCost += cost;
-            // 各社共通は行を消費しない
+            playerPurchased = true;  // 購入した
+
+            // 行動ログ記録
+            logAction(0, '各社共通', `¥12×${playerQty}個購入`, -cost, true);
 
             purchaseLog.push(`あなた: ${playerQty}個購入（¥${cost}）`);
         } else {
@@ -3248,25 +3496,35 @@ function processCommonPurchase() {
             }
 
             if (purchased > 0) {
-                company.cash -= purchased * 12;
+                const aiCost = purchased * 12;
+                company.cash -= aiCost;
                 company.materials += purchased;
-                company.totalMaterialCost += purchased * 12;
-                purchaseLog.push(`${company.name}: ${purchased}個購入（¥${purchased * 12}）`);
+                company.totalMaterialCost += aiCost;
+
+                // 行動ログ記録（AI）
+                logAction(i, '各社共通', `¥12×${purchased}個購入`, -aiCost, false);
+
+                purchaseLog.push(`${company.name}: ${purchased}個購入（¥${aiCost}）`);
             }
         }
     }
-    
+
     closeModal();
     updateDisplay();
-    
+
     // 購入結果を表示
     if (purchaseLog.length > 0) {
         alert('【各社共通購入結果】\n' + purchaseLog.join('\n'));
     } else {
         alert('どの会社も購入しませんでした');
     }
-    
-    nextTurn();
+
+    // プレイヤーが購入した場合のみ1行使用
+    if (playerPurchased) {
+        endTurn();
+    } else {
+        nextTurn();
+    }
 }
 
 // Render markets
@@ -3320,7 +3578,15 @@ function renderCompanies() {
         // Warehouse display
         let warehouseDisplay = '';
         if (company.warehouses > 0) {
-            warehouseDisplay = `<span class="warehouse-item">倉庫${company.warehouses}(${company.warehouseLocation === 'materials' ? '材' : '製'})</span>`;
+            let locationText = '';
+            if (company.warehouses === 2 || company.warehouseLocation === 'both') {
+                locationText = '材+製';
+            } else if (company.warehouseLocation === 'materials') {
+                locationText = '材';
+            } else {
+                locationText = '製';
+            }
+            warehouseDisplay = `<span class="warehouse-item">倉庫(${locationText})</span>`;
         }
         
         html += `
@@ -3597,11 +3863,17 @@ function renderMarketsBoard() {
         let unavailableClass = '';
         let onClickHandler = '';
 
+        // 2市場モードで選択済みかチェック（同時・別々両方）
+        const isSelected = (gameState.twoMarketMode === 'simultaneous' || gameState.twoMarketMode === 'separate') &&
+            gameState.selectedMarkets && gameState.selectedMarkets.includes(marketIndex);
+
         if (gameState.salesMode) {
             // 販売モード: 2期は海外禁止、閉鎖市場禁止、在庫満杯禁止
             const isFull = market.currentStock >= market.maxStock;
             const isOverseasIn2nd = period === 2 && market.name === '海外';
-            if (market.closed || isFull || isOverseasIn2nd) {
+            // 2市場同時モードでは入札市場のみ
+            const needsBidOnly = gameState.twoMarketMode === 'simultaneous' && !market.needsBid;
+            if (market.closed || isFull || isOverseasIn2nd || needsBidOnly) {
                 unavailableClass = 'unavailable';
             } else {
                 onClickHandler = `onclick="onMarketTileClick(${marketIndex}, 'sell')"`;
@@ -3619,8 +3891,12 @@ function renderMarketsBoard() {
         // マーケットボリューム（海外は無制限）
         const volumeText = market.name === '海外' ? '∞' : market.maxStock;
 
+        const selectedClass = isSelected ? 'selected' : '';
+        const selectedBadge = isSelected ? '<div style="position:absolute;top:2px;right:2px;background:#8b5cf6;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;">✓</div>' : '';
+
         html += `
-            <div class="market-tile ${marketClass} ${closedClass} ${unavailableClass}" ${onClickHandler}>
+            <div class="market-tile ${marketClass} ${closedClass} ${unavailableClass} ${selectedClass}" ${onClickHandler} style="position:relative;">
+                ${selectedBadge}
                 <div class="market-name">${market.name}</div>
                 <div class="market-volume">MV:${volumeText}</div>
                 <div class="market-prices">
@@ -3903,11 +4179,65 @@ function showFixedCostModal() {
         }
     });
 
+    // 戦略チップ費用
+    const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
+    let chipCost = 0;
+    let chipDetails = [];
+
+    if (period === 2) {
+        const researchCost = (company.chips.research || 0) * 20;
+        const educationCost = (company.chips.education || 0) * 20;
+        const advertisingCost = (company.chips.advertising || 0) * 20;
+        chipCost = researchCost + educationCost + advertisingCost;
+        if (researchCost > 0) chipDetails.push(`研究 ${company.chips.research}枚×¥20 = ¥${researchCost}`);
+        if (educationCost > 0) chipDetails.push(`教育 ${company.chips.education}枚×¥20 = ¥${educationCost}`);
+        if (advertisingCost > 0) chipDetails.push(`広告 ${company.chips.advertising}枚×¥20 = ¥${advertisingCost}`);
+    } else {
+        // 繰り越し分（20円）
+        const carryResearch = (carriedOver.research || 0) * 20;
+        const carryEducation = (carriedOver.education || 0) * 20;
+        const carryAdvertising = (carriedOver.advertising || 0) * 20;
+        // 特急分（40円）
+        const urgentResearch = Math.max(0, (company.chips.research || 0) - (carriedOver.research || 0)) * 40;
+        const urgentEducation = Math.max(0, (company.chips.education || 0) - (carriedOver.education || 0)) * 40;
+        const urgentAdvertising = Math.max(0, (company.chips.advertising || 0) - (carriedOver.advertising || 0)) * 40;
+        // 次期繰り越し分（20円）
+        const nextResearch = (company.nextPeriodChips?.research || 0) * 20;
+        const nextEducation = (company.nextPeriodChips?.education || 0) * 20;
+        const nextAdvertising = (company.nextPeriodChips?.advertising || 0) * 20;
+
+        chipCost = carryResearch + carryEducation + carryAdvertising +
+                   urgentResearch + urgentEducation + urgentAdvertising +
+                   nextResearch + nextEducation + nextAdvertising;
+
+        if (carriedOver.research > 0) chipDetails.push(`研究(繰越) ${carriedOver.research}枚×¥20 = ¥${carryResearch}`);
+        if (urgentResearch > 0) chipDetails.push(`研究(特急) ${(company.chips.research - carriedOver.research)}枚×¥40 = ¥${urgentResearch}`);
+        if (carriedOver.education > 0) chipDetails.push(`教育(繰越) ${carriedOver.education}枚×¥20 = ¥${carryEducation}`);
+        if (urgentEducation > 0) chipDetails.push(`教育(特急) ${(company.chips.education - carriedOver.education)}枚×¥40 = ¥${urgentEducation}`);
+        if (carriedOver.advertising > 0) chipDetails.push(`広告(繰越) ${carriedOver.advertising}枚×¥20 = ¥${carryAdvertising}`);
+        if (urgentAdvertising > 0) chipDetails.push(`広告(特急) ${(company.chips.advertising - carriedOver.advertising)}枚×¥40 = ¥${urgentAdvertising}`);
+        if (nextResearch > 0) chipDetails.push(`研究(次期) ${company.nextPeriodChips.research}枚×¥20 = ¥${nextResearch}`);
+        if (nextEducation > 0) chipDetails.push(`教育(次期) ${company.nextPeriodChips.education}枚×¥20 = ¥${nextEducation}`);
+        if (nextAdvertising > 0) chipDetails.push(`広告(次期) ${company.nextPeriodChips.advertising}枚×¥20 = ¥${nextAdvertising}`);
+    }
+
+    // コンピュータ・保険
+    const computerCost = (company.chips.computer || 0) * 20;
+    const insuranceCost = (company.chips.insurance || 0) * 5;
+
+    // 金利
+    const longInterest = Math.round((company.loans || 0) * 0.10);
+    const shortInterest = Math.round((company.shortLoans || 0) * 0.20);
+
+    // その他人件費（採用費、退職費、リスクカードなど）
     const extraLabor = company.extraLaborCost || 0;
-    const totalFixed = salaryCost + depreciationCost + extraLabor;
+
+    // 合計
+    const totalFixed = salaryCost + depreciationCost + chipCost + computerCost + insuranceCost +
+                       longInterest + shortInterest + extraLabor;
 
     const content = `
-        <div class="breakdown-list">
+        <div class="breakdown-list" style="max-height: 400px; overflow-y: auto;">
             <div style="font-weight: bold; color: #1e40af; margin-bottom: 12px; font-size: 14px;">給料（単価: ¥${unitCost}）</div>
             <div class="breakdown-item">
                 <span class="breakdown-item-label">機械 ${machineCount}台 × ¥${unitCost}</span>
@@ -3925,14 +4255,46 @@ function showFixedCostModal() {
                 <span class="breakdown-item-label">期中最大 ${maxPersonnel}人 × ¥${halfCost}</span>
                 <span class="breakdown-item-value">¥${maxPersonnelCost}</span>
             </div>
-            <div style="font-weight: bold; color: #1e40af; margin: 12px 0; font-size: 14px;">その他</div>
+            <div style="font-weight: bold; color: #1e40af; margin: 12px 0; font-size: 14px;">減価償却・その他</div>
             <div class="breakdown-item">
                 <span class="breakdown-item-label">減価償却</span>
                 <span class="breakdown-item-value">¥${depreciationCost}</span>
             </div>
+            ${chipCost > 0 ? `
+            <div style="font-weight: bold; color: #059669; margin: 12px 0; font-size: 12px;">戦略チップ</div>
+            ${chipDetails.map(d => `<div class="breakdown-item" style="font-size: 11px;"><span>${d}</span></div>`).join('')}
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">チップ合計</span>
+                <span class="breakdown-item-value">¥${chipCost}</span>
+            </div>
+            ` : ''}
+            ${computerCost > 0 ? `
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">コンピュータ ${company.chips.computer}枚×¥20</span>
+                <span class="breakdown-item-value">¥${computerCost}</span>
+            </div>
+            ` : ''}
+            ${insuranceCost > 0 ? `
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">保険 ${company.chips.insurance}枚×¥5</span>
+                <span class="breakdown-item-value">¥${insuranceCost}</span>
+            </div>
+            ` : ''}
+            ${longInterest > 0 ? `
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">長期借入金利 ¥${company.loans}×10%</span>
+                <span class="breakdown-item-value">¥${longInterest}</span>
+            </div>
+            ` : ''}
+            ${shortInterest > 0 ? `
+            <div class="breakdown-item">
+                <span class="breakdown-item-label">短期借入金利 ¥${company.shortLoans}×20%</span>
+                <span class="breakdown-item-value">¥${shortInterest}</span>
+            </div>
+            ` : ''}
             ${extraLabor > 0 ? `
             <div class="breakdown-item">
-                <span class="breakdown-item-label">その他人件費</span>
+                <span class="breakdown-item-label">その他（採用費・リスク等）</span>
                 <span class="breakdown-item-value">¥${extraLabor}</span>
             </div>
             ` : ''}
@@ -4002,12 +4364,13 @@ function buyMaterialsFromMultiple() {
     
     // 倉庫容量チェック
     const newMaterialCount = company.materials + totalQty;
-    if (newMaterialCount > 10 && company.warehouses === 0) {
-        alert(`材料置場に10個以上置くには無災害倉庫が必要です。\n現在: ${company.materials}個、購入後: ${newMaterialCount}個`);
-        return;
-    }
-    if (company.warehouses > 0 && company.warehouseLocation === 'materials' && newMaterialCount > 12 * company.warehouses) {
-        alert(`無災害倉庫の容量を超えます。\n倉庫${company.warehouses}台で最大${12 * company.warehouses}個まで`);
+    const maxMaterialCapacity = getMaterialCapacity(company);
+    if (newMaterialCount > maxMaterialCapacity) {
+        if (company.warehouses === 0) {
+            alert(`材料置場に10個以上置くには無災害倉庫が必要です。\n現在: ${company.materials}個、購入後: ${newMaterialCount}個`);
+        } else {
+            alert(`材料置場の容量（${maxMaterialCapacity}個）を超えます。\n現在: ${company.materials}個、購入後: ${newMaterialCount}個`);
+        }
         return;
     }
     
@@ -4029,19 +4392,23 @@ function buyMaterialsFromMultiple() {
     company.cash -= totalCost;
     company.materials += totalQty;
     company.totalMaterialCost += totalCost;
-    
+
     // 各市場の在庫を減らす
     purchases.forEach(p => {
         const marketIndex = gameState.markets.indexOf(p.market);
         gameState.markets[marketIndex].currentStock -= p.qty;
     });
-    
+
+    // 行動ログ記録（複数市場からの購入）
+    const purchaseDetails = purchases.map(p => `${p.market.name}¥${p.market.buyPrice}×${p.qty}`).join(', ');
+    logAction(0, '材料購入', purchaseDetails, -totalCost, true);
+
     // 使用行数分進める
     gameState.currentRow += rowsUsed - 1; // -1は通常のendTurnで1行進むため
-    
+
     closeModal();
     updateDisplay();
-    
+
     // 購入結果を表示
     let message = `材料${totalQty}個を¥${totalCost}で購入しました\n`;
     purchases.forEach(p => {
@@ -4049,7 +4416,7 @@ function buyMaterialsFromMultiple() {
     });
     message += `${rowsUsed}行使用しました`;
     alert(message);
-    
+
     endTurn();
 }
 
@@ -4062,12 +4429,13 @@ function buyMaterials() {
     
     // Check warehouse capacity
     const newMaterialCount = company.materials + quantity;
-    if (newMaterialCount > 10 && company.warehouses === 0) {
-        alert(`材料置場に10個以上置くには無災害倉庫が必要です。\n現在: ${company.materials}個、購入後: ${newMaterialCount}個`);
-        return;
-    }
-    if (company.warehouses > 0 && company.warehouseLocation === 'materials' && newMaterialCount > 12 * company.warehouses) {
-        alert(`無災害倉庫の容量を超えます。\n倉庫${company.warehouses}台で最大${12 * company.warehouses}個まで`);
+    const maxMaterialCapacity = getMaterialCapacity(company);
+    if (newMaterialCount > maxMaterialCapacity) {
+        if (company.warehouses === 0) {
+            alert(`材料置場に10個以上置くには無災害倉庫が必要です。\n現在: ${company.materials}個、購入後: ${newMaterialCount}個`);
+        } else {
+            alert(`材料置場の容量（${maxMaterialCapacity}個）を超えます。\n現在: ${company.materials}個、購入後: ${newMaterialCount}個`);
+        }
         return;
     }
     
@@ -4090,7 +4458,10 @@ function buyMaterials() {
     company.materials += quantity;
     company.totalMaterialCost += cost;
     market.currentStock -= quantity;
-    
+
+    // 行動ログ記録
+    logAction(0, '材料購入', `${market.name}から¥${market.buyPrice}×${quantity}個`, -cost, true);
+
     closeModal();
     updateDisplay();
     alert(`${market.name}から材料${quantity}個を¥${cost}で購入しました`);
@@ -4202,12 +4573,13 @@ function produce() {
         return;
     }
     
-    if (newProducts > 10 && company.warehouses === 0) {
-        alert(`製品置場に10個以上置くには無災害倉庫が必要です。\n現在: ${company.products}個、生産後: ${newProducts}個`);
-        return;
-    }
-    if (company.warehouses > 0 && company.warehouseLocation === 'products' && newProducts > 12 * company.warehouses) {
-        alert(`無災害倉庫の容量を超えます。\n倉庫${company.warehouses}台で最大${12 * company.warehouses}個まで`);
+    const maxProductCapacity = getProductCapacity(company);
+    if (newProducts > maxProductCapacity) {
+        if (company.warehouses === 0 || company.warehouseLocation === 'materials') {
+            alert(`製品置場に10個以上置くには無災害倉庫が必要です。\n現在: ${company.products}個、生産後: ${newProducts}個`);
+        } else {
+            alert(`製品置場の容量（${maxProductCapacity}個）を超えます。`);
+        }
         return;
     }
     
@@ -4226,7 +4598,11 @@ function produce() {
     company.wip = newWip;
     company.products = newProducts;
     company.totalProductionCost += cost;
-    
+
+    // 行動ログ記録
+    const productionDetails = `材${matToWip}→仕掛, 仕掛${wipToProd}→製品`;
+    logAction(0, '完成・投入', productionDetails, -cost, true);
+
     closeModal();
     updateDisplay();
     alert(`材料${matToWip}個→仕掛品、仕掛品${wipToProd}個→製品を生産しました（¥${cost}）`);
@@ -4242,17 +4618,111 @@ function enterSalesMode() {
         return;
     }
 
+    // 販売方式選択モーダルを表示
+    showSalesTypeModal();
+}
+
+// 販売方式選択モーダル
+function showSalesTypeModal() {
+    const company = gameState.companies[0];
+    const salesCapacity = getSalesCapacity(company);
+    const availableMarkets = gameState.markets.filter(m => !m.closed && m.needsBid);
+    const canTwoMarkets = availableMarkets.length >= 2 && company.products >= 2;
+
+    const content = `
+        <div style="padding: 10px;">
+            <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #92400e;">製品在庫: ${company.products}個 / 販売能力: ${salesCapacity}</div>
+            </div>
+
+            <div style="display: grid; gap: 12px;">
+                <button onclick="startSingleMarketSale()" class="submit-btn" style="padding: 15px; font-size: 16px;">
+                    <div style="font-weight: bold;">📍 1市場で販売</div>
+                    <div style="font-size: 12px; opacity: 0.8;">1行使用</div>
+                </button>
+
+                ${canTwoMarkets ? `
+                <button onclick="startTwoMarketSale()" class="submit-btn" style="padding: 15px; font-size: 16px; background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);">
+                    <div style="font-weight: bold;">📍📍 2市場同時販売</div>
+                    <div style="font-size: 12px; opacity: 0.8;">同価格・1行使用（低い上限価格適用）</div>
+                </button>
+
+                <button onclick="startSeparateTwoMarketSale()" class="submit-btn" style="padding: 15px; font-size: 16px; background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);">
+                    <div style="font-weight: bold;">📍+📍 2市場別々販売</div>
+                    <div style="font-size: 12px; opacity: 0.8;">別価格・2行使用</div>
+                </button>
+                ` : `
+                <div style="background: #f3f4f6; border-radius: 8px; padding: 12px; text-align: center; color: #6b7280;">
+                    2市場販売には入札市場が2つ以上必要です
+                </div>
+                `}
+            </div>
+
+            <button onclick="closeModal(); showTurnStartOptions();" class="submit-btn" style="margin-top: 15px; background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);">
+                ← 戻る
+            </button>
+        </div>
+    `;
+
+    showModal('💰 販売方式を選択', content);
+}
+
+// 1市場販売モード開始
+function startSingleMarketSale() {
+    const company = gameState.companies[0];
     gameState.salesMode = true;
     gameState.buyMode = false;
+    gameState.twoMarketMode = false;
     closeModal();
     renderMarketsBoard();
 
-    // インストラクションを表示
     const instruction = document.createElement('div');
     instruction.className = 'market-instruction';
     instruction.id = 'marketInstruction';
     instruction.innerHTML = `
         <span>💰 販売したい市場をタップしてください（在庫: ${company.products}個）</span>
+        <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
+    `;
+    document.body.appendChild(instruction);
+}
+
+// 2市場同時販売モード開始
+function startTwoMarketSale() {
+    const company = gameState.companies[0];
+    gameState.salesMode = true;
+    gameState.buyMode = false;
+    gameState.twoMarketMode = 'simultaneous';
+    gameState.selectedMarkets = [];
+    closeModal();
+    renderMarketsBoard();
+
+    const instruction = document.createElement('div');
+    instruction.className = 'market-instruction';
+    instruction.id = 'marketInstruction';
+    instruction.style.background = 'linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%)';
+    instruction.innerHTML = `
+        <span>📍📍 2つの市場を選択してください（同価格・1行）</span>
+        <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
+    `;
+    document.body.appendChild(instruction);
+}
+
+// 2市場別々販売モード開始
+function startSeparateTwoMarketSale() {
+    const company = gameState.companies[0];
+    gameState.salesMode = true;
+    gameState.buyMode = false;
+    gameState.twoMarketMode = 'separate';
+    gameState.selectedMarkets = [];
+    closeModal();
+    renderMarketsBoard();
+
+    const instruction = document.createElement('div');
+    instruction.className = 'market-instruction';
+    instruction.id = 'marketInstruction';
+    instruction.style.background = 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)';
+    instruction.innerHTML = `
+        <span>📍+📍 2つの市場を選択してください（別価格・2行）</span>
         <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
     `;
     document.body.appendChild(instruction);
@@ -4272,10 +4742,16 @@ function showMaterialPurchaseModal() {
     // 購入可能な市場を取得（閉鎖されていない市場のみ）
     const availableMarkets = gameState.markets.filter(m => !m.closed && m.currentStock > 0);
 
+    // 3期以降は1市場からの購入上限 = 製造能力
+    const mfgCapacity = getManufacturingCapacity(company);
+    const isPeriod2 = gameState.currentPeriod === 2;
+
     let marketOptions = '';
     availableMarkets.forEach((market, i) => {
         const marketIndex = gameState.markets.indexOf(market);
-        const maxBuy = Math.min(market.currentStock, 10 - company.materials);
+        // 2期: 制限なし、3期以降: 製造能力が上限
+        const maxPerMarket = isPeriod2 ? 99 : mfgCapacity;
+        const maxBuy = Math.min(market.currentStock, 10 - company.materials, maxPerMarket);
         marketOptions += `
             <div style="background: #f3f4f6; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -4298,6 +4774,7 @@ function showMaterialPurchaseModal() {
             <div style="background: #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 15px;">
                 <div style="font-weight: bold; color: #92400e;">現金: ¥${company.cash} / 材料: ${company.materials}個</div>
                 <div style="font-size: 12px; color: #78350f;">残り行数: ${remainingRows}行</div>
+                ${!isPeriod2 ? `<div style="font-size: 12px; color: #0369a1;">製造能力: ${mfgCapacity} (1市場あたり${mfgCapacity}個まで)</div>` : ''}
                 ${isHighestRow ? `<div style="font-size: 12px; color: #dc2626; margin-top: 5px;">⚠️ あなたは行数トップです。2市場購入は慎重に。</div>` : ''}
             </div>
             <div style="font-size: 13px; color: #6b7280; margin-bottom: 10px;">
@@ -4335,9 +4812,13 @@ function enterBuyMode() {
 function cancelMarketMode() {
     gameState.salesMode = false;
     gameState.buyMode = false;
+    gameState.twoMarketMode = false;
+    gameState.selectedMarkets = [];
+    gameState.pendingSeparateBids = null;
     const instruction = document.getElementById('marketInstruction');
     if (instruction) instruction.remove();
     renderMarketsBoard();
+    showTurnStartOptions();
 }
 
 // 市場タイルがクリックされた時
@@ -4345,19 +4826,438 @@ function onMarketTileClick(marketIndex, action) {
     const market = gameState.markets[marketIndex];
     const company = gameState.companies[0];
 
-    // インストラクションを削除
-    const instruction = document.getElementById('marketInstruction');
-    if (instruction) instruction.remove();
-
     if (action === 'sell') {
+        // 2市場同時販売モードの場合
+        if (gameState.twoMarketMode === 'simultaneous') {
+            if (!gameState.selectedMarkets) gameState.selectedMarkets = [];
+
+            // 既に選択済みなら除外
+            const existingIndex = gameState.selectedMarkets.indexOf(marketIndex);
+            if (existingIndex >= 0) {
+                gameState.selectedMarkets.splice(existingIndex, 1);
+                updateMarketSelectionInstruction();
+                renderMarketsBoard();
+                return;
+            }
+
+            // 選択追加
+            gameState.selectedMarkets.push(marketIndex);
+
+            if (gameState.selectedMarkets.length === 2) {
+                // 2市場選択完了
+                const instruction = document.getElementById('marketInstruction');
+                if (instruction) instruction.remove();
+                gameState.salesMode = false;
+                renderMarketsBoard();
+                showTwoMarketSaleModal();
+            } else {
+                updateMarketSelectionInstruction();
+                renderMarketsBoard();
+            }
+            return;
+        }
+
+        // 2市場別々販売モードの場合
+        if (gameState.twoMarketMode === 'separate') {
+            if (!gameState.selectedMarkets) gameState.selectedMarkets = [];
+
+            // 既に選択済みなら除外
+            const existingIndex = gameState.selectedMarkets.indexOf(marketIndex);
+            if (existingIndex >= 0) {
+                gameState.selectedMarkets.splice(existingIndex, 1);
+                updateSeparateMarketSelectionInstruction();
+                renderMarketsBoard();
+                return;
+            }
+
+            // 選択追加
+            gameState.selectedMarkets.push(marketIndex);
+
+            if (gameState.selectedMarkets.length === 2) {
+                // 2市場選択完了
+                const instruction = document.getElementById('marketInstruction');
+                if (instruction) instruction.remove();
+                gameState.salesMode = false;
+                renderMarketsBoard();
+                showSeparateTwoMarketSaleModal();
+            } else {
+                updateSeparateMarketSelectionInstruction();
+                renderMarketsBoard();
+            }
+            return;
+        }
+
+        // 通常の1市場販売
+        const instruction = document.getElementById('marketInstruction');
+        if (instruction) instruction.remove();
         gameState.salesMode = false;
         renderMarketsBoard();
         showSaleConfirmModal(marketIndex);
     } else if (action === 'buy') {
+        const instruction = document.getElementById('marketInstruction');
+        if (instruction) instruction.remove();
         gameState.buyMode = false;
         renderMarketsBoard();
         showBuyConfirmModal(marketIndex);
     }
+}
+
+// 2市場選択時のインストラクション更新（同時販売）
+function updateMarketSelectionInstruction() {
+    const instruction = document.getElementById('marketInstruction');
+    if (instruction) {
+        const selected = gameState.selectedMarkets || [];
+        const marketNames = selected.map(i => gameState.markets[i].name).join('、');
+        instruction.innerHTML = `
+            <span>📍📍 2つの市場を選択 (${selected.length}/2) ${marketNames ? '- ' + marketNames : ''}</span>
+            <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
+        `;
+    }
+}
+
+// 2市場選択時のインストラクション更新（別々販売）
+function updateSeparateMarketSelectionInstruction() {
+    const instruction = document.getElementById('marketInstruction');
+    if (instruction) {
+        const selected = gameState.selectedMarkets || [];
+        const marketNames = selected.map(i => gameState.markets[i].name).join('、');
+        instruction.innerHTML = `
+            <span>📍+📍 2つの市場を選択 (${selected.length}/2) ${marketNames ? '- ' + marketNames : ''}</span>
+            <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
+        `;
+    }
+}
+
+// 2市場別々販売モーダル
+function showSeparateTwoMarketSaleModal() {
+    const company = gameState.companies[0];
+    const salesCapacity = getSalesCapacity(company);
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+
+    // 各市場のマーケットボリューム（空き容量）
+    const volume1 = market1.maxStock - market1.currentStock;
+    const volume2 = market2.maxStock - market2.currentStock;
+
+    // 各市場への最大販売数
+    const maxQty1 = Math.min(salesCapacity, volume1, company.products);
+    const maxQty2 = Math.min(salesCapacity, volume2, company.products);
+
+    const defaultPrice1 = market1.sellPrice - 4;
+    const defaultPrice2 = market2.sellPrice - 4;
+
+    const content = `
+        <div style="padding: 10px;">
+            <div style="background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px; color: white;">
+                <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">2市場別々販売</div>
+                <div style="font-size: 12px;">各市場に異なる価格で入札（2行使用）</div>
+            </div>
+
+            <div style="background: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                <div style="font-weight: bold; color: #1e293b;">製品在庫: ${company.products}個 / 販売能力: ${salesCapacity}</div>
+            </div>
+
+            <!-- 1つ目の市場 -->
+            <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 10px; border-left: 4px solid #f59e0b;">
+                <div style="font-weight: bold; margin-bottom: 8px;">${market1.name}（上限¥${market1.sellPrice}、空き${volume1}個）</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #666;">数量</label>
+                        <select id="separateQty1" class="form-control" style="font-size: 14px;" onchange="updateSeparateTotal()">
+                            <option value="0">販売しない</option>
+                            ${Array(maxQty1).fill(0).map((_, i) => `<option value="${i+1}">${i+1}個</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #666;">入札価格</label>
+                        <input type="number" id="separatePrice1" class="form-control" min="1" max="${market1.sellPrice}" value="${defaultPrice1}" style="font-size: 14px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2つ目の市場 -->
+            <div style="background: #dbeafe; border-radius: 8px; padding: 12px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+                <div style="font-weight: bold; margin-bottom: 8px;">${market2.name}（上限¥${market2.sellPrice}、空き${volume2}個）</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #666;">数量</label>
+                        <select id="separateQty2" class="form-control" style="font-size: 14px;" onchange="updateSeparateTotal()">
+                            <option value="0">販売しない</option>
+                            ${Array(maxQty2).fill(0).map((_, i) => `<option value="${i+1}">${i+1}個</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #666;">入札価格</label>
+                        <input type="number" id="separatePrice2" class="form-control" min="1" max="${market2.sellPrice}" value="${defaultPrice2}" style="font-size: 14px;">
+                    </div>
+                </div>
+            </div>
+
+            <div id="separateTotalInfo" style="background: #f3f4f6; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center;">
+                <span style="color: #6b7280;">合計販売数量: <strong id="separateTotalQty">0</strong>個（販売能力: ${salesCapacity}）</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button onclick="cancelSeparateTwoMarketSale()" class="submit-btn" style="background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);">
+                    ← 戻る
+                </button>
+                <button onclick="processSeparateTwoMarketSale()" class="submit-btn" style="background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);">
+                    💰 入札実行（2行）
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('📍+📍 2市場別々販売', content);
+}
+
+// 別々販売の合計数量を更新
+function updateSeparateTotal() {
+    const qty1 = parseInt(document.getElementById('separateQty1').value) || 0;
+    const qty2 = parseInt(document.getElementById('separateQty2').value) || 0;
+    document.getElementById('separateTotalQty').textContent = qty1 + qty2;
+}
+
+// 2市場別々販売をキャンセル
+function cancelSeparateTwoMarketSale() {
+    gameState.selectedMarkets = [];
+    gameState.twoMarketMode = false;
+    closeModal();
+    showSalesTypeModal();
+}
+
+// 2市場別々販売を実行
+function processSeparateTwoMarketSale() {
+    const company = gameState.companies[0];
+    const salesCapacity = getSalesCapacity(company);
+
+    const qty1 = parseInt(document.getElementById('separateQty1').value) || 0;
+    const qty2 = parseInt(document.getElementById('separateQty2').value) || 0;
+    const price1 = parseInt(document.getElementById('separatePrice1').value);
+    const price2 = parseInt(document.getElementById('separatePrice2').value);
+
+    const totalQty = qty1 + qty2;
+
+    if (totalQty === 0) {
+        alert('少なくとも1つの市場に販売数量を設定してください');
+        return;
+    }
+
+    if (totalQty > salesCapacity) {
+        alert(`合計販売数量（${totalQty}個）が販売能力（${salesCapacity}個）を超えています`);
+        return;
+    }
+
+    if (totalQty > company.products) {
+        alert(`合計販売数量（${totalQty}個）が製品在庫（${company.products}個）を超えています`);
+        return;
+    }
+
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+
+    if (qty1 > 0 && price1 > market1.sellPrice) {
+        alert(`${market1.name}の入札価格は上限¥${market1.sellPrice}以下にしてください`);
+        return;
+    }
+
+    if (qty2 > 0 && price2 > market2.sellPrice) {
+        alert(`${market2.name}の入札価格は上限¥${market2.sellPrice}以下にしてください`);
+        return;
+    }
+
+    // 価格競争力を計算
+    const competitiveness = getPriceCompetitiveness(company, 0);
+
+    // 2市場別々入札として保存
+    gameState.pendingSeparateBids = {
+        bids: [],
+        currentIndex: 0
+    };
+
+    if (qty1 > 0) {
+        gameState.pendingSeparateBids.bids.push({
+            marketIndex: gameState.selectedMarkets[0],
+            quantity: qty1,
+            price: price1 - competitiveness,
+            displayPrice: price1,
+            company: 0
+        });
+    }
+
+    if (qty2 > 0) {
+        gameState.pendingSeparateBids.bids.push({
+            marketIndex: gameState.selectedMarkets[1],
+            quantity: qty2,
+            price: price2 - competitiveness,
+            displayPrice: price2,
+            company: 0
+        });
+    }
+
+    closeModal();
+    gameState.twoMarketMode = false;
+    gameState.selectedMarkets = [];
+
+    // 最初の市場の入札を処理
+    processSeparateBidNext();
+}
+
+// 別々販売の次の入札を処理
+function processSeparateBidNext() {
+    const pending = gameState.pendingSeparateBids;
+
+    if (pending.currentIndex >= pending.bids.length) {
+        // 全ての入札完了
+        gameState.pendingSeparateBids = null;
+        updateDisplay();
+        return;
+    }
+
+    const bid = pending.bids[pending.currentIndex];
+    const market = gameState.markets[bid.marketIndex];
+
+    // この入札をpendingBidに設定して通常の入札処理を実行
+    gameState.pendingBid = bid;
+    gameState.pendingSeparateBids.currentIndex++;
+
+    // 他社の入札を処理
+    showOtherPlayersBidModal(market, bid.marketIndex);
+}
+
+// 2市場同時販売モーダル
+function showTwoMarketSaleModal() {
+    const company = gameState.companies[0];
+    const salesCapacity = getSalesCapacity(company);
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+
+    // 低い方の上限価格を適用
+    const maxPrice = Math.min(market1.sellPrice, market2.sellPrice);
+    const defaultPrice = maxPrice - 4;
+
+    // 各市場のマーケットボリューム（空き容量）
+    const volume1 = market1.maxStock - market1.currentStock;
+    const volume2 = market2.maxStock - market2.currentStock;
+    const totalVolume = volume1 + volume2;
+
+    // 販売上限 = MIN(販売能力, 合計マーケットボリューム, 製品在庫)
+    const maxQuantity = Math.min(salesCapacity, totalVolume, company.products);
+
+    const content = `
+        <div style="padding: 10px;">
+            <div style="background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px; color: white;">
+                <div style="font-weight: bold; font-size: 16px; margin-bottom: 10px;">2市場同時販売</div>
+                <div style="display: flex; justify-content: space-around;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 12px; opacity: 0.8;">${market1.name}</div>
+                        <div style="font-size: 14px;">上限¥${market1.sellPrice}</div>
+                        <div style="font-size: 11px;">空き${volume1}個</div>
+                    </div>
+                    <div style="font-size: 24px;">+</div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 12px; opacity: 0.8;">${market2.name}</div>
+                        <div style="font-size: 14px;">上限¥${market2.sellPrice}</div>
+                        <div style="font-size: 11px;">空き${volume2}個</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);">
+                    <div style="font-size: 12px;">適用上限価格</div>
+                    <div style="font-size: 24px; font-weight: bold;">¥${maxPrice}</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <div style="background: #f1f5f9; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 11px; color: #64748b;">販売能力</div>
+                    <div style="font-size: 20px; font-weight: bold;">${salesCapacity}</div>
+                </div>
+                <div style="background: #f1f5f9; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 11px; color: #64748b;">製品在庫</div>
+                    <div style="font-size: 20px; font-weight: bold;">${company.products}</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">📦 販売数量</label>
+                    <select id="twoMarketQuantity" class="form-control" style="font-size: 16px; text-align: center;">
+                        ${Array(maxQuantity).fill(0).map((_, i) =>
+                            `<option value="${i+1}" ${i+1 === maxQuantity ? 'selected' : ''}>${i+1}個</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">💵 入札価格</label>
+                    <input type="number" id="twoMarketPrice" class="form-control" min="1" max="${maxPrice}" value="${defaultPrice}" style="font-size: 16px; text-align: center;">
+                </div>
+            </div>
+
+            <div style="font-size: 12px; color: #6b7280; margin-bottom: 15px; text-align: center;">
+                ※ 両市場に同価格で入札（1行使用）
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button onclick="cancelTwoMarketSale()" class="submit-btn" style="background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);">
+                    ← 戻る
+                </button>
+                <button onclick="processTwoMarketSale()" class="submit-btn">
+                    💰 入札実行
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('📍📍 2市場同時販売', content);
+}
+
+// 2市場同時販売をキャンセル
+function cancelTwoMarketSale() {
+    gameState.selectedMarkets = [];
+    gameState.twoMarketMode = false;
+    closeModal();
+    showSalesTypeModal();
+}
+
+// 2市場同時販売を実行
+function processTwoMarketSale() {
+    const company = gameState.companies[0];
+    const quantity = parseInt(document.getElementById('twoMarketQuantity').value);
+    const bidPrice = parseInt(document.getElementById('twoMarketPrice').value);
+    const salesCapacity = getSalesCapacity(company);
+
+    if (quantity > salesCapacity) {
+        alert(`販売能力（${salesCapacity}個）を超えて入札できません`);
+        return;
+    }
+
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+    const maxPrice = Math.min(market1.sellPrice, market2.sellPrice);
+
+    if (bidPrice > maxPrice) {
+        alert(`入札価格は上限価格¥${maxPrice}以下にしてください`);
+        return;
+    }
+
+    // 価格競争力を計算
+    const competitiveness = getPriceCompetitiveness(company, 0);
+    const effectiveBidPrice = bidPrice - competitiveness;
+
+    // 2市場同時入札として保存
+    gameState.pendingBid = {
+        markets: gameState.selectedMarkets,
+        quantity: quantity,
+        price: effectiveBidPrice,
+        displayPrice: bidPrice,
+        company: 0,
+        isTwoMarket: true
+    };
+
+    closeModal();
+
+    // 他社の入札を処理
+    showOtherPlayersBidModalTwoMarket();
 }
 
 // 販売確認モーダル
@@ -4436,7 +5336,7 @@ function showBuyConfirmModal(marketIndex) {
     const maxQuantity = Math.min(market.currentStock, Math.floor(company.cash / market.buyPrice));
 
     // 材料倉庫の空き容量をチェック
-    const maxMaterialCapacity = 10 + (company.warehouses > 0 && company.warehouseLocation === 'materials' ? company.warehouses * 12 : 0);
+    const maxMaterialCapacity = getMaterialCapacity(company);
     const spaceAvailable = maxMaterialCapacity - company.materials;
     const actualMax = Math.min(maxQuantity, spaceAvailable);
 
@@ -4571,7 +5471,7 @@ function processSale() {
         showOtherPlayersBidModal(market, marketIndex);
         return;  // Exit here, will continue after all bids collected
     } else {
-        // 入札不要（大阪・東京・海外）
+        // 入札不要（東京・海外）
         const actualQty = Math.min(quantity, market.maxStock - market.currentStock);
         if (actualQty > 0) {
             company.cash += market.sellPrice * actualQty;
@@ -4596,7 +5496,27 @@ function completeSale() {
         alert(gameState.lastSaleInfo);
         gameState.lastSaleInfo = null;
     }
-    endTurn();
+
+    // 別々販売の次の入札があれば処理
+    if (gameState.pendingSeparateBids && gameState.pendingSeparateBids.currentIndex < gameState.pendingSeparateBids.bids.length) {
+        processSeparateBidNext();
+        return;
+    }
+
+    // 別々販売完了
+    if (gameState.pendingSeparateBids) {
+        gameState.pendingSeparateBids = null;
+    }
+
+    // プレイヤーが実際に販売した場合のみ1行使用（お金の流れがあった場合）
+    const playerSold = gameState.playerSoldInBid;
+    gameState.playerSoldInBid = null;  // フラグをリセット
+
+    if (playerSold) {
+        endTurn();
+    } else {
+        nextTurn();
+    }
 }
 
 // Hire modal
@@ -4735,6 +5655,9 @@ function hire() {
         company.salesmen++;
         alert('教育チップの効果でワーカー+1、セールス+1！');
     }
+
+    // 行動ログ記録
+    logAction(0, '採用', `ワーカー${workers}人, セールス${salesmen}人`, -cost, true);
 
     closeModal();
     updateDisplay();
@@ -4878,49 +5801,206 @@ function buyMachine() {
 
 // Warehouse modal (無災害倉庫)
 function showWarehouseModal() {
+    const company = gameState.companies[0];
+    const currentWarehouses = company.warehouses || 0;
+
+    if (currentWarehouses >= 2) {
+        alert('倉庫は最大2個までです。既に2個所有しています。');
+        return;
+    }
+
+    // 購入可能なオプションを生成
+    let locationOptions = '';
+    let purchaseOptions = '';
+
+    if (currentWarehouses === 0) {
+        // 0個→1個: 材料か製品を選択
+        locationOptions = `
+            <option value="materials">材料置場に設置（+12個）</option>
+            <option value="products">製品置場に設置（+12個）</option>
+        `;
+        purchaseOptions = `
+            <option value="1">1個購入（¥20）</option>
+            <option value="2">2個購入（¥40）- 材料+製品両方</option>
+        `;
+    } else {
+        // 1個→2個: 反対側に追加
+        const otherLocation = company.warehouseLocation === 'materials' ? 'products' : 'materials';
+        const otherName = otherLocation === 'materials' ? '材料置場' : '製品置場';
+        locationOptions = `<option value="${otherLocation}">${otherName}に設置（+12個）</option>`;
+        purchaseOptions = `<option value="1">1個購入（¥20）</option>`;
+    }
+
     const content = `
-        <div class="form-group">
-            <label class="form-label">無災害倉庫（¥20/個）:</label>
-            <p style="font-size: 12px; color: #666;">効果：火災・盗難完全回避、材料・製品10個以上可能</p>
-            <select id="warehouseCount" class="form-control">
-                <option value="1">1個購入</option>
-                <option value="2">2個購入</option>
-            </select>
+        <div style="padding: 10px;">
+            <div style="background: #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #92400e;">現金: ¥${company.cash}</div>
+                <div style="font-size: 12px; color: #78350f;">
+                    現在の倉庫: ${currentWarehouses}個
+                    ${currentWarehouses === 1 ? `（${company.warehouseLocation === 'materials' ? '材料置場' : '製品置場'}）` : ''}
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">無災害倉庫（¥20/個、容量+12個）</label>
+                <p style="font-size: 12px; color: #666;">効果：火災・盗難完全回避</p>
+                <p style="font-size: 12px; color: #0369a1;">※ 1個の場合は後から移動可能</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">購入数:</label>
+                <select id="warehouseCount" class="form-control" onchange="updateWarehouseLocationOptions()">
+                    ${purchaseOptions}
+                </select>
+            </div>
+            <div class="form-group" id="warehouseLocationGroup">
+                <label class="form-label">設置場所:</label>
+                <select id="warehouseLocation" class="form-control">
+                    ${locationOptions}
+                </select>
+            </div>
+            <button class="submit-btn" onclick="buyWarehouse()">購入（1行使用）</button>
         </div>
-        <div class="form-group">
-            <label class="form-label">置場所:</label>
-            <select id="warehouseLocation" class="form-control">
-                <option value="materials">材料置場</option>
-                <option value="products">製品置場</option>
-            </select>
-        </div>
-        <button class="submit-btn" onclick="buyWarehouse()">購入</button>
     `;
-    
+
     showModal('無災害倉庫購入', content);
+}
+
+// 倉庫購入数に応じて設置場所オプションを更新
+function updateWarehouseLocationOptions() {
+    const count = document.getElementById('warehouseCount').value;
+    const locationGroup = document.getElementById('warehouseLocationGroup');
+
+    if (count === '2') {
+        locationGroup.style.display = 'none';  // 2個の場合は両方に設置なので選択不要
+    } else {
+        locationGroup.style.display = 'block';
+    }
 }
 
 // Buy warehouse
 function buyWarehouse() {
     const company = gameState.companies[0];
-    const count = parseInt(document.getElementById('warehouseCount').value);
-    const location = document.getElementById('warehouseLocation').value;
+    const count = parseInt(document.getElementById('warehouseCount')?.value || '1');
+    const location = document.getElementById('warehouseLocation')?.value || 'materials';
+
     const cost = count * 20;
-    
+
+    if (company.warehouses + count > 2) {
+        alert('倉庫は最大2個までです！');
+        return;
+    }
+
     if (company.cash < cost) {
         alert('現金が不足しています！');
         return;
     }
-    
+
     company.cash -= cost;
-    company.warehouses += count;
-    company.warehouseLocation = location;
-    company.extraLaborCost = (company.extraLaborCost || 0) + cost;  // 人件費（機械経費）
+
+    if (count === 2) {
+        // 2個購入: 両方に設置
+        company.warehouses = 2;
+        company.warehouseLocation = 'both';  // 両方に設置を示す
+    } else {
+        // 1個購入
+        company.warehouses += 1;
+        if (company.warehouses === 1) {
+            company.warehouseLocation = location;
+        } else {
+            // 2個目は反対側に設置（自動）
+            company.warehouseLocation = 'both';
+        }
+    }
+
+    company.extraLaborCost = (company.extraLaborCost || 0) + cost;
 
     closeModal();
+    let locationText;
+    if (count === 2 || company.warehouses === 2) {
+        locationText = '材料置場と製品置場';
+    } else {
+        locationText = location === 'materials' ? '材料置場' : '製品置場';
+    }
+    alert(`無災害倉庫を${locationText}に設置しました（¥${cost}）`);
 
     // カードを引く
     drawCard();
+}
+
+// 倉庫移動モーダル（1個のみ保有時に使用可能）
+function showWarehouseMoveModal() {
+    const company = gameState.companies[0];
+
+    if (company.warehouses !== 1) {
+        alert('倉庫の移動は1個保有時のみ可能です。');
+        return;
+    }
+
+    const currentLocation = company.warehouseLocation === 'materials' ? '材料置場' : '製品置場';
+    const newLocation = company.warehouseLocation === 'materials' ? 'products' : 'materials';
+    const newLocationName = newLocation === 'materials' ? '材料置場' : '製品置場';
+
+    // 移動先の容量チェック
+    let canMove = true;
+    let warningMessage = '';
+
+    if (newLocation === 'materials') {
+        // 製品置場→材料置場に移動する場合、製品が10個を超えているか確認
+        if (company.products > 10) {
+            canMove = false;
+            warningMessage = `製品が${company.products}個あります。\n倉庫を移動すると製品置場の容量（10個）を超えてしまいます。`;
+        }
+    } else {
+        // 材料置場→製品置場に移動する場合、材料が10個を超えているか確認
+        if (company.materials > 10) {
+            canMove = false;
+            warningMessage = `材料が${company.materials}個あります。\n倉庫を移動すると材料置場の容量（10個）を超えてしまいます。`;
+        }
+    }
+
+    const content = `
+        <div style="padding: 10px;">
+            <div style="background: #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #92400e;">現在の倉庫位置</div>
+                <div style="font-size: 18px; color: #78350f; margin-top: 5px;">${currentLocation}</div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <p style="font-size: 14px; color: #444;">倉庫を${newLocationName}に移動しますか？</p>
+                <p style="font-size: 12px; color: #0369a1;">※ 移動は何回でも可能で、行を消費しません</p>
+                ${!canMove ? `<p style="font-size: 12px; color: #dc2626; margin-top: 10px;">${warningMessage}</p>` : ''}
+            </div>
+            ${canMove ? `
+                <button class="submit-btn" onclick="moveWarehouse('${newLocation}')" style="width: 100%;">
+                    ${newLocationName}に移動
+                </button>
+            ` : `
+                <button class="submit-btn" disabled style="width: 100%; background: #ccc; cursor: not-allowed;">
+                    移動不可
+                </button>
+            `}
+            <button class="action-btn secondary" onclick="closeModal()" style="width: 100%; margin-top: 10px;">キャンセル</button>
+        </div>
+    `;
+
+    showModal('倉庫の移動', content);
+}
+
+// 倉庫を移動する
+function moveWarehouse(newLocation) {
+    const company = gameState.companies[0];
+
+    if (company.warehouses !== 1) {
+        alert('倉庫の移動は1個保有時のみ可能です。');
+        return;
+    }
+
+    const newLocationName = newLocation === 'materials' ? '材料置場' : '製品置場';
+    company.warehouseLocation = newLocation;
+
+    closeModal();
+    alert(`倉庫を${newLocationName}に移動しました。`);
+    updateDisplay();
+    // 行を消費しないので、ターン選択に戻る
+    showTurnOptions();
 }
 
 // Reassign modal (配置転換)
@@ -5243,11 +6323,11 @@ function showOtherPlayersBidModal(market, marketIndex) {
 
 // Cancel player bid
 function cancelPlayerBid() {
-    // プレイヤーの入札をキャンセル
+    // プレイヤーの入札をキャンセル（お金の流れがないので行を消費しない）
     gameState.pendingBid = null;
     closeModal();
     alert('入札への参加を取りやめました');
-    endTurn();
+    nextTurn();
 }
 
 // Process bids with all companies
@@ -5311,12 +6391,16 @@ function processBidsWithAllCompanies(marketIndex) {
 
         if (actualQty > 0) {
             const salePrice = bid.displayPrice || bid.price;
-            bidCompany.cash += salePrice * actualQty;
+            const revenue = salePrice * actualQty;
+            bidCompany.cash += revenue;
             bidCompany.products -= actualQty;
-            bidCompany.totalSales += salePrice * actualQty;
+            bidCompany.totalSales += revenue;
             bidCompany.totalSoldQuantity = (bidCompany.totalSoldQuantity || 0) + actualQty;
             market.currentStock += actualQty;
             remainingCapacity -= actualQty;
+
+            // 行動ログ記録
+            logAction(bid.company, '商品販売', `${market.name}に¥${salePrice}×${actualQty}個`, revenue, true);
 
             salesResults.push({
                 company: bidCompany,
@@ -5336,21 +6420,27 @@ function processBidsWithAllCompanies(marketIndex) {
         const researchChips = result.company.chips.research || 0;
         const isParent = (gameState.currentPlayerIndex === result.bid.company);
         const bgColor = index === 0 ? '#d4edda' : '#fef3c7';
+        const callPrice = result.bid.price;  // コール価格（勝敗判定用）
+        const recordPrice = result.bid.displayPrice || result.bid.price;  // 記帳価格（売上計上用）
 
         bidResultHtml += `<div style="background: ${bgColor}; padding: 10px; margin: 10px 0; border-radius: 5px;">`;
         bidResultHtml += `<strong>${index === 0 ? '🏆 1位落札' : '✓ 残枠販売'}: ${result.company.name}</strong><br>`;
-        bidResultHtml += `入札価格: ¥${result.price}/個 × ${result.quantity}個<br>`;
+        bidResultHtml += `<div style="display: flex; gap: 15px; margin: 5px 0;">`;
+        bidResultHtml += `<span style="font-size: 12px; color: #666;">コール価格: ¥${callPrice}</span>`;
+        bidResultHtml += `<span style="font-size: 12px; color: #2563eb;">記帳価格: ¥${recordPrice}</span>`;
+        bidResultHtml += `</div>`;
+        bidResultHtml += `数量: ${result.quantity}個<br>`;
         if (researchChips > 0 || isParent) {
-            bidResultHtml += '<div style="font-size: 12px; margin-top: 5px;">【価格競争力】<br>';
+            bidResultHtml += '<div style="font-size: 12px; margin-top: 5px; color: #666;">【価格競争力】';
             if (researchChips > 0) {
-                bidResultHtml += `・研究チップ: ${researchChips}枚 × 2円 = ${researchChips * 2}円<br>`;
+                bidResultHtml += ` 研究${researchChips}枚(-${researchChips * 2}円)`;
             }
             if (isParent) {
-                bidResultHtml += `・親ボーナス: 2円<br>`;
+                bidResultHtml += ` 親(-2円)`;
             }
             bidResultHtml += '</div>';
         }
-        bidResultHtml += `<strong>売上金額: ¥${result.price * result.quantity}</strong>`;
+        bidResultHtml += `<strong>売上金額: ¥${recordPrice * result.quantity}</strong>`;
         bidResultHtml += '</div>';
     });
 
@@ -5364,12 +6454,13 @@ function processBidsWithAllCompanies(marketIndex) {
         bidResultHtml += '<div style="font-size: 12px; color: #666; margin-bottom: 5px;">入札したが売れなかった:</div>';
         unsoldBids.forEach((bid) => {
             const bidCompany = gameState.companies[bid.company];
-            const actualPrice = bid.displayPrice || bid.price;
+            const callPrice = bid.price;  // コール価格
+            const recordPrice = bid.displayPrice || bid.price;  // 記帳価格
 
             bidResultHtml += `
-                <div class="bid-entry" style="color: #9ca3af;">
+                <div class="bid-entry" style="color: #9ca3af; padding: 5px;">
                     <span>${bidCompany.name}</span>
-                    <span>¥${actualPrice} × ${bid.quantity}個（市場枠なし）</span>
+                    <span style="font-size: 11px;">コール¥${callPrice} / 記帳¥${recordPrice} × ${bid.quantity}個（市場枠なし）</span>
                 </div>
             `;
         });
@@ -5381,18 +6472,231 @@ function processBidsWithAllCompanies(marketIndex) {
     closeModal();
     showModal('入札結果', bidResultHtml + '<button class="submit-btn" onclick="completeSale()">OK</button>');
 
-    // プレイヤーへのメッセージ
-    if (salesResults.length > 0) {
-        const playerResult = salesResults.find(r => r.bid.company === 0);
-        if (playerResult) {
-            gameState.lastSaleInfo = `【入札結果】\nあなたは${market.name}に${playerResult.quantity}個を¥${playerResult.price * playerResult.quantity}で販売しました`;
-        } else {
-            gameState.lastSaleInfo = `【入札結果】\n${market.name}への入札は他社に負けました`;
-        }
+    // プレイヤーへのメッセージとフラグ設定
+    const playerResult = salesResults.find(r => r.bid.company === 0);
+    if (playerResult) {
+        gameState.lastSaleInfo = `【入札結果】\nあなたは${market.name}に${playerResult.quantity}個を¥${playerResult.price * playerResult.quantity}で販売しました`;
+        gameState.playerSoldInBid = true;  // お金の流れがあった
+    } else {
+        gameState.lastSaleInfo = `【入札結果】\n${market.name}への入札は他社に負けました`;
+        gameState.playerSoldInBid = false;  // お金の流れがなかった
     }
 
     // Clear pending bid
     gameState.pendingBid = null;
+}
+
+// 2市場同時販売の他社入札モーダル
+function showOtherPlayersBidModalTwoMarket() {
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+    const maxPrice = Math.min(market1.sellPrice, market2.sellPrice);
+
+    const content = `
+        <div class="bid-display">
+            <div class="bid-title">2市場同時入札 - 他社参加</div>
+            <p>市場: ${market1.name} + ${market2.name}</p>
+            <p>適用上限価格: ¥${maxPrice}</p>
+            <p>あなたの入札: ¥${gameState.pendingBid.displayPrice} × ${gameState.pendingBid.quantity}個</p>
+            <p style="color: #666; font-size: 12px;">他社も入札に参加します（金額は非公開）</p>
+            <button class="submit-btn" onclick="processBidsWithAllCompaniesTwoMarket()">入札結果を確認</button>
+            <button class="cancel-btn" onclick="cancelPlayerBidTwoMarket()" style="margin-top: 10px;">入札に参加しない</button>
+        </div>
+    `;
+
+    showModal('2市場同時入札', content);
+}
+
+// 2市場同時入札のキャンセル
+function cancelPlayerBidTwoMarket() {
+    // お金の流れがないので行を消費しない
+    gameState.pendingBid = null;
+    gameState.selectedMarkets = [];
+    gameState.twoMarketMode = false;
+    closeModal();
+    alert('入札への参加を取りやめました');
+    nextTurn();
+}
+
+// 2市場同時入札の処理
+function processBidsWithAllCompaniesTwoMarket() {
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+    const maxPrice = Math.min(market1.sellPrice, market2.sellPrice);
+
+    const allBids = [gameState.pendingBid];
+
+    // AI companies also bid (2市場同時)
+    for (let i = 1; i < gameState.companies.length; i++) {
+        const aiCompany = gameState.companies[i];
+        if (aiCompany.products >= 2) {  // 2市場同時は2個以上必要
+            const aiSalesCapacity = getSalesCapacity(aiCompany);
+            const aiQuantity = Math.min(aiSalesCapacity, aiCompany.products);
+            if (aiQuantity >= 2) {
+                const isAIParent = (gameState.currentPlayerIndex === i);
+                const aiDisplayPrice = Math.floor(maxPrice * (0.7 + Math.random() * 0.25));
+                const aiPrice = aiDisplayPrice - getPriceCompetitiveness(aiCompany, isAIParent);
+                allBids.push({
+                    company: i,
+                    price: aiPrice,
+                    quantity: aiQuantity,
+                    displayPrice: aiDisplayPrice,
+                    isTwoMarket: true
+                });
+            }
+        }
+    }
+
+    // Sort by: 1) price (lowest), 2) research chips (most), 3) parent (priority)
+    allBids.sort((a, b) => {
+        if (a.price !== b.price) return a.price - b.price;
+        const aResearch = gameState.companies[a.company].chips.research || 0;
+        const bResearch = gameState.companies[b.company].chips.research || 0;
+        if (aResearch !== bResearch) return bResearch - aResearch;
+        const aIsParent = (gameState.currentPlayerIndex === a.company);
+        const bIsParent = (gameState.currentPlayerIndex === b.company);
+        if (aIsParent && !bIsParent) return -1;
+        if (!aIsParent && bIsParent) return 1;
+        return 0;
+    });
+
+    // 2市場の合計容量
+    const volume1 = market1.maxStock - market1.currentStock;
+    const volume2 = market2.maxStock - market2.currentStock;
+    const parentBid = allBids.find(b => b.company === gameState.currentPlayerIndex);
+    const parentQuantity = parentBid ? parentBid.quantity : gameState.pendingBid.quantity;
+    let remainingCapacity = Math.min(parentQuantity, volume1 + volume2);
+    let salesResults = [];
+
+    // 入札順に割り当て
+    for (const bid of allBids) {
+        if (remainingCapacity <= 0) break;
+
+        const bidCompany = gameState.companies[bid.company];
+        const actualQty = Math.min(bid.quantity, remainingCapacity, bidCompany.products);
+
+        if (actualQty > 0) {
+            const salePrice = bid.displayPrice || bid.price;
+            const revenue = salePrice * actualQty;
+            bidCompany.cash += revenue;
+            bidCompany.products -= actualQty;
+            bidCompany.totalSales += revenue;
+            bidCompany.totalSoldQuantity = (bidCompany.totalSoldQuantity || 0) + actualQty;
+
+            // 2市場に分配
+            let remainingQty = actualQty;
+            if (market1.currentStock < market1.maxStock && remainingQty > 0) {
+                const toMarket1 = Math.min(remainingQty, market1.maxStock - market1.currentStock);
+                market1.currentStock += toMarket1;
+                remainingQty -= toMarket1;
+            }
+            if (market2.currentStock < market2.maxStock && remainingQty > 0) {
+                const toMarket2 = Math.min(remainingQty, market2.maxStock - market2.currentStock);
+                market2.currentStock += toMarket2;
+            }
+
+            remainingCapacity -= actualQty;
+
+            // 行動ログ記録
+            logAction(bid.company, '商品販売', `${market1.name}+${market2.name}に¥${salePrice}×${actualQty}個`, revenue, true);
+
+            salesResults.push({
+                company: bidCompany,
+                quantity: actualQty,
+                price: salePrice,
+                bid: bid
+            });
+        }
+    }
+
+    // 入札結果の表示
+    let bidResultHtml = '<div class="bid-display">';
+    bidResultHtml += '<div class="bid-title">2市場同時入札 結果</div>';
+    bidResultHtml += `<p style="margin-bottom: 10px;">${market1.name} + ${market2.name}</p>`;
+
+    salesResults.forEach((result, index) => {
+        const researchChips = result.company.chips.research || 0;
+        const isParent = (gameState.currentPlayerIndex === result.bid.company);
+        const bgColor = index === 0 ? '#d4edda' : '#fef3c7';
+        const callPrice = result.bid.price;  // コール価格（勝敗判定用）
+        const recordPrice = result.bid.displayPrice || result.bid.price;  // 記帳価格（売上計上用）
+
+        bidResultHtml += `<div style="background: ${bgColor}; padding: 10px; margin: 10px 0; border-radius: 5px;">`;
+        bidResultHtml += `<strong>${index === 0 ? '🏆 1位落札' : '✓ 残枠販売'}: ${result.company.name}</strong><br>`;
+        bidResultHtml += `<div style="display: flex; gap: 15px; margin: 5px 0;">`;
+        bidResultHtml += `<span style="font-size: 12px; color: #666;">コール価格: ¥${callPrice}</span>`;
+        bidResultHtml += `<span style="font-size: 12px; color: #2563eb;">記帳価格: ¥${recordPrice}</span>`;
+        bidResultHtml += `</div>`;
+        bidResultHtml += `数量: ${result.quantity}個<br>`;
+        if (researchChips > 0 || isParent) {
+            bidResultHtml += '<div style="font-size: 12px; margin-top: 5px; color: #666;">【価格競争力】';
+            if (researchChips > 0) {
+                bidResultHtml += ` 研究${researchChips}枚(-${researchChips * 2}円)`;
+            }
+            if (isParent) {
+                bidResultHtml += ` 親(-2円)`;
+            }
+            bidResultHtml += '</div>';
+        }
+        bidResultHtml += `<strong>売上金額: ¥${recordPrice * result.quantity}</strong>`;
+        bidResultHtml += '</div>';
+    });
+
+    const unsoldBids = allBids.filter(bid =>
+        !salesResults.some(result => result.bid === bid)
+    );
+
+    if (unsoldBids.length > 0) {
+        bidResultHtml += '<div class="bid-entries">';
+        bidResultHtml += '<div style="font-size: 12px; color: #666; margin-bottom: 5px;">入札したが売れなかった:</div>';
+        unsoldBids.forEach((bid) => {
+            const bidCompany = gameState.companies[bid.company];
+            const callPrice = bid.price;  // コール価格
+            const recordPrice = bid.displayPrice || bid.price;  // 記帳価格
+            bidResultHtml += `
+                <div class="bid-entry" style="color: #9ca3af; padding: 5px;">
+                    <span>${bidCompany.name}</span>
+                    <span style="font-size: 11px;">コール¥${callPrice} / 記帳¥${recordPrice} × ${bid.quantity}個（市場枠なし）</span>
+                </div>
+            `;
+        });
+        bidResultHtml += '</div>';
+    }
+
+    bidResultHtml += '</div>';
+
+    closeModal();
+    showModal('2市場同時入札 結果', bidResultHtml + '<button class="submit-btn" onclick="completeSaleTwoMarket()">OK</button>');
+
+    // プレイヤーへのメッセージとフラグ設定
+    const playerResult = salesResults.find(r => r.bid.company === 0);
+    if (playerResult) {
+        gameState.lastSaleInfo = `【2市場同時入札結果】\n${market1.name}+${market2.name}に${playerResult.quantity}個を¥${playerResult.price * playerResult.quantity}で販売しました`;
+        gameState.playerSoldInBid = true;  // お金の流れがあった
+    } else {
+        gameState.lastSaleInfo = `【2市場同時入札結果】\n入札は他社に負けました`;
+        gameState.playerSoldInBid = false;  // お金の流れがなかった
+    }
+
+    gameState.pendingBid = null;
+    gameState.selectedMarkets = [];
+    gameState.twoMarketMode = false;
+}
+
+// 2市場同時販売完了
+function completeSaleTwoMarket() {
+    closeModal();
+    updateDisplay();
+
+    // プレイヤーが実際に販売した場合のみ1行使用（お金の流れがあった場合）
+    const playerSold = gameState.playerSoldInBid;
+    gameState.playerSoldInBid = null;  // フラグをリセット
+
+    if (playerSold) {
+        endTurn();
+    } else {
+        nextTurn();
+    }
 }
 
 // 各社の決算を個別に表示
@@ -5559,7 +6863,10 @@ function showFinancialSummary(financialData) {
             <p>平均P = PQ÷Q、平均V = VQ÷Q、平均M = MQ÷Q</p>
             <p>MQ = PQ - VQ、G = MQ - F</p>
         </div>
-        <button class="submit-btn" onclick="closeModal(); proceedToNextPeriod();" style="margin-top: 15px;">次期へ進む</button>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button class="cancel-btn" onclick="showActionLogModal()" style="flex: 1;">行動ログを見る</button>
+            <button class="submit-btn" onclick="closeModal(); proceedToNextPeriod();" style="flex: 1;">次期へ進む</button>
+        </div>
     `;
 
     showModal(`第${gameState.currentPeriod}期 決算結果`, html);
@@ -5849,6 +7156,9 @@ function showBorrowingChoice() {
 
 // Start period with borrowing (periods 3-5)
 function startPeriodWithBorrowing() {
+    // 行動ログをリセット
+    resetActionLog();
+
     // Auto-purchase chips for all companies first
     gameState.companies.forEach(company => {
         const computerCost = 20;
@@ -5891,6 +7201,9 @@ function startPeriodWithBorrowing() {
 
 // Start period without borrowing (periods 3-5)
 function startPeriodWithoutBorrowing() {
+    // 行動ログをリセット
+    resetActionLog();
+
     // Auto-purchase chips for all companies first
     gameState.companies.forEach(company => {
         const computerCost = 20;
@@ -5988,21 +7301,27 @@ function processBorrowing() {
 function showSalesCapacityDetail(companyIndex) {
     const company = gameState.companies[companyIndex];
     const baseCapacity = company.salesmen * 2;
-    const effectiveAds = Math.min(company.chips.advertising, company.salesmen * 2);
-    const educationBonus = company.chips.education || 0;
-    const totalCapacity = baseCapacity + effectiveAds + educationBonus;
-    
+    const maxAdChips = company.salesmen * 2;  // セールスマン1人につき2枚まで
+    const effectiveAdChips = Math.min(company.chips.advertising || 0, maxAdChips);
+    const adBonus = effectiveAdChips * 2;
+    const educationBonus = Math.min(company.chips.education || 0, 1);  // 効果は1枚分が上限
+    const totalCapacity = getSalesCapacity(company);
+
+    const adInfo = company.chips.advertising > 0
+        ? `広告チップ: ${effectiveAdChips}枚 × 2 = +${adBonus}${company.chips.advertising > maxAdChips ? ` (${company.chips.advertising}枚中${effectiveAdChips}枚有効)` : ''}`
+        : '';
+
     const content = `
         <div class="breakdown-list">
             <h3>販売能力の詳細</h3>
             <div class="breakdown-item"><span>セールスマン: ${company.salesmen}人 × 2 = ${baseCapacity}</span></div>
-            ${effectiveAds > 0 ? `<div class="breakdown-item"><span>広告チップ: +${effectiveAds} (最大${company.salesmen * 2}枚まで有効)</span></div>` : ''}
-            ${educationBonus > 0 ? `<div class="breakdown-item"><span>教育チップ: +${educationBonus}</span></div>` : ''}
+            ${adInfo ? `<div class="breakdown-item"><span>${adInfo}</span></div>` : ''}
+            ${educationBonus > 0 ? `<div class="breakdown-item"><span>教育チップ: +${educationBonus}${company.chips.education > 1 ? ' (上限1)' : ''}</span></div>` : ''}
             <hr>
             <div class="breakdown-item breakdown-total"><span>販売能力</span><span>${totalCapacity}</span></div>
         </div>
     `;
-    
+
     showModal(`${company.name}の販売能力`, content);
 }
 
@@ -6391,7 +7710,7 @@ function buyChips() {
     }
     
     company.cash -= cost;
-    
+
     if (isExpress) {
         // 即時使用
         company.chips[chipType] += quantity;
@@ -6399,7 +7718,12 @@ function buyChips() {
         // 次期繰り越し
         company.nextPeriodChips[chipType] += quantity;
     }
-    
+
+    // 行動ログ記録
+    const chipNames = {research: '研究', education: '教育', advertising: '広告'};
+    const typeStr = isExpress ? '特急' : '繰越';
+    logAction(0, 'チップ購入', `${chipNames[chipType]}${quantity}枚(${typeStr})`, -cost, true);
+
     closeModal();
     updateDisplay();
     alert(`${chipType}チップを${quantity}個購入しました（¥${cost}）`);
@@ -6830,15 +8154,16 @@ function processAICommonPurchase() {
     const playerQty = parseInt(document.getElementById('playerQuantity').value || 0);
     const playerCompany = gameState.companies[0];
     const aiCompany = gameState.aiCommonPurchase;
-    
+
     let purchaseLog = [];
-    
+    let playerPurchased = false;  // プレイヤーが実際に購入したかどうか
+
     // プレイヤーの購入処理
     if (playerQty > 0) {
         const cost = playerQty * 12;
         if (playerCompany.cash >= cost) {
             let purchased = 0;
-            
+
             // まず市場から購入
             for (const market of gameState.markets) {
                 if (purchased >= playerQty) break;
@@ -6848,7 +8173,7 @@ function processAICommonPurchase() {
                     purchased += qty;
                 }
             }
-            
+
             // 不足分は海外市場（ストッカー）から
             const overseasMarket = gameState.markets.find(m => m.name === '海外');
             if (purchased < playerQty && overseasMarket) {
@@ -6856,11 +8181,14 @@ function processAICommonPurchase() {
                 overseasMarket.currentStock = Math.max(0, overseasMarket.currentStock - qty);
                 purchased += qty;
             }
-            
+
             playerCompany.cash -= cost;
             playerCompany.materials += playerQty;
             playerCompany.totalMaterialCost += cost;
-            // 各社共通は行を消費しない
+            playerPurchased = true;  // お金の流れがあった
+
+            // 行動ログ記録
+            logAction(0, '各社共通', `¥12×${playerQty}個購入`, -cost, true);
 
             purchaseLog.push(`あなた: ${playerQty}個購入（¥${cost}）`);
         } else {
@@ -6898,23 +8226,34 @@ function processAICommonPurchase() {
             }
 
             if (purchased > 0) {
-                company.cash -= purchased * 12;
+                const aiCost = purchased * 12;
+                company.cash -= aiCost;
                 company.materials += purchased;
-                company.totalMaterialCost += purchased * 12;
-                purchaseLog.push(`${company.name}: ${purchased}個購入（¥${purchased * 12}）`);
+                company.totalMaterialCost += aiCost;
+
+                // 行動ログ記録（AI）
+                logAction(i, '各社共通', `¥12×${purchased}個購入`, -aiCost, false);
+
+                purchaseLog.push(`${company.name}: ${purchased}個購入（¥${aiCost}）`);
             }
         }
     }
-    
+
     closeModal();
     updateDisplay();
-    
+
     // 購入結果を表示
     alert('【各社共通購入結果】\n' + purchaseLog.join('\n'));
-    
+
     // AIのターンを終了
     gameState.aiCommonPurchase = null;
-    nextTurn();
+
+    // プレイヤーが購入した場合のみ1行使用（お金の流れがあった場合）
+    if (playerPurchased) {
+        endTurn();
+    } else {
+        nextTurn();
+    }
 }
 
 // AI行動表示モーダル
@@ -7061,10 +8400,11 @@ function executeAITurn() {
     executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis);
 }
 
-// AI財務分析（賢い判断のためのデータ収集）
+// AI財務分析（賢い判断のためのデータ収集 - 5期終了時自己資本最大化志向）
 function getAIFinancialAnalysis(company) {
     const period = gameState.currentPeriod;
     const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+    const periodsRemaining = 5 - period;  // 残り期数
 
     // 期末必要資金（給料 + 借入返済）
     const periodEndCost = calculatePeriodPayment(company);
@@ -7098,8 +8438,24 @@ function getAIFinancialAnalysis(company) {
     const availableLoan = Math.max(0, maxLongLoan - company.loans);
     const canBorrow = period >= 3 && availableLoan > 0;
 
+    // === 長期戦略分析（5期終了時自己資本最大化） ===
+    const mfgCapacity = getManufacturingCapacity(company);
+
+    // 次期への投資価値（研究チップは価格競争力+2 → 入札勝率向上 → MQ増加）
+    const researchChipValue = periodsRemaining * 2 * 5;  // 残り期数 × 価格競争力 × 推定販売回数
+    const shouldInvestForFuture = periodsRemaining >= 2 && !isCashTight && company.chips.research < 4;
+
+    // 能力バランス（長期的に製造=販売が理想）
+    const capacityBalance = mfgCapacity - salesCapacity;
+    const needsCapacityBalance = Math.abs(capacityBalance) >= 2;
+
+    // 5期は投資せず売り切り優先（回収期）
+    const isFinalPeriod = period === 5;
+    const isRecoveryPhase = period >= 4 && rowsRemaining < 10;
+
     return {
         period,
+        periodsRemaining,
         rowsRemaining,
         periodEndCost,
         fixedCost,
@@ -7115,10 +8471,17 @@ function getAIFinancialAnalysis(company) {
         isCashTight,
         maxLongLoan,
         canBorrow,
+        // 長期戦略
+        shouldInvestForFuture,
+        researchChipValue,
+        capacityBalance,
+        needsCapacityBalance,
+        isFinalPeriod,
+        isRecoveryPhase,
         // 推奨アクション優先度
-        shouldSellFirst: canSell && (isCashTight || rowsRemaining < 5),
-        shouldInvest: !isCashTight && rowsRemaining > 10 && equityRank > 2,
-        shouldBeAggressive: equityRank > 3 && rowsRemaining > 5
+        shouldSellFirst: canSell && (isCashTight || rowsRemaining < 5 || isFinalPeriod),
+        shouldInvest: !isCashTight && rowsRemaining > 10 && !isRecoveryPhase,
+        shouldBeAggressive: equityRank > 3 && rowsRemaining > 5 && !isFinalPeriod
     };
 }
 
@@ -7166,81 +8529,85 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     }
 }
 
-// A社：積極的戦略（MQ最大化重視）
+// A社：積極的戦略（MQ最大化重視・長期志向）
 function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis) {
-    // MQを最大化するための戦略的判断（給料支払い考慮済み）
-    
-    // 1. 販売優先（PQを増やす）
-    if (company.products > 0 && salesCapacity > 0) {
-        const sellQty = Math.min(company.products, salesCapacity);
-        // 高価格市場を優先
-        const bestMarket = gameState.markets
-            .filter(m => m.currentStock < m.maxStock && (gameState.currentPeriod > 2 || m.name !== '海外'))
-            .sort((a, b) => b.sellPrice - a.sellPrice)[0];
-        
-        if (bestMarket && sellQty > 0) {
-            executeDefaultSale(company, salesCapacity, 0.75);
+    // MQを最大化するための戦略的判断（5期終了時自己資本最大化）
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 30;
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+
+    // === 5期（最終期）は売り切り優先 ===
+    if (analysis.isFinalPeriod) {
+        if (company.products > 0 && salesCapacity > 0) {
+            executeDefaultSale(company, salesCapacity, 0.70);
             return;
         }
-    }
-    
-    // 2. 生産最大化（在庫を製品に変換）
-    if (company.materials > 0 && mfgCapacity > 0) {
-        const produceQty = Math.min(company.materials, mfgCapacity);
-        if (produceQty > 0) {
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
             executeDefaultProduction(company, mfgCapacity);
             return;
         }
-    }
-    
-    // 3. 材料購入（低価格で購入）
-    if (company.cash > 40 && company.materials < 5) {
-        executeDefaultMaterialPurchase(company, Math.min(5, mfgCapacity));
+        nextTurn();
         return;
     }
-    
-    // 4. 能力向上投資（MQ最大化のため積極的に投資）
-    if (company.cash > 60 && company.currentRow < gameState.maxRows - 5) {
-        // 研究チップ優先（価格競争力とMQ向上）
-        if (company.chips.research < 5 && Math.random() > 0.3) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
-                company.chips.research++;
+
+    // === 4期後半は回収フェーズ ===
+    if (analysis.isRecoveryPhase && company.products > 0 && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.72);
+        return;
+    }
+
+    // 1. 販売優先（PQを増やす - 7割以上で）
+    if (company.products > 0 && salesCapacity > 0) {
+        const minSellQty = Math.ceil(salesCapacity * 0.7);
+        if (company.products >= minSellQty) {
+            executeDefaultSale(company, salesCapacity, 0.70);  // A社は積極的な低価格
+            return;
+        }
+    }
+
+    // 2. 生産最大化（在庫を製品に変換）
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+        executeDefaultProduction(company, mfgCapacity);
+        return;
+    }
+
+    // 3. 材料購入（7割以上の製造能力で）
+    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // 4. 長期投資（残り期数を考慮）
+    if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
+        // 研究チップ優先（長期的にMQ増加に直結）
+        if (analysis.shouldInvestForFuture && company.chips.research < 5 && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.research++;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（長期投資）');
+            return;
+        }
+
+        // 次期用チップ購入（積極的に）
+        if (gameState.currentPeriod >= 3 && analysis.periodsRemaining >= 2) {
+            if (company.nextPeriodChips.research < 3 && company.cash >= chipCost + safetyMargin + 30) {
+                company.cash -= chipCost;
+                company.nextPeriodChips.research++;
                 incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
+                showAIActionModal(company, 'チップ購入(次期)', '🔬', '次期用研究チップ購入');
                 return;
             }
         }
-        // 広告チップ（販売能力向上）
-        if (company.chips.advertising < 4 && Math.random() > 0.4) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
+
+        // ボトルネック解消投資
+        if (analysis.needsCapacityBalance && analysis.capacityBalance > 0) {
+            if (company.chips.advertising < 3 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
                 company.chips.advertising++;
                 incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
+                showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入');
                 return;
             }
-        }
-        // 教育チップ（製造・販売能力向上）
-        if (company.chips.education < 3 && Math.random() > 0.5) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
-                company.chips.education++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            }
-        }
-        // 機械投資
-        if (company.machines.length < 3 && company.cash > 100) {
-            company.cash -= 50;
-            company.machines.push({type: 'small', attachments: 0});
-            incrementRow(gameState.companies.indexOf(company));
-            nextTurn();
-            return;
         }
     }
     
@@ -7402,383 +8769,443 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
     executeDefaultInvestment(company);
 }
 
-// C社：保守的戦略（安定的MQ確保）
+// C社：保守的戦略（安定的MQ確保・長期志向）
 function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analysis) {
-    // 安定的にMQを確保する戦略
-    
-    // 1. 確実な販売（在庫リスク回避）
-    if (company.products >= 2 && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.8);
-        return;
-    }
-    
-    // 2. 安定生産
-    if (company.materials >= 2 && mfgCapacity > 0 && company.products < 3) {
-        executeDefaultProduction(company, Math.min(2, mfgCapacity));
-        return;
-    }
-    
-    // 3. 計画的材料購入
-    if (company.cash > 60 && company.materials < 3) {
-        // 低価格市場を優先
-        const cheapMarket = gameState.markets
-            .filter(m => m.currentStock > 0)
-            .sort((a, b) => a.buyPrice - b.buyPrice)[0];
-        
-        if (cheapMarket) {
-            executeDefaultMaterialPurchase(company, 3);
+    // 安定的にMQを確保する戦略（5期終了時自己資本最大化）
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 50;  // 保守的なので余裕を持つ
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+
+    // === 5期（最終期）は売り切り優先 ===
+    if (analysis.isFinalPeriod) {
+        if (company.products > 0 && salesCapacity > 0) {
+            executeDefaultSale(company, salesCapacity, 0.85);
             return;
         }
-    }
-    
-    // 4. コスト削減投資（コンピュータチップ）
-    if (company.cash > 100 && company.chips.computer === 0) {
-        company.cash -= 20;
-        company.chips.computer = 1;
-        incrementRow(gameState.companies.indexOf(company));
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            executeDefaultProduction(company, mfgCapacity);
+            return;
+        }
         nextTurn();
         return;
     }
-    
-    // 慎重に生産
-    if (company.materials > 0 && company.cash > 50) {
-        executeDefaultProduction(company, Math.min(mfgCapacity, 2));
-        return;
-    }
-    
-    // Do Nothing（行数を増やさない）
-    nextTurn();
-}
 
-// D社：価格競争戦略（量でMQ確保）
-function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analysis) {
-    // 大量生産・大量販売でMQを確保
-    
-    // 1. 大量販売（低価格でも量で勝負）
-    if (company.products >= 3 && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.65);
+    // === 4期後半は回収フェーズ ===
+    if (analysis.isRecoveryPhase && company.products > 0 && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.83);
         return;
     }
-    
-    // 2. 大量生産
-    if (company.materials >= 3 && mfgCapacity >= 3) {
+
+    // 1. 確実な販売（在庫リスク回避、7割以上で）
+    const minSellQty = Math.ceil(salesCapacity * 0.7);
+    if (company.products >= minSellQty && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.85);  // 安全な価格
+        return;
+    }
+
+    // 2. 安定生産
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0 && company.products < 4) {
         executeDefaultProduction(company, mfgCapacity);
         return;
     }
-    
-    // 3. 大量材料購入（安い市場から）
-    if (company.cash > 60 && company.materials < 6) {
-        // 最安市場を選択
-        const cheapestMarket = gameState.markets
-            .filter(m => m.currentStock > 0)
-            .sort((a, b) => a.buyPrice - b.buyPrice)[0];
-        
-        if (cheapestMarket) {
-            const buyQty = Math.min(6, Math.floor(company.cash / cheapestMarket.buyPrice));
-            executeDefaultMaterialPurchase(company, buyQty);
+
+    // 3. 計画的材料購入（7割以上で）
+    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // 4. 長期的投資（保守的だが着実に）
+    if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 8 && !analysis.isRecoveryPhase) {
+        // 保険チップ（リスク軽減）
+        if (!company.chips.insurance && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.insurance = 1;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🛡️', '保険チップ購入（リスク軽減）');
             return;
         }
+        // 研究チップ（長期的に価格競争力向上）
+        if (analysis.shouldInvestForFuture && company.chips.research < 3 && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.research++;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（長期投資）');
+            return;
+        }
+        // 次期用チップ購入（保守的に1枚まで）
+        if (gameState.currentPeriod >= 3 && analysis.periodsRemaining >= 2) {
+            if (company.nextPeriodChips.research < 1 && company.cash >= chipCost + safetyMargin + 80) {
+                company.cash -= chipCost;
+                company.nextPeriodChips.research++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入(次期)', '🔬', '次期用研究チップ購入');
+                return;
+            }
+        }
     }
-    
-    // 4. 生産能力向上
-    if (company.cash > 120 && company.workers < 3) {
-        // ワーカー採用
-        company.workers++;
-        incrementRow(gameState.companies.indexOf(company));
+
+    // Do Nothing（行数を増やさない - 保守的判断）
+    nextTurn();
+}
+
+// D社：価格競争戦略（量でMQ確保・長期志向）
+function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analysis) {
+    // 大量生産・大量販売でMQを確保（5期終了時自己資本最大化）
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 30;
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+
+    // === 5期（最終期）は売り切り優先 ===
+    if (analysis.isFinalPeriod) {
+        if (company.products > 0 && salesCapacity > 0) {
+            executeDefaultSale(company, salesCapacity, 0.65);
+            return;
+        }
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            executeDefaultProduction(company, mfgCapacity);
+            return;
+        }
         nextTurn();
         return;
     }
-    
+
+    // === 4期後半は回収フェーズ ===
+    if (analysis.isRecoveryPhase && company.products > 0 && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.67);
+        return;
+    }
+
+    // 1. 大量販売（低価格でも量で勝負、7割以上）
+    const minSellQty = Math.ceil(salesCapacity * 0.7);
+    if (company.products >= minSellQty && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.65);  // 積極的な低価格
+        return;
+    }
+
+    // 2. 大量生産
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+        executeDefaultProduction(company, mfgCapacity);
+        return;
+    }
+
+    // 3. 大量材料購入（7割以上で）
+    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // 4. 長期投資（量を増やすための投資）
+    if (company.cash > safetyMargin + 50 && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
+        // 研究チップ（価格競争力で量を確保）
+        if (analysis.shouldInvestForFuture && company.chips.research < 3 && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.research++;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（長期投資）');
+            return;
+        }
+
+        // 能力バランス調整
+        if (analysis.needsCapacityBalance && analysis.capacityBalance > 0) {
+            if (company.chips.advertising < 3 && company.cash >= chipCost + safetyMargin) {
+                company.cash -= chipCost;
+                company.chips.advertising++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入');
+                return;
+            }
+        }
+
+        // 次期用チップ購入
+        if (gameState.currentPeriod >= 3 && analysis.periodsRemaining >= 2) {
+            if (company.nextPeriodChips.research < 2 && company.cash >= chipCost + safetyMargin + 40) {
+                company.cash -= chipCost;
+                company.nextPeriodChips.research++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入(次期)', '🔬', '次期用研究チップ購入');
+                return;
+            }
+        }
+    }
+
     // 何もしなかった場合はDo Nothing
     nextTurn();
 }
 
-// E社：技術重視戦略（能力向上でMQ最大化）
+// E社：技術重視戦略（能力向上でMQ最大化・長期志向）
 function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysis) {
-    // 技術投資で効率を上げてMQを最大化
-    
-    // 1. 高効率販売
-    if (company.products > 0 && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.8);
-        return;
-    }
-    
-    // 2. 効率的生産
-    if (company.materials > 0 && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
-    }
-    
-    // 3. 技術投資優先（積極的にチップ購入）
-    if (company.cash > 50 && company.currentRow < gameState.maxRows - 5) {
-        // 研究チップ（価格競争力）
-        if (company.chips.research < 6 && Math.random() > 0.2) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
-                company.chips.research++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            }
-        }
-        
-        // 教育チップ（製造・販売能力+1）
-        if (company.chips.education < 4 && Math.random() > 0.3) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
-                company.chips.education++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            }
-        }
-        
-        // 広告チップ（販売能力）
-        if (company.chips.advertising < 5 && Math.random() > 0.4) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
-                company.chips.advertising++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            }
-        }
-        
-        // 機械投資
-        if (company.machines.length < 4 && company.cash > 80) {
-            company.cash -= 50;
-            company.machines.push({type: 'small', attachments: 0});
-            incrementRow(gameState.companies.indexOf(company));
-            nextTurn();
+    // 技術投資で効率を上げてMQを最大化（5期終了時自己資本最大化）
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 40;
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+
+    // === 5期（最終期）は売り切り優先 ===
+    if (analysis.isFinalPeriod) {
+        if (company.products > 0 && salesCapacity > 0) {
+            executeDefaultSale(company, salesCapacity, 0.80);
             return;
         }
-    }
-    
-    // 4. 材料購入
-    if (company.cash > 40 && company.materials < 3) {
-        executeDefaultMaterialPurchase(company, 3);
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            executeDefaultProduction(company, mfgCapacity);
+            return;
+        }
+        nextTurn();
         return;
     }
-    
-    // 通常の販売・生産
-    executeBalancedStrategy(company, mfgCapacity, salesCapacity);
-}
 
-// B社・デフォルト：バランス戦略（MQバランス）
-function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) {
-    // バランス良くMQを増やす
-    
-    // 1. 販売機会を逃さない
-    if (company.products >= 2 && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.75);
+    // === 4期後半は回収フェーズ ===
+    if (analysis.isRecoveryPhase && company.products > 0 && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.78);
         return;
     }
-    
+
+    // 1. 高効率販売（7割以上で）
+    const minSellQty = Math.ceil(salesCapacity * 0.7);
+    if (company.products >= minSellQty && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.80);  // 研究チップで勝負
+        return;
+    }
+
     // 2. 効率的生産
-    if (company.materials >= 2 && mfgCapacity >= 2 && company.products < 4) {
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
         executeDefaultProduction(company, mfgCapacity);
         return;
     }
-    
-    // 3. 材料確保
-    if (company.cash > 50 && company.materials < 4) {
-        executeDefaultMaterialPurchase(company, Math.min(4, mfgCapacity));
-        return;
-    }
-    
-    // 4. 戦略的投資
-    if (company.cash > 80 && gameState.currentRow < gameState.maxRows - 8) {
-        // 広告チップ（販売力強化）
-        if (company.chips.advertising < 2 && company.salesmen > 0) {
-            const cost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= cost) {
-                company.cash -= cost;
-                company.chips.advertising++;
+
+    // 3. 長期技術投資（残り期数を考慮）
+    if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
+        // 研究チップ優先（長期的に価格競争力向上）
+        if (analysis.shouldInvestForFuture && company.chips.research < 5 && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.research++;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（長期投資）');
+            return;
+        }
+
+        // 教育チップ（製造・販売能力+1、上限確認）
+        const maxEducation = gameState.currentPeriod === 2 ? 2 : 1;
+        if (company.chips.education < maxEducation && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.education++;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（能力+1）');
+            return;
+        }
+
+        // コンピュータチップ（製造能力+1）
+        if (!company.chips.computer && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.computer = 1;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '💻', 'コンピュータチップ購入（製造能力+1）');
+            return;
+        }
+
+        // 次期用チップ購入（積極的に）
+        if (gameState.currentPeriod >= 3 && analysis.periodsRemaining >= 2) {
+            if (company.nextPeriodChips.research < 3 && company.cash >= chipCost + safetyMargin + 30) {
+                company.cash -= chipCost;
+                company.nextPeriodChips.research++;
                 incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
+                showAIActionModal(company, 'チップ購入(次期)', '🔬', '次期用研究チップ購入');
                 return;
             }
         }
     }
-    
+
+    // 4. 材料購入（7割以上で）
+    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // 通常の投資戦略へ
     executeDefaultInvestment(company);
 }
 
-// F社：予測不能戦略（ランダムな行動、意外な判断）
+// B社・デフォルト：バランス戦略（長期的自己資本最大化志向）
+function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) {
+    // バランス良くMQを増やしつつ、5期終了時の自己資本最大化を目指す
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 35;
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+
+    // === 5期（最終期）は売り切り優先 ===
+    if (analysis.isFinalPeriod) {
+        if (company.products > 0 && salesCapacity > 0) {
+            executeDefaultSale(company, salesCapacity, 0.80);
+            return;
+        }
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            executeDefaultProduction(company, mfgCapacity);
+            return;
+        }
+        nextTurn();
+        return;
+    }
+
+    // === 4期後半は回収フェーズ ===
+    if (analysis.isRecoveryPhase) {
+        if (company.products > 0 && salesCapacity > 0) {
+            executeDefaultSale(company, salesCapacity, 0.78);
+            return;
+        }
+    }
+
+    // 1. 販売機会を逃さない（7割以上で）
+    const minSellQty = Math.ceil(salesCapacity * 0.7);
+    if (company.products >= minSellQty && salesCapacity > 0) {
+        executeDefaultSale(company, salesCapacity, 0.75);
+        return;
+    }
+
+    // 2. 効率的生産
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+        executeDefaultProduction(company, mfgCapacity);
+        return;
+    }
+
+    // 3. 材料確保（7割以上で）
+    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // 4. 長期戦略的投資（残り期数を考慮）
+    if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 6 && !analysis.isRecoveryPhase) {
+        // 研究チップ優先（価格競争力は長期的にMQ増加に直結）
+        if (analysis.shouldInvestForFuture && company.chips.research < 4 && company.cash >= chipCost + safetyMargin) {
+            company.cash -= chipCost;
+            company.chips.research++;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（長期投資）');
+            return;
+        }
+
+        // 能力バランス調整（製造=販売が理想）
+        if (analysis.needsCapacityBalance) {
+            if (analysis.capacityBalance > 0 && company.chips.advertising < 2 && company.cash >= chipCost + safetyMargin) {
+                // 製造 > 販売 → 広告チップで販売力強化
+                company.cash -= chipCost;
+                company.chips.advertising++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（能力バランス）');
+                return;
+            }
+        }
+
+        // 次期用チップ購入（3期以降、余裕があれば）
+        if (gameState.currentPeriod >= 3 && analysis.periodsRemaining >= 2) {
+            if (company.nextPeriodChips.research < 2 && company.cash >= chipCost + safetyMargin + 50) {
+                company.cash -= chipCost;
+                company.nextPeriodChips.research++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入(次期)', '🔬', '次期用研究チップ購入');
+                return;
+            }
+        }
+    }
+
+    // 何もしなかった場合はDo Nothing
+    nextTurn();
+}
+
+// F社：予測不能戦略（ランダムだが長期志向）
 function executeUnpredictableStrategy(company, mfgCapacity, salesCapacity, analysis) {
-    // 完全にランダムな行動を選択
+    // ランダムだが5期終了時の自己資本最大化を意識
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 20;
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+
+    // === 5期（最終期）は売り切り優先 ===
+    if (analysis.isFinalPeriod) {
+        if (company.products > 0 && salesCapacity > 0) {
+            const priceBase = 0.70 + Math.random() * 0.15;
+            executeDefaultSale(company, salesCapacity, priceBase);
+            return;
+        }
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            executeDefaultProduction(company, mfgCapacity);
+            return;
+        }
+        nextTurn();
+        return;
+    }
+
+    // === 4期後半は回収フェーズ ===
+    if (analysis.isRecoveryPhase && company.products > 0 && salesCapacity > 0) {
+        const priceBase = 0.68 + Math.random() * 0.12;
+        executeDefaultSale(company, salesCapacity, priceBase);
+        return;
+    }
+
     const actions = [];
 
-    // 可能なアクションをリストアップ
-    if (company.products > 0 && salesCapacity > 0) {
-        actions.push('sell_high');      // 高値で少量販売
-        actions.push('sell_low');       // 安値で大量販売
-        actions.push('sell_random');    // ランダム市場に販売
+    // 可能なアクションをリストアップ（合理的な条件で）
+    const minSellQty = Math.ceil(salesCapacity * 0.7);
+    if (company.products >= minSellQty && salesCapacity > 0) {
+        actions.push('sell');  // 販売
     }
-    if (company.materials > 0 && mfgCapacity > 0) {
-        actions.push('produce_all');    // 全力生産
-        actions.push('produce_one');    // 1個だけ生産
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+        actions.push('produce');  // 生産
     }
-    if (company.cash >= 10) {
+    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
         actions.push('buy_materials');  // 材料購入
-        actions.push('buy_random_chip'); // ランダムなチップ購入
     }
-    if (company.cash >= 30) {
-        actions.push('hire_worker');    // ワーカー採用
-        actions.push('hire_salesman');  // セールスマン採用
-        actions.push('buy_machine');    // 機械購入
+    if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
+        actions.push('buy_chip');  // チップ購入（長期投資）
     }
-    actions.push('do_nothing');         // 何もしない（意外と有効な時も）
-    actions.push('surprise');           // サプライズ行動
+    // 常にDo Nothingは選択可能
+    actions.push('do_nothing');
 
     // ランダムに行動を選択
     const action = actions[Math.floor(Math.random() * actions.length)];
 
     switch(action) {
-        case 'sell_high':
-            // 仙台など高価格市場を狙う
-            const highMarkets = gameState.markets.filter(m => m.maxPrice >= 32 && m.currentStock < m.capacity);
-            if (highMarkets.length > 0 && company.products > 0) {
-                const market = highMarkets[Math.floor(Math.random() * highMarkets.length)];
-                const qty = Math.min(1, company.products, market.capacity - market.currentStock);
-                if (qty > 0) {
-                    company.products -= qty;
-                    market.currentStock += qty;
-                    const price = market.maxPrice - Math.floor(Math.random() * 5);
-                    company.cash += qty * price;
-                    company.totalSales += qty * price;
-                    company.totalSoldQuantity = (company.totalSoldQuantity || 0) + qty;
-                }
-            }
-            break;
+        case 'sell':
+            // ランダムな価格で販売（0.65〜0.85の範囲）
+            const priceBase = 0.65 + Math.random() * 0.2;
+            executeDefaultSale(company, salesCapacity, priceBase);
+            return;
 
-        case 'sell_low':
-            // 東京や大阪で大量販売
-            const lowMarkets = gameState.markets.filter(m => m.maxPrice <= 24);
-            if (lowMarkets.length > 0 && company.products > 0) {
-                const market = lowMarkets[Math.floor(Math.random() * lowMarkets.length)];
-                const qty = Math.min(company.products, salesCapacity, 5);
-                company.products -= qty;
-                company.cash += qty * market.maxPrice;
-                company.totalSales += qty * market.maxPrice;
-                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + qty;
-            }
-            break;
-
-        case 'sell_random':
-            // 完全ランダムな市場に販売
-            const randomMarket = gameState.markets[Math.floor(Math.random() * gameState.markets.length)];
-            if (company.products > 0) {
-                const qty = Math.min(company.products, Math.ceil(Math.random() * 3));
-                const price = Math.floor(randomMarket.maxPrice * (0.5 + Math.random() * 0.5));
-                company.products -= qty;
-                company.cash += qty * price;
-                company.totalSales += qty * price;
-                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + qty;
-            }
-            break;
-
-        case 'produce_all':
-            // 可能な限り生産
-            const produceQty = Math.min(company.materials, mfgCapacity);
-            company.materials -= produceQty;
-            company.wip += produceQty;
-            // 仕掛品も完成させる
-            const finishQty = Math.min(company.wip, mfgCapacity - produceQty);
-            company.wip -= finishQty;
-            company.products += finishQty;
-            company.totalProductionCost += (produceQty + finishQty);
-            break;
-
-        case 'produce_one':
-            // 1個だけ生産
-            if (company.materials > 0) {
-                company.materials -= 1;
-                company.wip += 1;
-                company.totalProductionCost += 1;
-            } else if (company.wip > 0) {
-                company.wip -= 1;
-                company.products += 1;
-                company.totalProductionCost += 1;
-            }
-            break;
+        case 'produce':
+            // 生産実行
+            executeDefaultProduction(company, mfgCapacity);
+            return;
 
         case 'buy_materials':
-            // ランダムな量を購入
-            const buyQty = Math.floor(Math.random() * 5) + 1;
-            const availableMarket = gameState.markets.find(m => m.currentStock > 0);
-            if (availableMarket && company.cash >= availableMarket.buyPrice * buyQty) {
-                const actualQty = Math.min(buyQty, availableMarket.currentStock);
-                company.cash -= actualQty * availableMarket.buyPrice;
-                company.materials += actualQty;
-                company.totalMaterialCost += actualQty * availableMarket.buyPrice;
-                availableMarket.currentStock -= actualQty;
-            }
-            break;
+            // 材料購入
+            executeDefaultMaterialPurchase(company, mfgCapacity);
+            return;
 
-        case 'buy_random_chip':
-            // ランダムなチップを購入
-            const chipTypes = ['research', 'education', 'advertising'];
+        case 'buy_chip':
+            // ランダムなチップを購入（研究チップ優先）
+            const chipTypes = ['research', 'research', 'advertising'];  // 研究チップ確率高め
             const chipType = chipTypes[Math.floor(Math.random() * chipTypes.length)];
-            const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
-            if (company.cash >= chipCost) {
+            if (chipType === 'research' && company.chips.research < 4) {
                 company.cash -= chipCost;
-                company.nextPeriodChips[chipType]++;
+                company.chips.research++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入');
+            } else if (company.chips.advertising < 3) {
+                company.cash -= chipCost;
+                company.chips.advertising++;
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入');
+            } else {
+                nextTurn();
             }
-            break;
-
-        case 'hire_worker':
-            if (company.cash >= 30 && company.workers < 5) {
-                company.cash -= 30;
-                company.workers++;
-            }
-            break;
-
-        case 'hire_salesman':
-            if (company.cash >= 30 && company.salesmen < 5) {
-                company.cash -= 30;
-                company.salesmen++;
-            }
-            break;
-
-        case 'buy_machine':
-            if (company.cash >= 50) {
-                company.cash -= 50;
-                company.machines.push({type: 'small', attachments: 0});
-            }
-            break;
-
-        case 'surprise':
-            // サプライズ：突然大量投資か、全く何もしないか
-            if (Math.random() > 0.5 && company.cash >= 100) {
-                // 突然の大量投資
-                if (Math.random() > 0.5) {
-                    company.cash -= 50;
-                    company.machines.push({type: 'small', attachments: 0});
-                }
-                if (Math.random() > 0.5 && company.cash >= 30) {
-                    company.cash -= 30;
-                    company.workers++;
-                }
-                if (Math.random() > 0.5 && company.cash >= 30) {
-                    company.cash -= 30;
-                    company.salesmen++;
-                }
-            }
-            // else: 何もしない
-            break;
+            return;
 
         case 'do_nothing':
         default:
-            // 意図的に何もしない（行を消費しない戦略）
-            break;
+            // 意図的に何もしない
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'DO NOTHING', '⏭️', '様子見');
+            return;
     }
-
-    incrementRow(gameState.companies.indexOf(company));
-    nextTurn();
 }
 
 // 共通関数：販売実行
@@ -8196,59 +9623,92 @@ function executeDefaultProduction(company, maxQty) {
     showAIActionModal(company, 'DO NOTHING', '⏭️', '生産できません');
 }
 
-// 共通関数：投資実行
+// 共通関数：投資実行（G最大化・自己資本最大化志向）
 function executeDefaultInvestment(company) {
-    // 投資確率（性格により変動）
-    let investChance = 0.3;
-    if (company.strategy === 'tech_focused') investChance = 0.5;
-    if (company.strategy === 'aggressive') investChance = 0.4;
-    if (company.strategy === 'conservative') investChance = 0.2;
-    
-    if (Math.random() < investChance && company.cash > 50) {
-        const rand = Math.random();
-        const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
-        
-        // 戦略チップ購入（50%の確率）
-        if (rand < 0.5 && company.cash >= chipCost) {
-            const chipRand = Math.random();
-            if (chipRand < 0.35 && company.chips.research < 4) {
-                company.cash -= chipCost;
-                company.chips.research++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            } else if (chipRand < 0.7 && company.chips.advertising < 3) {
-                company.cash -= chipCost;
-                company.chips.advertising++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            } else if (company.chips.education < 2) {
-                company.cash -= chipCost;
-                company.chips.education++;
-                incrementRow(gameState.companies.indexOf(company));
-                nextTurn();
-                return;
-            }
-        }
-        // 人員採用（25%の確率）
-        else if (rand < 0.75 && company.workers < 3 && company.cash >= 5) {
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+
+    // 期末近くは投資しない（資金を確保）
+    if (rowsRemaining < 5) {
+        nextTurn();
+        return;
+    }
+
+    // 必要な余裕資金（期末支払い+αを確保）
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = periodEndCost + 30;
+    if (company.cash <= safetyMargin) {
+        nextTurn();
+        return;
+    }
+
+    // === 戦略的投資判断 ===
+
+    // 1. 研究チップ（価格競争力向上→MQ増加に直結）
+    if (company.chips.research < 4 && company.cash >= chipCost + safetyMargin) {
+        // 入札市場での勝率向上はGに直接貢献
+        company.cash -= chipCost;
+        company.chips.research++;
+        incrementRow(gameState.companies.indexOf(company));
+        showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（価格競争力+2）');
+        return;
+    }
+
+    // 2. 能力バランス調整（ボトルネック解消のみ）
+    // 製造能力 < 販売能力 → ワーカー or 機械が必要
+    const needMoreMfg = mfgCapacity < salesCapacity && mfgCapacity < 6;
+    // 販売能力 < 製造能力 → セールスマンが必要
+    const needMoreSales = salesCapacity < mfgCapacity && salesCapacity < 6;
+
+    // ワーカー採用（製造能力がボトルネックの場合のみ）
+    if (needMoreMfg && company.workers < 3 && company.cash >= 5 + safetyMargin) {
+        // 機械能力も確認（ワーカーが増えても機械能力がなければ無意味）
+        const machineCapacity = company.machines.reduce((sum, m) => {
+            if (m.type === 'small') return sum + (m.attachments > 0 ? 2 : 1);
+            return sum + 4;
+        }, 0) + (company.chips.computer || 0);
+
+        if (company.workers < machineCapacity) {
             company.cash -= 5;
             company.workers++;
+            company.extraLaborCost = (company.extraLaborCost || 0) + 5;
             incrementRow(gameState.companies.indexOf(company));
-            nextTurn();
-            return;
-        } 
-        // セールスマン採用（25%の確率）
-        else if (company.salesmen < 3 && company.cash >= 5) {
-            company.cash -= 5;
-            company.salesmen++;
-            incrementRow(gameState.companies.indexOf(company));
-            nextTurn();
+            showAIActionModal(company, '採用', '👷', 'ワーカー採用（製造能力向上）');
             return;
         }
     }
-    
+
+    // セールスマン採用（販売能力がボトルネックの場合のみ）
+    if (needMoreSales && company.salesmen < 3 && company.cash >= 5 + safetyMargin) {
+        company.cash -= 5;
+        company.salesmen++;
+        company.extraLaborCost = (company.extraLaborCost || 0) + 5;
+        incrementRow(gameState.companies.indexOf(company));
+        showAIActionModal(company, '採用', '💼', 'セールスマン採用（販売能力向上）');
+        return;
+    }
+
+    // 3. 広告チップ（販売能力がボトルネックの場合）
+    if (needMoreSales && company.chips.advertising < 3 && company.cash >= chipCost + safetyMargin) {
+        company.cash -= chipCost;
+        company.chips.advertising++;
+        incrementRow(gameState.companies.indexOf(company));
+        showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（販売能力向上）');
+        return;
+    }
+
+    // 4. 機械投資（製造能力がボトルネック、かつワーカー能力に余裕がある場合のみ）
+    const workerCapacity = company.workers + (company.chips.education || 0);
+    if (needMoreMfg && company.machines.length < 2 && workerCapacity > mfgCapacity && company.cash >= 50 + safetyMargin) {
+        company.cash -= 50;
+        company.machines.push({type: 'small', attachments: 0});
+        incrementRow(gameState.companies.indexOf(company));
+        showAIActionModal(company, '設備投資', '⚙️', '小型機械購入（製造能力向上）');
+        return;
+    }
+
     // 何もしなかった場合はDo Nothing
     nextTurn();
 }
@@ -8354,9 +9814,9 @@ function endPeriod() {
                 alert(`広告チップが${totalAdvertising}枚ありますが、3枚までしか持ち越せません。`);
             }
 
-            // 次期チップ設定
-            const newResearch = Math.min(totalResearch, maxCarryOver);
-            const newEducation = Math.max(0, totalEducation - 1);
+            // 次期チップ設定（2期→3期は全チップ1枚減って繰り越し、最大3枚まで）
+            const newResearch = Math.max(0, Math.min(totalResearch, maxCarryOver) - 1);
+            const newEducation = Math.max(0, Math.min(totalEducation, maxCarryOver) - 1);
             const newAdvertising = Math.max(0, Math.min(totalAdvertising, maxCarryOver) - 1);
 
             company.chips.computer = 0;  // 返却
@@ -8572,19 +10032,100 @@ function processPlayerLoanRepayment() {
 
 // End game
 function endGame() {
-    const rankings = [...gameState.companies].sort((a, b) => b.equity - a.equity);
-    
-    let resultHtml = '<div class="breakdown-list">';
-    rankings.forEach((company, index) => {
+    // 勝利条件チェック: 次期繰り越しチップ3枚以上 かつ 在庫合計10個以上
+    const companiesWithConditions = gameState.companies.map(company => {
+        const nextChips = (company.nextPeriodChips?.research || 0) +
+                         (company.nextPeriodChips?.education || 0) +
+                         (company.nextPeriodChips?.advertising || 0);
+        const inventory = company.materials + company.wip + company.products;
+        const meetsCondition = nextChips >= 3 && inventory >= 10;
+
+        return {
+            ...company,
+            nextChips,
+            inventory,
+            meetsCondition
+        };
+    });
+
+    // 条件を満たす会社のみでランキング
+    const qualifiedCompanies = companiesWithConditions.filter(c => c.meetsCondition);
+    const disqualifiedCompanies = companiesWithConditions.filter(c => !c.meetsCondition);
+
+    let resultHtml = '<div style="max-height: 500px; overflow-y: auto;">';
+
+    // 勝利条件の説明
+    resultHtml += `
+        <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 15px; font-size: 12px;">
+            <div style="font-weight: bold; color: #92400e; margin-bottom: 5px;">勝利条件</div>
+            <div style="color: #78350f;">次期繰り越しチップ3枚以上 かつ 在庫合計10個以上</div>
+        </div>
+    `;
+
+    if (qualifiedCompanies.length > 0) {
+        const rankings = qualifiedCompanies.sort((a, b) => b.equity - a.equity);
+        const winner = rankings[0];
+
         resultHtml += `
-            <div class="breakdown-item">
-                <span>${index + 1}位: ${company.name}</span>
-                <span>自己資本: ¥${company.equity}</span>
+            <div style="background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%); border-radius: 12px; padding: 20px; margin-bottom: 15px; text-align: center; border: 3px solid #d97706;">
+                <div style="font-size: 32px; margin-bottom: 5px;">🏆</div>
+                <div style="font-size: 20px; font-weight: bold; color: #78350f;">${winner.name}</div>
+                <div style="font-size: 24px; font-weight: bold; color: #1e40af; margin-top: 5px;">自己資本 ¥${winner.equity}</div>
+                <div style="font-size: 11px; color: #78350f; margin-top: 8px;">
+                    繰越チップ: ${winner.nextChips}枚 / 在庫: ${winner.inventory}個
+                </div>
             </div>
         `;
-    });
+
+        resultHtml += '<div class="breakdown-list">';
+        rankings.forEach((company, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+            resultHtml += `
+                <div class="breakdown-item" style="padding: 10px; ${index === 0 ? 'background: #fef9c3;' : ''}">
+                    <div>
+                        <span style="font-weight: bold;">${medal} ${index + 1}位: ${company.name}</span>
+                        <div style="font-size: 11px; color: #666;">チップ: ${company.nextChips}枚 / 在庫: ${company.inventory}個</div>
+                    </div>
+                    <span style="font-weight: bold; color: #1e40af;">¥${company.equity}</span>
+                </div>
+            `;
+        });
+        resultHtml += '</div>';
+    } else {
+        resultHtml += `
+            <div style="background: #fee2e2; border-radius: 12px; padding: 20px; margin-bottom: 15px; text-align: center;">
+                <div style="font-size: 24px; margin-bottom: 5px;">😢</div>
+                <div style="font-size: 16px; font-weight: bold; color: #991b1b;">勝利条件を満たす会社がありません</div>
+            </div>
+        `;
+    }
+
+    // 失格会社（条件未達成）
+    if (disqualifiedCompanies.length > 0) {
+        resultHtml += `
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 2px dashed #e5e7eb;">
+                <div style="font-weight: bold; color: #6b7280; margin-bottom: 10px;">条件未達成</div>
+        `;
+        disqualifiedCompanies.forEach(company => {
+            const chipStatus = company.nextChips >= 3 ? '✓' : '✗';
+            const invStatus = company.inventory >= 10 ? '✓' : '✗';
+            resultHtml += `
+                <div class="breakdown-item" style="padding: 8px; opacity: 0.7;">
+                    <div>
+                        <span>${company.name}</span>
+                        <div style="font-size: 10px; color: #ef4444;">
+                            チップ${chipStatus}${company.nextChips}枚 / 在庫${invStatus}${company.inventory}個
+                        </div>
+                    </div>
+                    <span style="color: #6b7280;">¥${company.equity}</span>
+                </div>
+            `;
+        });
+        resultHtml += '</div>';
+    }
+
     resultHtml += '</div>';
-    
+
     showModal('ゲーム終了 - 最終結果', resultHtml);
 }
 
