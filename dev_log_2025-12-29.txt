@@ -443,3 +443,71 @@ AIBrain.RISK_KNOWLEDGE = {
 3. 生存モード・機械アップグレード・採用戦略を実行
 4. 勝ちパターン認識（リード vs ビハインド）
 5. 性格別戦略を実行
+
+---
+
+## 追加修正（セッション4）
+
+### 1. AI入札への1円刻み参加UI
+- **ステッパーUI実装**: -10/-1/+1/+10ボタンで価格調整
+- **プリセットボタン**: 攻め(80%)/普通(85%)/安全(90%)/高め(95%)
+- **価格範囲表示**: 最低¥26〜上限価格
+- 新規関数: `adjustAIBidPrice()`, `setAIBidPrice()`, `updateAIBidPriceDisplay()`
+
+### 2. 入札価格の浮動小数点問題修正
+- `calculateStrategicBidPrice()`内の3箇所で`Math.round()`追加
+  - 生存モード: `basePrice * 0.6`
+  - ブロッキングモード: `basePrice * 0.75`
+  - プレミアムモード: `basePrice * 0.92`
+- 親AI・他AIの入札処理でも`Math.round()`追加
+
+### 3. 安い材料の貪欲な仕入れ（Vを下げる）
+- **12円以下**の材料があれば優先的に仕入れる
+- 仙台(¥10)、札幌(¥11)、福岡(¥12)の材料が残っていれば積極的に購入
+- 倉庫容量・製造能力・現金の範囲内で最大限購入
+- `executeAIStrategyByType()`の冒頭に安価材料チェック追加
+
+### 4. 倉庫購入タイミング制限
+- **残り20行**（期の最初）の時のみ購入
+- 期末に没収されるため、後半に買っても効果が薄い問題を解決
+
+### 5. 特急チップROI計算機能
+`AIBrain.shouldUseExpressChip(company, chipType, companyIndex)`
+
+#### 判断ロジック
+| チップ種類 | 効果 | 損益分岐点 |
+|-----------|------|-----------|
+| 研究 | 価格競争力+2円 | 20個以上売らないと回収不可 |
+| 教育 | 能力+1 | MQ15円×追加生産数 > 40円 |
+| 広告 | 販売能力+2 | MQ12円×追加販売数 > 40円 |
+
+#### 判断基準
+- 残り行数から販売可能数を推定
+- 期待利益が**40円の1.2倍以上**なければ「安く売った方が確実」と判断
+- ROIが+の時のみ特急を実行
+
+#### コンソールログ出力
+```
+[AI特急] 攻め商事: 期待利益80円 > 投資40円
+[AI特急見送り] 堅実産業: 残り10個しか売れない → 40円安く売った方が効果的
+```
+
+### 6. 販売条件の統一
+- 全戦略で「製品が販売能力の7割以上」で販売する条件を維持
+- aggressive/conservative/price_focused/tech_focused/balanced 全て統一
+
+## 技術的変更
+
+### 新規関数追加
+- `adjustAIBidPrice(delta)`: AI入札価格をステッパーで調整
+- `setAIBidPrice(price)`: AI入札価格を直接設定（プリセット用）
+- `updateAIBidPriceDisplay()`: AI入札価格の表示を更新
+- `AIBrain.shouldUseExpressChip()`: 特急チップROI計算
+
+### 修正箇所
+- `showPlayerBidInAIAuction()`: priceCardsをpriceStepperに変更
+- `calculateStrategicBidPrice()`: Math.round()追加（3箇所）
+- `startAIBidding()`: Math.round()追加
+- `processAIOnlyBidding()`: Math.round()追加
+- `executeAIStrategyByType()`: 安価材料購入・特急ROI判断追加
+- 倉庫購入条件: `rowsRemaining >= 10` → `rowsRemaining >= 20`

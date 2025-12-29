@@ -7400,7 +7400,7 @@ const AIBrain = {
             const neededForSurvival = cashFlow.mustPay - company.cash;
             const minPriceForSurvival = Math.ceil(neededForSurvival / company.products);
             // 生存のためなら20円まで下げる
-            return Math.max(20, Math.min(minPriceForSurvival, basePrice * 0.6));
+            return Math.max(20, Math.min(minPriceForSurvival, Math.round(basePrice * 0.6)));
         }
 
         // === 2. ブロッキングモード（ライバルを妨害） ===
@@ -7411,14 +7411,14 @@ const AIBrain = {
 
         if (canBlock && shouldBlock && Math.random() > 0.6) {
             // ライバルより安くして販売機会を奪う
-            const blockPrice = Math.max(24, basePrice * 0.75);
+            const blockPrice = Math.max(24, Math.round(basePrice * 0.75));
             return blockPrice;
         }
 
         // === 3. プレミアムモード（余裕がある） ===
         if (company.cash > cashFlow.mustPay + 150 && !competitors.mostDangerous.canSellNow) {
             // ライバルが売れない状況なら高値で
-            return Math.min(basePrice, basePrice * 0.92);
+            return Math.min(basePrice, Math.round(basePrice * 0.92));
         }
 
         // === 4. 通常モード（戦略別） ===
@@ -7450,6 +7450,104 @@ const AIBrain = {
 
         const price = Math.floor(basePrice * priceMultiplier);
         return Math.max(26, Math.min(price, basePrice));
+    },
+
+    // ============================================
+    // ⚡ 特急チップROI計算
+    // ============================================
+    // 特急チップ(40円+1行)を使うべきか、それとも安く売った方が得か判断
+
+    shouldUseExpressChip: function(company, chipType, companyIndex) {
+        const EXPRESS_COST = 40;
+        const EXPRESS_ROWS = 1;  // 特急購入で1行消費
+
+        const rowsRemaining = 20 - (company.currentRow || 1);
+        const salesCapacity = getSalesCapacity(company);
+        const mfgCapacity = getManufacturingCapacity(company);
+
+        // 残り行数が少なすぎる場合は特急しない
+        if (rowsRemaining < 3) {
+            return { shouldUse: false, reason: '残り行数が少なすぎる' };
+        }
+
+        // 残り販売可能数を推定（残り行数の半分程度が販売に使えると仮定）
+        const estimatedSalesRows = Math.floor((rowsRemaining - EXPRESS_ROWS) / 2);
+        const maxSellableQty = estimatedSalesRows * salesCapacity;
+
+        // チップ種類別のROI計算
+        let expectedBenefit = 0;
+        let breakEvenQty = 0;
+
+        switch (chipType) {
+            case 'research':
+                // 研究チップ: 価格競争力+2円
+                const priceAdvantage = 2;
+                breakEvenQty = Math.ceil(EXPRESS_COST / priceAdvantage);  // 20個
+                expectedBenefit = maxSellableQty * priceAdvantage;
+
+                if (maxSellableQty < breakEvenQty) {
+                    return {
+                        shouldUse: false,
+                        reason: `残り${maxSellableQty}個しか売れない（回収に${breakEvenQty}個必要）`,
+                        alternative: '40円安く売った方が効果的'
+                    };
+                }
+                break;
+
+            case 'education':
+                // 教育チップ: 製造+1、販売+1
+                // 追加1個あたりの限界利益（MQ）を15円と仮定
+                const mqPerUnit = 15;
+                const additionalUnits = estimatedSalesRows;  // 残り行で追加で作れる/売れる数
+                expectedBenefit = additionalUnits * mqPerUnit;
+                breakEvenQty = Math.ceil(EXPRESS_COST / mqPerUnit);  // 約3個
+
+                if (additionalUnits < breakEvenQty) {
+                    return {
+                        shouldUse: false,
+                        reason: `追加${additionalUnits}個では回収不可（${breakEvenQty}個必要）`,
+                        alternative: '通常購入か次期用購入が効果的'
+                    };
+                }
+                break;
+
+            case 'advertising':
+                // 広告チップ: 販売能力+2（セールスマンがいれば）
+                if (company.salesmen === 0) {
+                    return { shouldUse: false, reason: 'セールスマンがいない' };
+                }
+                const additionalSales = Math.min(2, company.products) * estimatedSalesRows;
+                const avgMQ = 12;
+                expectedBenefit = additionalSales * avgMQ;
+                breakEvenQty = Math.ceil(EXPRESS_COST / avgMQ);
+
+                if (additionalSales < breakEvenQty) {
+                    return {
+                        shouldUse: false,
+                        reason: `追加販売${additionalSales}個では回収不可`,
+                        alternative: '特急より安売りが効果的'
+                    };
+                }
+                break;
+        }
+
+        // 特急 vs 安売りの比較
+        // 40円安く売る = 販売能力分の値引き効果
+        const discountAlternative = EXPRESS_COST;  // 40円値引きに相当
+
+        if (expectedBenefit <= discountAlternative * 1.2) {  // 1.2倍以上の効果がないなら安売りの方が確実
+            return {
+                shouldUse: false,
+                reason: `期待利益${expectedBenefit}円 ≒ 40円値引き効果`,
+                alternative: '安く売った方が確実に効果的'
+            };
+        }
+
+        return {
+            shouldUse: true,
+            reason: `期待利益${expectedBenefit}円 > 投資${EXPRESS_COST}円`,
+            expectedROI: Math.round((expectedBenefit / EXPRESS_COST - 1) * 100)
+        };
     },
 
     // ============================================
@@ -7929,6 +8027,22 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     const brainDecision = AIBrain.decideOptimalAction(company, companyIndex);
     console.log(`[AIBrain] ${company.name}: ${brainDecision.action} - ${brainDecision.reason}`);
 
+    // === 安い材料があれば貪欲に仕入れる（Vを下げる） ===
+    const cheapMaterials = gameState.markets.filter(m => m.currentStock > 0 && !m.closed && m.buyPrice <= 12);
+    if (cheapMaterials.length > 0 && company.materials < getMaterialCapacity(company)) {
+        const periodEndCost = calculatePeriodPayment(company);
+        const cheapest = cheapMaterials.sort((a, b) => a.buyPrice - b.buyPrice)[0];
+        const canStore = getMaterialCapacity(company) - company.materials;
+        const canAfford = Math.floor((company.cash - periodEndCost - 20) / cheapest.buyPrice);
+        const buyQty = Math.min(canStore, cheapest.currentStock, canAfford, mfgCapacity * 2);
+
+        if (buyQty >= 2 && company.cash > periodEndCost + 30) {
+            console.log(`[AI仕入れ] ${company.name}: 安い材料発見！ ${cheapest.name} ¥${cheapest.buyPrice} x ${buyQty}個`);
+            executeDefaultMaterialPurchase(company, buyQty);
+            return;
+        }
+    }
+
     // === リスクカード認識に基づく予防行動 ===
     const riskRecommendation = AIBrain.getRecommendedAction(company, companyIndex);
     if (riskRecommendation) {
@@ -8050,8 +8164,9 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         }
     }
 
-    // === 倉庫購入（在庫容量・リスク保護） ===
-    if (analysis.needsWarehouse && company.warehouses < 2 && company.cash >= 50 + analysis.periodEndCost) {
+    // === 倉庫購入（在庫容量・リスク保護）- 期の最初のみ ===
+    // 期末に没収されるため、残り行数20（期の最初）の時のみ購入する
+    if (analysis.needsWarehouse && company.warehouses < 2 && company.cash >= 50 + analysis.periodEndCost && analysis.rowsRemaining >= 20) {
         const warehouseCost = 50;
         company.cash -= warehouseCost;
         company.warehouses++;
@@ -8126,15 +8241,21 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     if (victory.needsAggression && competitors.myRank >= 4) {
         console.log(`[AI戦略] ${company.name}: ビハインドのため攻めモード発動`);
 
-        // 特急チップで追い上げ
+        // 特急チップで追い上げ（ROI計算で判断）
         if (period >= 3 && company.cash > analysis.periodEndCost + 60) {
             if (company.chips.research < competitors.averageResearch) {
-                const expressCost = 40;
-                company.cash -= expressCost;
-                company.chips.research++;
-                incrementRow(companyIndex);
-                showAIActionModal(company, '特急チップ', '🔬', '研究チップ特急購入（追い上げ）');
-                return;
+                const expressROI = AIBrain.shouldUseExpressChip(company, 'research', companyIndex);
+                if (expressROI.shouldUse) {
+                    const expressCost = 40;
+                    company.cash -= expressCost;
+                    company.chips.research++;
+                    incrementRow(companyIndex);
+                    console.log(`[AI特急] ${company.name}: ${expressROI.reason}`);
+                    showAIActionModal(company, '特急チップ', '🔬', `研究チップ特急（ROI:${expressROI.expectedROI}%）`);
+                    return;
+                } else {
+                    console.log(`[AI特急見送り] ${company.name}: ${expressROI.reason} → ${expressROI.alternative || '安売りへ'}`);
+                }
             }
         }
 
@@ -8241,13 +8362,11 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
         return;
     }
 
-    // 1. 販売優先（PQを増やす - 7割以上で）
-    if (company.products > 0 && salesCapacity > 0) {
-        const minSellQty = Math.ceil(salesCapacity * 0.7);
-        if (company.products >= minSellQty) {
-            executeDefaultSale(company, salesCapacity, 0.78);  // A社は積極的だが利益も確保
-            return;
-        }
+    // 1. 販売優先（製品が販売能力の7割以上で売る - 攻め商事は積極的）
+    const minSellQty = Math.ceil(salesCapacity * 0.7);
+    if (company.products >= minSellQty && salesCapacity > 0) {
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
+        return;
     }
 
     // 2. 生産最大化（在庫を製品に変換）
@@ -8537,10 +8656,10 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    // 1. 確実な販売（在庫リスク回避、7割以上で）
+    // 1. 確実な販売（製品が販売能力の7割以上で売る）
     const minSellQty = Math.ceil(salesCapacity * 0.7);
     if (company.products >= minSellQty && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.85);  // 安全な価格
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.85);
         return;
     }
 
@@ -8666,10 +8785,10 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    // 1. 大量販売（低価格でも量で勝負、7割以上）
+    // 1. 大量販売（製品が販売能力の7割以上で売る）
     const minSellQty = Math.ceil(salesCapacity * 0.7);
     if (company.products >= minSellQty && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.78);  // 量重視だが利益も確保
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
         return;
     }
 
@@ -8799,10 +8918,10 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
         return;
     }
 
-    // 1. 高効率販売（7割以上で）
+    // 1. 高効率販売（製品が販売能力の7割以上で売る）
     const minSellQty = Math.ceil(salesCapacity * 0.7);
     if (company.products >= minSellQty && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.80);  // 研究チップで勝負
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.80);
         return;
     }
 
@@ -8940,10 +9059,9 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
         }
     }
 
-    // 1. 販売機会を逃さない（7割以上で）
-    const minSellQty = Math.ceil(salesCapacity * 0.7);
-    if (company.products >= minSellQty && salesCapacity > 0) {
-        executeDefaultSale(company, salesCapacity, 0.80);
+    // 1. 販売機会を逃さない（製品があれば売る）
+    if (company.products >= 1 && salesCapacity > 0) {
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.80);
         return;
     }
 
@@ -9303,7 +9421,7 @@ function startAIBidding(parentCompany, market, parentQty, priceBase) {
 
     // AIBrainによる戦略的価格決定
     const strategicPrice = AIBrain.calculateStrategicBidPrice(parentCompany, market, parentIndex);
-    const parentPrice = Math.max(20, Math.min(strategicPrice, market.sellPrice)); // 生存モードなら20円まで許容
+    const parentPrice = Math.max(20, Math.min(Math.round(strategicPrice), market.sellPrice)); // 生存モードなら20円まで許容
     const parentCompetitiveness = getPriceCompetitiveness(parentCompany, true);
     const parentEffectivePrice = parentPrice - parentCompetitiveness;
 
@@ -9352,27 +9470,43 @@ function showPlayerBidInAIAuction(parentCompany, market, parentQty, parentPrice,
         `;
     }
 
-    // 価格カード生成（最低26円、上限の80%～95%）
-    const priceOptions = [
-        { pct: 80, label: '攻め' },
-        { pct: 85, label: '普通' },
-        { pct: 90, label: '安全' },
-        { pct: 95, label: '高め' }
+    // 価格ステッパー（1円刻み）
+    const minPrice = 26;
+    const maxPrice = market.sellPrice;
+    window.aiBidSelection.minPrice = minPrice;
+    window.aiBidSelection.maxPrice = maxPrice;
+
+    // プリセット価格（クイック選択用）
+    const presets = [
+        { price: Math.max(minPrice, Math.floor(maxPrice * 0.80)), label: '攻め' },
+        { price: Math.max(minPrice, Math.floor(maxPrice * 0.85)), label: '普通' },
+        { price: Math.max(minPrice, Math.floor(maxPrice * 0.90)), label: '安全' },
+        { price: Math.max(minPrice, Math.floor(maxPrice * 0.95)), label: '高め' }
     ];
-    let priceCards = '';
-    priceOptions.forEach((opt, idx) => {
-        // 最低26円を保証
-        const rawPrice = Math.floor(market.sellPrice * opt.pct / 100);
-        const price = Math.max(26, rawPrice);
-        const isDefault = (opt.pct === 85);
-        if (isDefault) window.aiBidSelection.price = price;
-        priceCards += `
-            <div onclick="selectAIBidPrice(${price})" id="aibid-price-${price}" class="qty-card" style="background: ${isDefault ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#374151'}; border: 2px solid ${isDefault ? '#60a5fa' : '#6b7280'}; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; color: white;">
-                <div style="font-size: 16px; font-weight: bold;">¥${price}</div>
-                <div style="font-size: 10px;">${opt.label}</div>
+
+    let presetBtns = presets.map(p => `
+        <button onclick="setAIBidPrice(${p.price})" style="padding: 6px 8px; border: 1px solid #4b5563; border-radius: 6px; background: #374151; color: white; font-size: 11px; cursor: pointer;">
+            ${p.label}<br>¥${p.price}
+        </button>
+    `).join('');
+
+    const priceStepper = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <button onclick="adjustAIBidPrice(-10)" style="width: 40px; height: 40px; border-radius: 8px; border: none; background: #4b5563; color: white; font-size: 16px; cursor: pointer;">-10</button>
+                <button onclick="adjustAIBidPrice(-1)" style="width: 36px; height: 40px; border-radius: 8px; border: none; background: #6b7280; color: white; font-size: 18px; cursor: pointer;">-</button>
+                <div id="aibid-price-display" style="min-width: 80px; padding: 10px 15px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; text-align: center;">
+                    <div style="font-size: 22px; font-weight: bold; color: white;">¥${window.aiBidSelection.price}</div>
+                </div>
+                <button onclick="adjustAIBidPrice(1)" style="width: 36px; height: 40px; border-radius: 8px; border: none; background: #6b7280; color: white; font-size: 18px; cursor: pointer;">+</button>
+                <button onclick="adjustAIBidPrice(10)" style="width: 40px; height: 40px; border-radius: 8px; border: none; background: #4b5563; color: white; font-size: 16px; cursor: pointer;">+10</button>
             </div>
-        `;
-    });
+            <div style="display: flex; justify-content: center; gap: 6px;">
+                ${presetBtns}
+            </div>
+            <div style="font-size: 11px; color: #9ca3af; text-align: center;">最低¥${minPrice} ～ 上限¥${maxPrice}</div>
+        </div>
+    `;
 
     const content = `
         <div style="text-align: center; padding: 10px;">
@@ -9395,9 +9529,7 @@ function showPlayerBidInAIAuction(parentCompany, market, parentQty, parentPrice,
 
             <div style="margin-bottom: 15px;">
                 <div style="font-weight: bold; margin-bottom: 6px; font-size: 13px;">💵 入札価格</div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                    ${priceCards}
-                </div>
+                ${priceStepper}
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -9424,17 +9556,35 @@ function selectAIBidQty(qty) {
     }
 }
 
-// AI入札参加の価格選択
+// AI入札参加の価格選択（レガシー）
 function selectAIBidPrice(price) {
     window.aiBidSelection.price = price;
-    document.querySelectorAll('[id^="aibid-price-"]').forEach(el => {
-        el.style.background = '#374151';
-        el.style.borderColor = '#6b7280';
-    });
-    const selected = document.getElementById(`aibid-price-${price}`);
-    if (selected) {
-        selected.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-        selected.style.borderColor = '#60a5fa';
+    updateAIBidPriceDisplay();
+}
+
+// AI入札価格をステッパーで調整（1円刻み）
+function adjustAIBidPrice(delta) {
+    const min = window.aiBidSelection.minPrice || 26;
+    const max = window.aiBidSelection.maxPrice || 50;
+    let newPrice = (window.aiBidSelection.price || min) + delta;
+    newPrice = Math.max(min, Math.min(newPrice, max));
+    window.aiBidSelection.price = newPrice;
+    updateAIBidPriceDisplay();
+}
+
+// AI入札価格を直接設定（プリセットボタン用）
+function setAIBidPrice(price) {
+    const min = window.aiBidSelection.minPrice || 26;
+    const max = window.aiBidSelection.maxPrice || 50;
+    window.aiBidSelection.price = Math.max(min, Math.min(price, max));
+    updateAIBidPriceDisplay();
+}
+
+// AI入札価格の表示を更新
+function updateAIBidPriceDisplay() {
+    const display = document.getElementById('aibid-price-display');
+    if (display) {
+        display.innerHTML = `<div style="font-size: 22px; font-weight: bold; color: white;">¥${window.aiBidSelection.price}</div>`;
     }
 }
 
@@ -9540,7 +9690,7 @@ function processAIOnlyBidding() {
             if (aiQuantity >= 1) {
                 // AIBrainによる戦略的価格決定
                 const strategicPrice = AIBrain.calculateStrategicBidPrice(aiCompany, market, i);
-                const aiDisplayPrice = Math.max(20, Math.min(strategicPrice, market.sellPrice));
+                const aiDisplayPrice = Math.max(20, Math.min(Math.round(strategicPrice), market.sellPrice));
                 const aiCompetitiveness = getPriceCompetitiveness(aiCompany, false);
                 const aiPrice = aiDisplayPrice - aiCompetitiveness;
                 allBids.push({
