@@ -10,6 +10,88 @@
         .container { max-width: 100%; margin: 0 auto; padding: 8px; }
 
         /* ============================================ */
+        /* トースト通知システム */
+        /* ============================================ */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            min-width: 280px;
+            max-width: 400px;
+            animation: toastSlideIn 0.3s ease-out;
+            pointer-events: auto;
+            border: 2px solid #3b82f6;
+        }
+        .toast.success {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border-color: #34d399;
+        }
+        .toast.warning {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            border-color: #fbbf24;
+        }
+        .toast.danger {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            border-color: #f87171;
+        }
+        .toast-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .toast-icon {
+            font-size: 24px;
+        }
+        .toast-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .toast-body {
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+        .toast-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .toast-close:hover {
+            opacity: 1;
+        }
+        @keyframes toastSlideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastSlideOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-20px); }
+        }
+        .toast.hiding {
+            animation: toastSlideOut 0.3s ease-in forwards;
+        }
+
+        /* ============================================ */
         /* ヘッダー - ゲーム情報 */
         /* ============================================ */
         .header { background: #fff; border: 2px solid #1e40af; border-radius: 8px; padding: 10px 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -189,6 +271,11 @@
             grid-template-columns: 1fr auto;
             gap: 10px;
             align-items: start;
+            position: relative;
+        }
+        /* 会社盤固定時のスペース確保 */
+        .player-area-wrapper {
+            margin-top: 10px;
         }
 
         /* 次繰盤 */
@@ -253,7 +340,9 @@
             color: #fff;
             box-shadow: 0 6px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
             border: 4px solid #1e4a7a;
-            position: relative;
+            position: sticky;
+            bottom: 10px;
+            z-index: 100;
         }
         /* 情報バー（期数・行数・現金・F・自己資本） */
         .board-info-bar {
@@ -505,14 +594,15 @@
             cursor: pointer;
         }
         .market-tile:hover { transform: scale(1.08); box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
-        /* 各市場の位置と色（六角形内に収まるよう調整） */
-        .market-tile.tokyo { top: 2%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
-        .market-tile.nagoya { top: 22%; right: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.osaka { top: 52%; right: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.fukuoka { bottom: 8%; right: 22%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.overseas { bottom: 8%; left: 22%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
-        .market-tile.sapporo { top: 52%; left: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.sendai { top: 22%; left: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        /* 各市場の位置と色（六角形内に完全収まるよう調整） */
+        /* 六角形の頂点付近は狭いため、タイルをより中央寄りに配置 */
+        .market-tile.tokyo { top: 12%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.nagoya { top: 28%; right: 12%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.osaka { top: 52%; right: 10%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.fukuoka { bottom: 18%; right: 22%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.overseas { bottom: 18%; left: 22%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.sapporo { top: 52%; left: 10%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.sendai { top: 28%; left: 12%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
         .market-tile.closed { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; border-color: #6b7280 !important; opacity: 0.7; }
         .market-tile.closed .market-name { color: #9ca3af; text-decoration: line-through; }
 
@@ -991,15 +1081,15 @@
         @media (max-width: 480px) {
             .container { padding: 5px; }
             .header { padding: 6px; margin-bottom: 6px; }
-            .period-info { gap: 4px; }
+            .period-info { gap: 4px; flex-wrap: wrap; }
             .info-item { padding: 4px 8px; }
-            .info-label { font-size: 9px; }
+            .info-label { font-size: 10px; }
             .info-value { font-size: 12px; }
 
             /* スマホ：縦積みレイアウト */
             .center-area { flex-direction: column; }
             .other-companies-left,
-            .other-companies-right { flex-direction: row; justify-content: center; }
+            .other-companies-right { flex-direction: row; justify-content: center; flex-wrap: wrap; }
             .market-center { max-width: 100%; }
 
             .card-draw-section { padding: 10px; }
@@ -1009,38 +1099,61 @@
             .board-title { font-size: 14px; padding: 4px; }
             .production-flow { gap: 4px; }
             .flow-box { padding: 6px; }
-            .flow-box-title { font-size: 9px; }
+            .flow-box-title { font-size: 10px; }
             .inv-block { width: 16px; height: 16px; }
 
             .personnel-row { gap: 4px; }
             .personnel-box { padding: 6px; }
-            .personnel-box-title { font-size: 9px; }
-            .person-dot { width: 20px; height: 20px; font-size: 9px; }
-            .machine-dot { width: 24px; height: 24px; font-size: 8px; }
+            .personnel-box-title { font-size: 10px; }
+            .person-dot { width: 20px; height: 20px; font-size: 10px; }
+            .machine-dot { width: 24px; height: 24px; font-size: 9px; }
 
             .chips-row { gap: 3px; }
             .chip-box { padding: 4px; }
-            .chip-box-title { font-size: 8px; }
+            .chip-box-title { font-size: 9px; }
             .chip { width: 14px; height: 14px; }
 
-            .markets-board { padding: 8px; }
-            .markets-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
-            .market-tile { padding: 6px; }
-            .market-name { font-size: 11px; }
-            .price-badge { font-size: 9px; padding: 1px 4px; }
-            .stock-cube { width: 10px; height: 10px; }
+            /* スマホ用市場盤調整 */
+            .markets-board {
+                padding: 10px;
+                min-height: 320px;
+                max-width: 340px;
+            }
+            .markets-ring {
+                width: 300px;
+                height: 300px;
+            }
+            .market-tile {
+                padding: 4px 3px;
+                width: 68px;
+            }
+            .market-name { font-size: 10px; }
+            .market-volume { font-size: 9px; }
+            .price-badge { font-size: 8px; padding: 1px 3px; }
+            .stock-cube { width: 8px; height: 8px; }
+            .card-deck-area { width: 50px; height: 50px; }
+            .deck-cards { font-size: 7px; }
 
             .fixed-cost-panel { padding: 8px; }
             .panel-title { font-size: 12px; }
-            .cost-breakdown { font-size: 10px; }
+            .cost-breakdown { font-size: 11px; }
 
             /* 手元エリア：スマホでは縦積み */
             .player-area { grid-template-columns: 1fr; }
 
-            /* 他社：スマホでは小さく */
+            /* 他社会社盤：スマホ用調整 */
+            .other-company-board {
+                min-width: 145px;
+                max-width: 160px;
+                padding: 5px;
+                font-size: 10px;
+            }
+            .other-company-board .board-title { font-size: 11px; }
+
+            /* ミニ表示用 */
             .other-company-mini { min-width: 60px; padding: 4px 6px; }
-            .other-company-mini .oc-name { font-size: 9px; }
-            .other-company-mini .oc-cash { font-size: 9px; }
+            .other-company-mini .oc-name { font-size: 10px; }
+            .other-company-mini .oc-cash { font-size: 10px; }
 
             /* モーダル - スマホ最適化 */
             .modal-content { width: 95%; max-height: 90vh; padding: 12px; }
@@ -1048,13 +1161,40 @@
             .form-control { font-size: 16px; padding: 12px; }
             .submit-btn { padding: 15px; font-size: 16px; }
             .decision-options { grid-template-columns: 1fr; gap: 8px; }
+
+            /* トースト調整 */
+            .toast {
+                min-width: 260px;
+                max-width: 90vw;
+                font-size: 12px;
+                padding: 12px 16px;
+            }
         }
 
         /* タブレット向け（481px〜768px） */
         @media (min-width: 481px) and (max-width: 768px) {
             .markets-grid { grid-template-columns: repeat(4, 1fr); }
-            .market-center { max-width: 350px; }
+            .market-center { max-width: 380px; }
             .player-area { grid-template-columns: 1fr 200px; }
+
+            /* タブレット用市場盤調整 */
+            .markets-board {
+                min-height: 360px;
+                max-width: 400px;
+            }
+            .markets-ring {
+                width: 340px;
+                height: 340px;
+            }
+            .market-tile {
+                width: 78px;
+            }
+
+            /* 他社会社盤 */
+            .other-company-board {
+                min-width: 160px;
+                max-width: 180px;
+            }
         }
 
         /* PC向け（769px以上） */
@@ -1077,6 +1217,9 @@
     </style>
 </head>
 <body>
+    <!-- トースト通知コンテナ -->
+    <div id="toastContainer" class="toast-container"></div>
+
     <div class="container">
         <!-- ゲームエリア：市場盤中央、他社周囲 -->
         <div class="game-area">
@@ -1110,6 +1253,7 @@
         </div>
 
         <!-- 手元エリア：プレイヤーの会社盤 + 固定費 + 次繰盤 -->
+        <div class="player-area-wrapper">
         <div class="player-area">
             <!-- 会社盤（大きく表示） -->
             <div class="company-board" id="companyBoard">
@@ -1236,6 +1380,7 @@
                 </div>
             </div>
         </div>
+        </div> <!-- player-area-wrapper -->
     </div>
 
     <div id="modalContainer"></div>
@@ -2518,7 +2663,7 @@ function applyRiskCard(cardId) {
         case 1: // クレーム発生
         case 2:
             company.cash = Math.max(0, company.cash - 5);
-            alert('クレーム発生！\n本社経費▲5');
+            showToast('クレーム発生！\n本社経費▲5', 'warning', 4000);
             break;
         case 3: // 教育成功（仕入れ可）
         case 4:
@@ -2540,7 +2685,7 @@ function applyRiskCard(cardId) {
         case 5: // 消費者運動発生
         case 6:
             company.cannotSell = true;
-            alert('消費者運動発生！\n商品の販売はできません\n（材料購入、完成・投入、DO NOTHINGは可能）');
+            showToast('消費者運動発生！\n商品の販売はできません\n（材料購入、完成・投入、DO NOTHINGは可能）', 'danger', 5000);
             showForcedActionModal();  // アクション選択モーダルを表示
             return;  // ここでリターン（モーダルで行動を選択後にターン終了）
         case 7: // 得意先倒産
@@ -2589,7 +2734,7 @@ function applyRiskCard(cardId) {
         case 15: // 労災発生
         case 16:
             company.cannotProduce = true;
-            alert('労災発生！\n生産活動はできません\n（材料購入、商品販売・入札、DO NOTHINGは可能）');
+            showToast('労災発生！\n生産活動はできません\n（材料購入、商品販売・入札、DO NOTHINGは可能）', 'danger', 5000);
             showLaborAccidentActionModal();  // 行動選択モーダルを表示
             return;  // ここでリターン（モーダルで行動を選択後にターン終了）
         case 17: // 広告政策失敗
@@ -2624,7 +2769,7 @@ function applyRiskCard(cardId) {
         case 24: // コンピュータートラブル
         case 25:
             company.cash = Math.max(0, company.cash - 10);
-            alert('コンピュータートラブル！\n製造経費▲10');
+            showToast('コンピュータートラブル！\n製造経費▲10', 'warning', 4000);
             break;
         case 26: // 商品の独占販売（仕入れ可）
         case 27:
@@ -2719,7 +2864,7 @@ function applyRiskCard(cardId) {
         case 43: // ストライキ発生
         case 44:
             company.skipTurns = 1;
-            alert('ストライキ発生！\n1回休み');
+            showToast('ストライキ発生！\n1回休み', 'danger', 4000);
             rowUsed = false;
             break;
         case 45: // 盗難発見
@@ -2759,7 +2904,7 @@ function applyRiskCard(cardId) {
         case 47: // 長期労務紛争
         case 48:
             company.skipTurns = 2;
-            alert('長期労務紛争！\n2回休み');
+            showToast('長期労務紛争！\n2回休み', 'danger', 4000);
             rowUsed = false;
             break;
         case 49: // 設計トラブル発生
@@ -2812,7 +2957,7 @@ function applyRiskCard(cardId) {
         case 59: // 社長、病気で倒れる
         case 60:
             company.skipTurns = 1;
-            alert('社長、病気で倒れる！\n1回休み');
+            showToast('社長、病気で倒れる！\n1回休み', 'danger', 4000);
             rowUsed = false;
             break;
         case 61: // 不良在庫発生
@@ -3425,7 +3570,7 @@ function executeHiring(type) {
         const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
 
     // 5円支払い
@@ -4125,6 +4270,48 @@ function renderOtherCompanies() {
     document.getElementById('otherCompaniesRight').innerHTML = rightHtml;
 }
 
+// ============================================
+// トースト通知システム
+// ============================================
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    const icons = {
+        info: 'ℹ️',
+        success: '✅',
+        warning: '⚠️',
+        danger: '❌'
+    };
+
+    const titles = {
+        info: 'お知らせ',
+        success: '成功',
+        warning: '注意',
+        danger: '警告'
+    };
+
+    toast.innerHTML = `
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+        <div class="toast-header">
+            <span class="toast-icon">${icons[type] || icons.info}</span>
+            <span class="toast-title">${titles[type] || titles.info}</span>
+        </div>
+        <div class="toast-body">${message}</div>
+    `;
+
+    container.appendChild(toast);
+
+    // 自動削除
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+
+    return toast;
+}
+
 // Modal functions
 function showModal(title, content) {
     const modalHtml = `
@@ -4412,7 +4599,7 @@ function buyMaterialsFromMultiple() {
     });
     
     if (rowsUsed === 0) {
-        alert('購入する市場を選択してください');
+        showToast('購入する市場を選択してください', 'warning', 3000);
         return;
     }
     
@@ -4439,7 +4626,7 @@ function buyMaterialsFromMultiple() {
         const needed = Math.ceil((totalCost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
     
     // 購入実行
@@ -4500,11 +4687,11 @@ function buyMaterials() {
         const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
     
     if (quantity > market.currentStock) {
-        alert('在庫が不足しています！');
+        showToast('在庫が不足しています！', 'danger', 3000);
         return;
     }
     
@@ -4518,7 +4705,7 @@ function buyMaterials() {
 
     closeModal();
     updateDisplay();
-    alert(`${market.name}から材料${quantity}個を¥${cost}で購入しました`);
+    showToast(`${market.name}から材料${quantity}個を¥${cost}で購入しました`, 'success', 3000);
     endTurn();
 }
 
@@ -4528,7 +4715,7 @@ function showProductionModal() {
 
     // 労災発生チェック（フラグはターン終了時にリセット）
     if (company.cannotProduce) {
-        alert('労災発生中のため生産できません！\n（材料購入、商品販売・入札、DO NOTHINGは可能）');
+        showToast('労災発生中のため生産できません！\n（材料購入、商品販売・入札、DO NOTHINGは可能）', 'danger', 4000);
         showDecisionCard();
         return;
     }
@@ -4643,7 +4830,7 @@ function produce() {
         const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
     
     company.cash -= cost;
@@ -4658,7 +4845,7 @@ function produce() {
 
     closeModal();
     updateDisplay();
-    alert(`材料${matToWip}個→仕掛品、仕掛品${wipToProd}個→製品を生産しました（¥${cost}）`);
+    showToast(`材料${matToWip}個→仕掛品、仕掛品${wipToProd}個→製品を生産しました（¥${cost}）`, 'success', 3500);
     endTurn();
 }
 
@@ -4667,7 +4854,7 @@ function enterSalesMode() {
     const company = gameState.companies[0];
 
     if (company.products <= 0) {
-        alert('製品在庫がありません');
+        showToast('製品在庫がありません', 'danger', 3000);
         return;
     }
 
@@ -5092,7 +5279,7 @@ function processSeparateTwoMarketSale() {
     const totalQty = qty1 + qty2;
 
     if (totalQty === 0) {
-        alert('少なくとも1つの市場に販売数量を設定してください');
+        showToast('少なくとも1つの市場に販売数量を設定してください', 'warning', 3000);
         return;
     }
 
@@ -5456,12 +5643,12 @@ function processBuyFromModal() {
     const cost = market.buyPrice * quantity;
 
     if (company.cash < cost) {
-        alert('現金が不足しています');
+        showToast('現金が不足しています', 'danger', 3000);
         return;
     }
 
     if (market.currentStock < quantity) {
-        alert('市場在庫が不足しています');
+        showToast('市場在庫が不足しています', 'danger', 3000);
         return;
     }
 
@@ -5472,7 +5659,7 @@ function processBuyFromModal() {
 
     closeModal();
     updateDisplay();
-    alert(`${market.name}から材料${quantity}個を¥${cost}で購入しました`);
+    showToast(`${market.name}から材料${quantity}個を¥${cost}で購入しました`, 'success', 3000);
     endTurn();
 }
 
@@ -5489,7 +5676,7 @@ function processSale() {
     const market = gameState.markets[marketIndex];
     
     if (company.products < quantity) {
-        alert('製品が不足しています！');
+        showToast('製品が不足しています！', 'danger', 3000);
         return;
     }
     
@@ -5678,7 +5865,7 @@ function hire() {
         const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
     
     company.cash -= cost;
@@ -5828,7 +6015,7 @@ function buyMachine() {
         const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
     
     if (type === 'attachment') {
@@ -5844,7 +6031,7 @@ function buyMachine() {
     } else {
         company.cash -= cost;
         company.machines.push({type: type, attachments: 0});
-        alert(`${type === 'small' ? '小型' : '大型'}機械を購入しました（¥${cost}）`);
+        showToast(`${type === 'small' ? '小型' : '大型'}機械を購入しました（¥${cost}）`, 'success', 3000);
     }
     
     closeModal();
@@ -5943,7 +6130,7 @@ function buyWarehouse() {
     }
 
     if (company.cash < cost) {
-        alert('現金が不足しています！');
+        showToast('現金が不足しています！', 'danger', 3000);
         return;
     }
 
@@ -6088,7 +6275,7 @@ function reassign() {
     const cost = count * 5;
 
     if (company.cash < cost) {
-        alert('現金が不足しています！');
+        showToast('現金が不足しています！', 'danger', 3000);
         return;
     }
 
@@ -6277,7 +6464,7 @@ function buyChipDirect(chipType) {
 
     const names = { research: '研究開発', education: '教育', advertising: '広告' };
     closeModal();
-    alert(`${names[chipType]}チップを購入しました（¥20）`);
+    showToast(`${names[chipType]}チップを購入しました（¥20）`, 'success', 3000);
 
     endTurn();
 }
@@ -6291,7 +6478,7 @@ function buyChipsFromDecision() {
     const cost = quantity * 20;
     
     if (company.cash < cost) {
-        alert('現金が不足しています');
+        showToast('現金が不足しています', 'danger', 3000);
         return;
     }
     
@@ -6313,7 +6500,7 @@ function buyChipsFromDecision() {
     company.chips[chipType] = newTotal;
     
     closeModal();
-    alert(`${chipType}チップを${quantity}個購入しました（¥${cost}）`);
+    showToast(`${chipType}チップを${quantity}個購入しました（¥${cost}）`, 'success', 3000);
     
     endTurn();
 }
@@ -6379,7 +6566,7 @@ function cancelPlayerBid() {
     // プレイヤーの入札をキャンセル（お金の流れがないので行を消費しない）
     gameState.pendingBid = null;
     closeModal();
-    alert('入札への参加を取りやめました');
+    showToast('入札への参加を取りやめました', 'info', 3000);
     nextTurn();
 }
 
@@ -6567,7 +6754,7 @@ function cancelPlayerBidTwoMarket() {
     gameState.selectedMarkets = [];
     gameState.twoMarketMode = false;
     closeModal();
-    alert('入札への参加を取りやめました');
+    showToast('入札への参加を取りやめました', 'info', 3000);
     nextTurn();
 }
 
@@ -7066,7 +7253,7 @@ function proceedToNextPeriod() {
             
             gameState.periodStarted = true;
             updateDisplay();
-            alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理により2行目からゲーム開始です。`);
+            showToast(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理により2行目からゲーム開始です。`, 'success', 5000);
 
             // 強制的にもう一度updateDisplay()を呼んで確実に2行目表示
             setTimeout(() => {
@@ -7248,7 +7435,7 @@ function startPeriodWithBorrowing() {
     gameState.periodStarted = true;
     closeModal();
     updateDisplay();
-    alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n借入を実施するため、3行目からゲームスタートです。`);
+    showToast(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n借入を実施するため、3行目からゲームスタートです。`, 'success', 5000);
     showBorrowModal();
 }
 
@@ -7295,7 +7482,7 @@ function startPeriodWithoutBorrowing() {
     closeModal();
     updateDisplay();
     saveGame();  // 期首を自動セーブ
-    alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理完了で2行目からゲームスタートです。`);
+    showToast(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理完了で2行目からゲームスタートです。`, 'success', 5000);
     showTurnStartOptions();
 }
 
@@ -7544,7 +7731,7 @@ function showInsurancePurchaseModal() {
     const company = gameState.companies[0];
     
     if (company.chips.insurance > 0) {
-        alert('すでに保険に加入しています');
+        showToast('すでに保険に加入しています', 'warning', 3000);
         return;
     }
     
@@ -7564,7 +7751,7 @@ function buyInsurance() {
     const company = gameState.companies[0];
     
     if (company.cash < 5) {
-        alert('現金が不足しています');
+        showToast('現金が不足しています', 'danger', 3000);
         return;
     }
     
@@ -7572,7 +7759,7 @@ function buyInsurance() {
     company.chips.insurance = 1;
     
     closeModal();
-    alert('保険チップを購入しました（¥5）');
+    showToast('保険チップを購入しました（¥5）', 'success', 3000);
     
     // カードを引く
     drawCard();
@@ -7751,7 +7938,7 @@ function buyChips() {
         const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
         company.shortLoans += needed;
         company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        alert(`現金不足のため短期借入¥${needed}を実行しました`);
+        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
     }
     
     // Check max limits
@@ -7780,7 +7967,7 @@ function buyChips() {
 
     closeModal();
     updateDisplay();
-    alert(`${chipType}チップを${quantity}個購入しました（¥${cost}）`);
+    showToast(`${chipType}チップを${quantity}個購入しました（¥${cost}）`, 'success', 3000);
     endTurn();
 }
 
@@ -7793,12 +7980,12 @@ function doNothing() {
     }
     
     if (gameState.doNothingCount[0] >= 3) {
-        alert('DO NOTHINGは連続3回までです！');
+        showToast('DO NOTHINGは連続3回までです！', 'danger', 3000);
         return;
     }
     
     gameState.doNothingCount[0]++;
-    alert(`DO NOTHINGを選択しました（${gameState.doNothingCount[0]}/3回）\n行は消費されません。`);
+    showToast(`DO NOTHINGを選択しました（${gameState.doNothingCount[0]}/3回）\n行は消費されません。`, 'info', 3000);
     
     // DO NOTHING doesn't use a row
     nextTurn();
@@ -9772,7 +9959,7 @@ function executeDefaultInvestment(company) {
 
 // End period
 function endPeriod() {
-    alert('期末決算を開始します');
+    showToast('期末決算を開始します', 'info', 3000);
     
     // 期末時点の人数・機械台数を記録
     gameState.companies.forEach(company => {
@@ -10292,7 +10479,7 @@ function resumeGame() {
         restoreGame(saveData);
         document.getElementById('modalContainer').innerHTML = '';
         updateDisplay();
-        alert('ゲームを再開しました（' + gameState.currentPeriod + '期）');
+        showToast('ゲームを再開しました（' + gameState.currentPeriod + '期）', 'success', 3000);
     }
 }
 
