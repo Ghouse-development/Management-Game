@@ -5321,63 +5321,77 @@ function processBidsWithAllCompanies(marketIndex) {
         }
     }
 
-    // 入札結果の表示
-    let bidResultHtml = '<div class="bid-display">';
-    bidResultHtml += '<div class="bid-title">入札結果</div>';
+    // 入札結果の表示（臨場感のある表示）
+    let bidResultHtml = `<div style="text-align: center; margin-bottom: 10px;">
+        <div style="font-size: 14px; color: #666;">📍 ${market.name}市場</div>
+    </div>`;
 
-    // 販売成功者を表示
-    salesResults.forEach((result, index) => {
-        const researchChips = result.company.chips.research || 0;
-        const isParent = (gameState.currentPlayerIndex === result.bid.company);
-        const bgColor = index === 0 ? '#d4edda' : '#fef3c7';
-        const callPrice = result.bid.price;  // コール価格（勝敗判定用）
-        const recordPrice = result.bid.displayPrice || result.bid.price;  // 記帳価格（売上計上用）
+    // 入札アリーナ（全プレイヤーのプライスカードと吹き出し）
+    bidResultHtml += '<div class="bid-arena">';
 
-        bidResultHtml += `<div style="background: ${bgColor}; padding: 10px; margin: 10px 0; border-radius: 5px;">`;
-        bidResultHtml += `<strong>${index === 0 ? '🏆 1位落札' : '✓ 残枠販売'}: ${result.company.name}</strong><br>`;
-        bidResultHtml += `<div style="display: flex; gap: 15px; margin: 5px 0;">`;
-        bidResultHtml += `<span style="font-size: 12px; color: #666;">コール価格: ¥${callPrice}</span>`;
-        bidResultHtml += `<span style="font-size: 12px; color: #2563eb;">記帳価格: ¥${recordPrice}</span>`;
-        bidResultHtml += `</div>`;
-        bidResultHtml += `数量: ${result.quantity}個<br>`;
-        if (researchChips > 0 || isParent) {
-            bidResultHtml += '<div style="font-size: 12px; margin-top: 5px; color: #666;">【価格競争力】';
-            if (researchChips > 0) {
-                bidResultHtml += ` 研究${researchChips}枚(-${researchChips * 2}円)`;
-            }
-            if (isParent) {
-                bidResultHtml += ` 親(-2円)`;
-            }
-            bidResultHtml += '</div>';
-        }
-        bidResultHtml += `<strong>売上金額: ¥${recordPrice * result.quantity}</strong>`;
-        bidResultHtml += '</div>';
+    // 勝者のコール価格を取得
+    const winnerCallPrice = allBids.length > 0 ? allBids[0].price : 0;
+
+    allBids.forEach((bid, index) => {
+        const bidCompany = gameState.companies[bid.company];
+        const researchChips = bidCompany.chips.research || 0;
+        const isParent = (gameState.currentPlayerIndex === bid.company);
+        const callPrice = bid.price;
+        const displayPrice = bid.displayPrice || bid.price;
+        const isWinner = (index === 0);
+
+        // 価格競争力の内訳
+        let compStr = '';
+        if (researchChips > 0) compStr += `青${researchChips}`;
+        if (isParent) compStr += (compStr ? '+' : '') + '親';
+
+        bidResultHtml += `
+            <div class="bid-player">
+                <div class="bid-player-name ${isParent ? 'is-parent' : ''}">${bidCompany.name}</div>
+                <div class="price-card">
+                    <div class="price-card-yen">¥</div>
+                    <div class="price-card-value">${displayPrice}</div>
+                </div>
+                <div class="call-bubble ${isWinner ? 'winner' : ''}">¥${callPrice}</div>
+                ${compStr ? `<div class="bid-competitiveness">${compStr}</div>` : ''}
+            </div>
+        `;
     });
 
-    // 入札したが売れなかった者
+    bidResultHtml += '</div>';
+
+    // 結果サマリー
+    if (salesResults.length > 0) {
+        const winner = salesResults[0];
+        const winnerRecordPrice = winner.bid.displayPrice || winner.bid.price;
+        bidResultHtml += `
+            <div class="bid-result-summary">
+                <div class="bid-winner-announce">🏆 ${winner.company.name} の勝ち！</div>
+                <div class="bid-record-price">記帳: ¥${winnerRecordPrice} × ${winner.quantity}個 = ¥${winnerRecordPrice * winner.quantity}</div>
+            </div>
+        `;
+
+        // 残枠販売があれば表示
+        if (salesResults.length > 1) {
+            bidResultHtml += '<div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 6px;">';
+            bidResultHtml += '<div style="font-size: 11px; color: #666; margin-bottom: 5px;">残枠販売:</div>';
+            salesResults.slice(1).forEach(result => {
+                const recordPrice = result.bid.displayPrice || result.bid.price;
+                bidResultHtml += `<div style="font-size: 12px;">${result.company.name}: ¥${recordPrice} × ${result.quantity}個</div>`;
+            });
+            bidResultHtml += '</div>';
+        }
+    }
+
+    // 売れなかった入札者
     const unsoldBids = allBids.filter(bid =>
         !salesResults.some(result => result.bid === bid)
     );
-
     if (unsoldBids.length > 0) {
-        bidResultHtml += '<div class="bid-entries">';
-        bidResultHtml += '<div style="font-size: 12px; color: #666; margin-bottom: 5px;">入札したが売れなかった:</div>';
-        unsoldBids.forEach((bid) => {
-            const bidCompany = gameState.companies[bid.company];
-            const callPrice = bid.price;  // コール価格
-            const recordPrice = bid.displayPrice || bid.price;  // 記帳価格
-
-            bidResultHtml += `
-                <div class="bid-entry" style="color: #9ca3af; padding: 5px;">
-                    <span>${bidCompany.name}</span>
-                    <span style="font-size: 11px;">コール¥${callPrice} / 記帳¥${recordPrice} × ${bid.quantity}個（市場枠なし）</span>
-                </div>
-            `;
-        });
+        bidResultHtml += '<div style="margin-top: 10px; font-size: 11px; color: #9ca3af; text-align: center;">';
+        bidResultHtml += '市場枠なし: ' + unsoldBids.map(b => gameState.companies[b.company].name).join(', ');
         bidResultHtml += '</div>';
     }
-
-    bidResultHtml += '</div>';
 
     closeModal();
     showModal('入札結果', bidResultHtml + '<button class="submit-btn" onclick="completeSale()">OK</button>');
