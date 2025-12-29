@@ -155,6 +155,48 @@ html, body {
     gap: 1px;
 }
 
+/* AIバッジ - 在庫ブロック表示（スマホ対応） */
+.ai-badge-inventory {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 4px;
+    padding: 3px 4px;
+}
+.ai-inv-item {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.ai-inv-label {
+    font-size: 9px;
+    font-weight: bold;
+    min-width: 12px;
+}
+.ai-inv-blocks {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.ai-inv-block {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.ai-inv-extra {
+    font-size: 9px;
+    color: #fbbf24;
+    font-weight: bold;
+    margin-left: 1px;
+}
+.ai-inv-zero {
+    font-size: 9px;
+    color: #6b7280;
+}
+
 /* ============================================ */
 /* 入札結果表示（臨場感） */
 /* ============================================ */
@@ -243,6 +285,57 @@ html, body {
     margin-top: 3px;
     text-align: center;
 }
+
+/* 入札価格表示（記帳価格・コール価格） */
+.bid-prices {
+    background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+    border-radius: 8px;
+    padding: 8px;
+    margin: 5px 0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    border: 2px solid #ccc;
+}
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+}
+.price-label {
+    font-size: 9px;
+    color: #666;
+}
+.price-value {
+    font-size: 14px;
+    font-weight: bold;
+}
+.price-value.record {
+    color: #1e3a8a;
+}
+.price-value.call {
+    color: #dc2626;
+}
+.comp-badges {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    margin: 3px 0;
+}
+.comp-badge {
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+.comp-badge.parent {
+    background: #fbbf24;
+    color: #78350f;
+}
+.comp-badge.research {
+    background: #3b82f6;
+    color: white;
+}
+
 .bid-result-summary {
     background: #fef3c7;
     border: 2px solid #f59e0b;
@@ -732,15 +825,21 @@ html, body {
 }
 
 /* 在庫ブロック */
+.inv-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    justify-items: center;
+}
 .inv-block {
     width: 22px; height: 22px;
     border-radius: 3px;
     display: inline-block;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
-.inv-block.material { background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); border: 1px solid #7b3b9b; }
-.inv-block.wip { background: linear-gradient(135deg, #a569bd 0%, #9b59b6 100%); border: 2px dashed #c39bd3; }
-.inv-block.product { background: linear-gradient(135deg, #7d6ee7 0%, #6366f1 100%); border: 1px solid #5651d8; }
+.inv-block.material { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); border: 1px solid #5b21b6; }
+.inv-block.wip { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: 1px solid #b45309; }
+.inv-block.product { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: 1px solid #15803d; }
 
 /* 人員・機械セクション */
 .personnel-row {
@@ -1118,14 +1217,14 @@ html, body {
 .company-card .personnel-dot { width: 8px; height: 8px; background: #6c757d; border-radius: 50%; }
 
 /* 在庫セクション */
-.inventory-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
-.inventory-box { background: white; border: 1px solid #dee2e6; border-radius: 4px; padding: 6px; }
-.inventory-label { font-size: 10px; color: #666; margin-bottom: 4px; text-align: center; }
-.inventory-blocks { display: flex; gap: 2px; flex-wrap: wrap; min-height: 20px; justify-content: center; }
-.inventory-block { width: 12px; height: 12px; border-radius: 2px; }
+.inventory-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.inventory-box { background: white; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px; min-width: 0; }
+.inventory-label { font-size: 10px; color: #666; margin-bottom: 2px; text-align: center; }
+.inventory-blocks { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; min-height: 20px; justify-items: center; }
+.inventory-block { width: 9px; height: 9px; border-radius: 2px; }
 .inventory-block.material { background: #7c3aed; }
-.inventory-block.wip { background: #8b5cf6; }
-.inventory-block.product { background: #7c3aed; }
+.inventory-block.wip { background: #f59e0b; }
+.inventory-block.product { background: #22c55e; }
 
 /* 機械表示 */
 .machine-section { margin-bottom: 8px; font-size: 11px; }
@@ -1137,14 +1236,15 @@ html, body {
 
 .chips-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid #dee2e6; font-size: 11px; }
 .chip-row { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
-.chip-label { width: 80px; color: #6c757d; }
-.chips-section .chip-dots { display: flex; gap: 3px; }
-.chips-section .chip-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #dee2e6; }
+.chip-label { width: 40px; color: #6c757d; font-size: 10px; }
+.chips-section .chip-dots { display: flex; gap: 2px; flex: 1; }
+.chips-section .chip-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #dee2e6; }
 .chips-section .chip-dot.filled.computer { background: #10b981; }
 .chips-section .chip-dot.filled.insurance { background: #f97316; }
 .chips-section .chip-dot.filled.research { background: #3b82f6; }
 .chips-section .chip-dot.filled.education { background: #eab308; }
 .chips-section .chip-dot.filled.advertising { background: #ef4444; }
+.chip-count { font-weight: bold; color: #374151; min-width: 14px; text-align: right; }
 
 /* ============================================ */
 /* アクションボタン */
@@ -1524,30 +1624,34 @@ html, body {
     /* 縦に3分割: AIバッジ(10%) + カード&市場(35%) + 会社盤(55%) */
     .container { padding: 2px; }
 
-    /* AIバッジ - 1行に収める */
+    /* AIバッジ - スマホ用拡大 */
     .ai-companies-bar {
         flex: 0 0 auto;
-        gap: 2px;
-        padding: 2px;
+        gap: 3px;
+        padding: 3px;
         flex-wrap: nowrap;
         overflow-x: auto;
     }
     .ai-badge {
-        min-width: 62px;
-        max-width: 75px;
-        padding: 3px 4px;
-        gap: 1px;
+        min-width: 70px;
+        max-width: 85px;
+        padding: 4px 5px;
+        gap: 2px;
         flex-shrink: 0;
     }
-    .ai-badge-name { font-size: 8px; }
-    .ai-badge-cash { font-size: 8px; }
-    .ai-badge-row2 { padding: 1px 2px; display: flex; font-size: 7px; }
-    .ai-badge-row3 { display: flex; font-size: 6px; }
-    .ai-badge-label { font-size: 6px; }
-    .ai-badge-val { font-size: 7px; }
-    .ai-badge-info { font-size: 6px; }
-    .ai-badge-chips { font-size: 6px; }
-    .ai-badge-rownum { font-size: 6px; padding: 1px 3px; }
+    .ai-badge-name { font-size: 9px; }
+    .ai-badge-cash { font-size: 9px; }
+    .ai-badge-inventory { padding: 2px 3px; gap: 3px; }
+    .ai-inv-item { gap: 2px; }
+    .ai-inv-label { font-size: 8px; min-width: 10px; }
+    .ai-inv-block { width: 8px; height: 8px; }
+    .ai-inv-extra { font-size: 8px; }
+    .ai-inv-zero { font-size: 8px; }
+    .ai-badge-row3 { display: flex; font-size: 7px; }
+    .ai-badge-info { font-size: 7px; }
+    .ai-badge-chips { font-size: 7px; }
+    .ai-badge-rownum { font-size: 7px; padding: 1px 3px; }
+    .chip-dot { width: 5px; height: 5px; }
 
     /* メインコンテンツ */
     .main-content-wrapper { flex: 1; gap: 2px; }
@@ -1580,16 +1684,16 @@ html, body {
     }
     .markets-grid-compact {
         grid-template-columns: repeat(4, 1fr);
-        gap: 1px;
+        gap: 2px;
         max-width: 100%;
     }
-    .market-tile { border-radius: 3px; }
-    .market-color-band { padding: 1px; font-size: 6px; }
-    .market-pocket { padding: 1px; margin: 0; }
-    .market-tile .market-name { font-size: 6px; padding: 0 1px; }
-    .market-tile .market-volume { font-size: 5px; }
-    .market-tile .price-badge { width: 11px; height: 11px; font-size: 5px; }
-    .market-tile .stock-cube { width: 5px; height: 5px; margin: 0; }
+    .market-tile { border-radius: 4px; }
+    .market-color-band { padding: 2px; font-size: 8px; }
+    .market-pocket { padding: 2px; margin: 0; }
+    .market-tile .market-name { font-size: 9px; padding: 1px 2px; font-weight: bold; }
+    .market-tile .market-volume { font-size: 7px; }
+    .market-tile .price-badge { width: 14px; height: 14px; font-size: 7px; font-weight: bold; }
+    .market-tile .stock-cube { width: 6px; height: 6px; margin: 0 1px; }
 
     /* 会社盤 - 残りスペースを使用 */
     .player-area-wrapper { flex: 1; min-height: 0; }
@@ -1613,6 +1717,7 @@ html, body {
     .flow-box-title { font-size: 7px; }
     .flow-arrow { font-size: 10px; }
     .flow-arrow-label { font-size: 6px; }
+    .inv-grid { gap: 1px; }
     .inv-block { width: 12px; height: 12px; font-size: 7px; }
     .personnel-row { gap: 2px; margin: 2px 0; }
     .personnel-box { padding: 2px; }

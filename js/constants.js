@@ -274,8 +274,14 @@ const AI_STRATEGY_DESCRIPTIONS = {
     unpredictable: { name: '予測不能', description: 'ランダムだが合理的な範囲内で行動', bidMultiplier: 0.80 }
 };
 
-/** AI会社名リスト */
-const AI_COMPANY_NAMES = ['青山商事', '鈴木産業', '田中製作所', '山本工業', '佐藤物産'];
+/** AI会社名リスト（性格が分かる名前） */
+const AI_COMPANY_NAMES = [
+    '攻め商事',      // aggressive - 積極的
+    '堅実産業',      // conservative - 保守的
+    '安値製作所',    // price_focused - 価格競争
+    '技術工業',      // tech_focused - 技術重視
+    '変幻物産'       // unpredictable - 予測不能
+];
 
 // ============================================
 // 初期状態

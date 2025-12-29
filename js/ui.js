@@ -60,16 +60,20 @@ function renderCompanyBoard(company) {
     document.getElementById('salesCapacityDisplay').textContent = salesCapacity;
     document.getElementById('priceCompDisplay').textContent = '+' + priceComp;
 
-    // 在庫表示
-    document.getElementById('materialsDisplay').innerHTML =
-        Array(company.materials).fill('<div class="inv-block material"></div>').join('') ||
-        '<span style="color:#999;font-size:10px;">0</span>';
-    document.getElementById('wipDisplay').innerHTML =
-        Array(company.wip).fill('<div class="inv-block wip"></div>').join('') ||
-        '<span style="color:#999;font-size:10px;">0</span>';
-    document.getElementById('productsDisplay').innerHTML =
-        Array(company.products).fill('<div class="inv-block product"></div>').join('') ||
-        '<span style="color:#999;font-size:10px;">0</span>';
+    // 在庫表示（5個単位で横並び）
+    const makeInvBlocks = (count, type) => {
+        if (count === 0) return '<span style="color:#999;font-size:10px;">0</span>';
+        let html = '<div class="inv-grid">';
+        for (let i = 0; i < count; i++) {
+            html += `<div class="inv-block ${type}"></div>`;
+        }
+        html += '</div>';
+        return html;
+    };
+
+    document.getElementById('materialsDisplay').innerHTML = makeInvBlocks(company.materials, 'material');
+    document.getElementById('wipDisplay').innerHTML = makeInvBlocks(company.wip, 'wip');
+    document.getElementById('productsDisplay').innerHTML = makeInvBlocks(company.products, 'product');
 
     // 人員表示
     document.getElementById('workersDisplay').innerHTML =
@@ -261,12 +265,18 @@ function renderOtherCompanies() {
         if (chips.computer) chipDots += makeChipDots(chips.computer, '#22c55e');
         if (chips.insurance) chipDots += makeChipDots(chips.insurance, '#f97316');
 
-        // 在庫をドットで表示（最大5個まで表示、残りは+n）
-        const makeDots = (count, color, maxShow = 5) => {
-            const shown = Math.min(count, maxShow);
+        // 在庫を大きなブロックで表示（スマホでも見やすく）
+        const makeBlocks = (count, type) => {
+            const colors = {material: '#7c3aed', wip: '#f59e0b', product: '#22c55e'};
+            const shown = Math.min(count, 5);
             const extra = count - shown;
-            let html = Array(shown).fill(`<span class="inv-dot" style="background:${color}"></span>`).join('');
-            if (extra > 0) html += `<span class="inv-extra">+${extra}</span>`;
+            let html = '<div class="ai-inv-blocks">';
+            for (let i = 0; i < shown; i++) {
+                html += `<span class="ai-inv-block" style="background:${colors[type]}"></span>`;
+            }
+            if (extra > 0) html += `<span class="ai-inv-extra">+${extra}</span>`;
+            if (count === 0) html += `<span class="ai-inv-zero">0</span>`;
+            html += '</div>';
             return html;
         };
 
@@ -276,10 +286,19 @@ function renderOtherCompanies() {
                     <span class="ai-badge-name">${company.name}</span>
                     <span class="ai-badge-cash">¥${company.cash}</span>
                 </div>
-                <div class="ai-badge-row2">
-                    <span class="ai-inv-group"><span class="inv-label">材</span>${makeDots(company.materials, '#8b5cf6', 4)}</span>
-                    <span class="ai-inv-group"><span class="inv-label">仕</span>${makeDots(company.wip, '#3b82f6', 4)}</span>
-                    <span class="ai-inv-group"><span class="inv-label">製</span>${makeDots(company.products, '#22c55e', 4)}</span>
+                <div class="ai-badge-inventory">
+                    <div class="ai-inv-item">
+                        <span class="ai-inv-label" style="color:#7c3aed">材</span>
+                        ${makeBlocks(company.materials, 'material')}
+                    </div>
+                    <div class="ai-inv-item">
+                        <span class="ai-inv-label" style="color:#f59e0b">仕</span>
+                        ${makeBlocks(company.wip, 'wip')}
+                    </div>
+                    <div class="ai-inv-item">
+                        <span class="ai-inv-label" style="color:#22c55e">製</span>
+                        ${makeBlocks(company.products, 'product')}
+                    </div>
                 </div>
                 <div class="ai-badge-row3">
                     <span class="ai-badge-info">W${company.workers}機${company.machines.length}S${company.salesmen}</span>
