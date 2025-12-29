@@ -258,6 +258,7 @@ html, body {
     align-items: center;
     min-height: 0;
     padding: 4px;
+    gap: 8px;
 }
 
 /* ============================================ */
@@ -1392,8 +1393,8 @@ html, body {
     .other-companies-right { flex-direction: row; justify-content: center; flex-wrap: wrap; }
     .market-center { max-width: 100%; }
 
-    .card-draw-section { padding: 10px; }
-    .draw-card-btn { padding: 15px 30px; font-size: 16px; }
+    .card-draw-section { padding: 10px; margin-bottom: 8px; position: relative; z-index: 10; }
+    .draw-card-btn { padding: 12px 24px; font-size: 14px; }
 
     .company-board { padding: 8px; }
     .board-title { font-size: 14px; padding: 4px; }
@@ -1413,11 +1414,12 @@ html, body {
     .chip-box-title { font-size: 9px; }
     .chip { width: 14px; height: 14px; }
 
-    /* スマホ版市場盤 - 円形配置を縮小 */
-    .markets-board { max-width: 340px; }
+    /* スマホ版市場盤 */
+    .markets-board { max-width: 100%; }
+    .markets-board.compact { flex: 0 0 auto; }
     .markets-inner { height: 360px; }
     /* スマホ版：コンパクトグリッド調整 */
-    .markets-grid-compact { grid-template-columns: repeat(4, 1fr); gap: 3px; }
+    .markets-grid-compact { grid-template-columns: repeat(4, 1fr); gap: 3px; max-width: 320px; }
     .market-color-band { padding: 2px 3px; }
     .market-pocket { padding: 3px 2px; margin: 0 1px 1px 1px; }
     .market-tile .market-name { font-size: 8px; padding: 1px 3px; }
