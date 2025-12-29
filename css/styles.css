@@ -778,8 +778,8 @@ html, body {
     border: 2px solid #333;
 }
 .markets-board.compact {
-    flex: 1;
-    min-height: 0;
+    flex: 0 0 auto;
+    min-height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1416,10 +1416,10 @@ html, body {
 
     /* スマホ版市場盤 */
     .markets-board { max-width: 100%; }
-    .markets-board.compact { flex: 0 0 auto; }
+    .markets-board.compact { flex: 0 0 auto; min-height: 180px; }
     .markets-inner { height: 360px; }
     /* スマホ版：コンパクトグリッド調整 */
-    .markets-grid-compact { grid-template-columns: repeat(4, 1fr); gap: 3px; max-width: 320px; }
+    .markets-grid-compact { grid-template-columns: repeat(4, 1fr); gap: 3px; max-width: 100%; }
     .market-color-band { padding: 2px 3px; }
     .market-pocket { padding: 3px 2px; margin: 0 1px 1px 1px; }
     .market-tile .market-name { font-size: 8px; padding: 1px 3px; }
