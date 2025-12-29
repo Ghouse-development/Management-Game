@@ -9,6 +9,8 @@
     <!-- 外部JSファイル -->
     <script src="js/constants.js"></script>
     <script src="js/state.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/bidding.js"></script>
     <script src="js/accounting.js"></script>
     <script src="js/cards.js"></script>
@@ -1468,7 +1470,7 @@ function applyRiskCard(cardId) {
                 company.cash += revenue;
                 company.products -= sellQty;
                 company.totalSales += revenue;
-                // 100個保存: 販売した製品を海外市場に戻す
+                // ストッカー（海外市場）に戻す
                 const overseasMarket = gameState.markets.find(m => m.name === '海外');
                 if (overseasMarket) overseasMarket.currentStock += sellQty;
                 alert(`研究開発成功！\n青チップ${company.chips.research}枚で${sellQty}個を¥32で販売\n入金額: ¥${revenue}`);
@@ -6866,7 +6868,7 @@ function applyRiskCardToAI(company, card) {
                 company.products -= sellQtyEdu;
                 company.totalSales += sellQtyEdu * 32;
                 company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyEdu;
-                // 100個保存: 海外市場に戻す
+                // ストッカー（海外市場）に戻す
                 const overseasMktEdu = gameState.markets.find(m => m.name === '海外');
                 if (overseasMktEdu) overseasMktEdu.currentStock += sellQtyEdu;
             }
@@ -6901,7 +6903,7 @@ function applyRiskCardToAI(company, card) {
                 company.products -= sellQtyAd;
                 company.totalSales += sellQtyAd * 32;
                 company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyAd;
-                // 100個保存: 海外市場に戻す
+                // ストッカー（海外市場）に戻す
                 const overseasMktAd = gameState.markets.find(m => m.name === '海外');
                 if (overseasMktAd) overseasMktAd.currentStock += sellQtyAd;
             }
@@ -6950,7 +6952,7 @@ function applyRiskCardToAI(company, card) {
                 company.products -= sellQtyMono;
                 company.totalSales += sellQtyMono * 32;
                 company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyMono;
-                // 100個保存: 海外市場に戻す
+                // ストッカー（海外市場）に戻す
                 const overseasMktMono = gameState.markets.find(m => m.name === '海外');
                 if (overseasMktMono) overseasMktMono.currentStock += sellQtyMono;
             }
