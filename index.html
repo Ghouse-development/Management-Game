@@ -14,35 +14,20 @@
     <!-- トースト通知コンテナ -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <div class="container">
-        <!-- ゲームエリア：市場盤中央、他社周囲 -->
-        <div class="game-area">
-            <!-- 上部：他社（1-3） -->
-            <div class="other-companies-top" id="otherCompaniesTop"></div>
+    <div class="container no-scroll">
+        <!-- 新レイアウト：スクロールなしで全情報表示 -->
 
-            <!-- 中央エリア：左の他社 | 市場盤+カードデッキ | 右の他社 -->
-            <div class="center-area">
-                <!-- 左の他社 -->
-                <div class="other-companies-left" id="otherCompaniesLeft"></div>
+        <!-- 1. AI会社バッジ（タップで詳細表示） -->
+        <div class="ai-companies-bar" id="aiCompaniesBar"></div>
 
-                <!-- 市場盤（中央）とカードデッキ -->
-                <div class="market-center">
-                    <div class="card-draw-section" id="cardDrawSection">
-                        <button class="draw-card-btn" onclick="drawCard()">カードを引く</button>
-                        <div class="turn-info" id="turnInfo">あなたのターンです</div>
-                    </div>
-                    <div class="markets-board">
-                        <div class="markets-inner">
-                            <div class="card-deck-area">
-                                <div class="deck-cards">DECISION</div>
-                            </div>
-                            <div class="markets-ring" id="marketsDisplay"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 右の他社 -->
-                <div class="other-companies-right" id="otherCompaniesRight"></div>
+        <!-- 2. カード操作 + 市場盤 -->
+        <div class="main-game-area">
+            <div class="card-draw-section" id="cardDrawSection">
+                <button class="draw-card-btn" onclick="drawCard()">カードを引く</button>
+                <div class="turn-info" id="turnInfo">あなたのターンです</div>
+            </div>
+            <div class="markets-board compact">
+                <div class="markets-grid-compact" id="marketsDisplay"></div>
             </div>
         </div>
 
@@ -2827,106 +2812,105 @@ function renderFixedCostBreakdown(company) {
 function renderOtherCompanies() {
     const others = gameState.companies.slice(1);
 
-    // 他社会社盤のHTML生成関数（プレイヤーと同じ形式）
-    function createCompanyBoard(company, idx) {
+    // AI会社バッジ（コンパクト表示、タップで詳細モーダル）
+    let badgesHtml = '';
+    others.forEach((company, idx) => {
         const isCurrent = gameState.currentPlayerIndex === idx + 1;
-
-        // 材料ブロック
-        const materialsHtml = Array(company.materials).fill('<div class="inv-block material"></div>').join('');
-        // 仕掛品ブロック
-        const wipHtml = Array(company.wip).fill('<div class="inv-block wip"></div>').join('');
-        // 製品ブロック
-        const productsHtml = Array(company.products).fill('<div class="inv-block product"></div>').join('');
-
-        // ワーカー
-        const workersHtml = Array(company.workers).fill('<div class="person-dot worker">W</div>').join('');
-        // 機械
-        const machinesHtml = company.machines.map(m =>
-            `<div class="machine-dot ${m.type === 'large' ? 'large' : ''}">${m.type === 'large' ? '大' : '小'}${m.attachments > 0 ? '+' : ''}</div>`
-        ).join('');
-        // セールスマン
-        const salesmenHtml = Array(company.salesmen).fill('<div class="person-dot salesman">S</div>').join('');
-
-        // チップ
-        const researchHtml = Array(company.chips.research || 0).fill('<div class="chip research"></div>').join('');
-        const educationHtml = Array(company.chips.education || 0).fill('<div class="chip education"></div>').join('');
-        const advertisingHtml = Array(company.chips.advertising || 0).fill('<div class="chip advertising"></div>').join('');
-        const computerHtml = Array(company.chips.computer || 0).fill('<div class="chip computer"></div>').join('');
-        const insuranceHtml = Array(company.chips.insurance || 0).fill('<div class="chip insurance"></div>').join('');
-
-        return `
-            <div class="other-company-board ${isCurrent ? 'current-turn' : ''}">
-                <div class="board-title-mini">
-                    ${company.name}
-                    <span style="color: #4ade80;">¥${company.cash}</span>
-                    <span style="background: ${(company.currentRow || 1) >= gameState.maxRows - 5 ? '#ef4444' : '#3b82f6'}; color: white; padding: 1px 4px; border-radius: 3px; font-size: 9px; margin-left: 4px;">
-                        ${company.currentRow || 1}/${gameState.maxRows}
-                    </span>
+        const rowWarning = (company.currentRow || 1) >= gameState.maxRows - 5;
+        // 在庫サマリー: 材/仕/製
+        const invSummary = `${company.materials}/${company.wip}/${company.products}`;
+        badgesHtml += `
+            <div class="ai-badge ${isCurrent ? 'current-turn' : ''}" onclick="showAICompanyModal(${idx + 1})">
+                <div class="ai-badge-top">
+                    <span class="ai-badge-name">${company.name}</span>
+                    <span class="ai-badge-cash">¥${company.cash}</span>
                 </div>
-
-                <!-- 生産フロー -->
-                <div class="production-flow-mini">
-                    <div class="flow-box-mini">
-                        <div class="flow-box-title-mini">材料</div>
-                        <div class="flow-box-content-mini">${materialsHtml || '-'}</div>
-                    </div>
-                    <div class="flow-box-mini factory">
-                        <div class="flow-box-title-mini">仕掛</div>
-                        <div class="flow-box-content-mini">${wipHtml || '-'}</div>
-                    </div>
-                    <div class="flow-box-mini">
-                        <div class="flow-box-title-mini">製品</div>
-                        <div class="flow-box-content-mini">${productsHtml || '-'}</div>
-                    </div>
-                </div>
-
-                <!-- 人員・機械 -->
-                <div class="personnel-row-mini">
-                    <div class="personnel-box-mini">
-                        <div class="personnel-box-title-mini">W</div>
-                        <div class="personnel-dots-mini">${workersHtml || '-'}</div>
-                    </div>
-                    <div class="personnel-box-mini">
-                        <div class="personnel-box-title-mini">機</div>
-                        <div class="personnel-dots-mini">${machinesHtml || '-'}</div>
-                    </div>
-                    <div class="personnel-box-mini">
-                        <div class="personnel-box-title-mini">S</div>
-                        <div class="personnel-dots-mini">${salesmenHtml || '-'}</div>
-                    </div>
-                </div>
-
-                <!-- チップ -->
-                <div class="chips-row-mini">
-                    <div class="chip-box-mini" title="研究">${researchHtml || '-'}</div>
-                    <div class="chip-box-mini" title="教育">${educationHtml || '-'}</div>
-                    <div class="chip-box-mini" title="広告">${advertisingHtml || '-'}</div>
-                    <div class="chip-box-mini" title="PC">${computerHtml || '-'}</div>
-                    <div class="chip-box-mini" title="保険">${insuranceHtml || '-'}</div>
+                <div class="ai-badge-bottom">
+                    <span class="ai-badge-inv" title="材料/仕掛/製品">${invSummary}</span>
+                    <span class="ai-badge-row ${rowWarning ? 'warning' : ''}">${company.currentRow || 1}/${gameState.maxRows}</span>
                 </div>
             </div>
         `;
-    }
-
-    // 5社を上2・左1・右2に配置
-    let topHtml = '';
-    let leftHtml = '';
-    let rightHtml = '';
-
-    others.forEach((company, idx) => {
-        const board = createCompanyBoard(company, idx);
-        if (idx < 2) {
-            topHtml += board;  // A社、B社
-        } else if (idx === 2) {
-            leftHtml += board;  // C社
-        } else {
-            rightHtml += board;  // D社、E社
-        }
     });
 
-    document.getElementById('otherCompaniesTop').innerHTML = topHtml;
-    document.getElementById('otherCompaniesLeft').innerHTML = leftHtml;
-    document.getElementById('otherCompaniesRight').innerHTML = rightHtml;
+    document.getElementById('aiCompaniesBar').innerHTML = badgesHtml;
+}
+
+// AI会社詳細モーダル表示
+function showAICompanyModal(companyIndex) {
+    const company = gameState.companies[companyIndex];
+    if (!company) return;
+
+    // 材料・仕掛・製品
+    const materialsHtml = Array(company.materials).fill('<div class="inv-block material"></div>').join('') || '0';
+    const wipHtml = Array(company.wip).fill('<div class="inv-block wip"></div>').join('') || '0';
+    const productsHtml = Array(company.products).fill('<div class="inv-block product"></div>').join('') || '0';
+
+    // 人員・機械
+    const workersHtml = Array(company.workers).fill('<div class="person-dot worker">W</div>').join('') || '0';
+    const machinesHtml = company.machines.map(m =>
+        `<div class="machine-dot ${m.type === 'large' ? 'large' : ''}">${m.type === 'large' ? '大' : '小'}${m.attachments > 0 ? '+' : ''}</div>`
+    ).join('') || '0';
+    const salesmenHtml = Array(company.salesmen).fill('<div class="person-dot salesman">S</div>').join('') || '0';
+
+    // チップ
+    const researchHtml = Array(company.chips.research || 0).fill('<div class="chip research"></div>').join('') || '-';
+    const educationHtml = Array(company.chips.education || 0).fill('<div class="chip education"></div>').join('') || '-';
+    const advertisingHtml = Array(company.chips.advertising || 0).fill('<div class="chip advertising"></div>').join('') || '-';
+    const computerHtml = Array(company.chips.computer || 0).fill('<div class="chip computer"></div>').join('') || '-';
+    const insuranceHtml = Array(company.chips.insurance || 0).fill('<div class="chip insurance"></div>').join('') || '-';
+
+    const content = `
+        <div class="ai-modal-content">
+            <div class="ai-modal-header">
+                <span class="ai-modal-name">${company.name}</span>
+                <span class="ai-modal-cash">現金: ¥${company.cash}</span>
+                <span class="ai-modal-row">行: ${company.currentRow || 1}/${gameState.maxRows}</span>
+            </div>
+            <div class="ai-modal-section">
+                <div class="ai-modal-row">
+                    <span class="ai-modal-label">材料</span>
+                    <div class="ai-modal-items">${materialsHtml}</div>
+                </div>
+                <div class="ai-modal-row">
+                    <span class="ai-modal-label">仕掛</span>
+                    <div class="ai-modal-items">${wipHtml}</div>
+                </div>
+                <div class="ai-modal-row">
+                    <span class="ai-modal-label">製品</span>
+                    <div class="ai-modal-items">${productsHtml}</div>
+                </div>
+            </div>
+            <div class="ai-modal-section">
+                <div class="ai-modal-row">
+                    <span class="ai-modal-label">W</span>
+                    <div class="ai-modal-items">${workersHtml}</div>
+                </div>
+                <div class="ai-modal-row">
+                    <span class="ai-modal-label">機械</span>
+                    <div class="ai-modal-items">${machinesHtml}</div>
+                </div>
+                <div class="ai-modal-row">
+                    <span class="ai-modal-label">S</span>
+                    <div class="ai-modal-items">${salesmenHtml}</div>
+                </div>
+            </div>
+            <div class="ai-modal-section">
+                <div class="ai-modal-chips">
+                    <span title="研究">${researchHtml}</span>
+                    <span title="教育">${educationHtml}</span>
+                    <span title="広告">${advertisingHtml}</span>
+                    <span title="PC">${computerHtml}</span>
+                    <span title="保険">${insuranceHtml}</span>
+                </div>
+            </div>
+            <div class="ai-modal-footer">
+                <span>借入: 長期¥${company.loans || 0} / 短期¥${company.shortLoans || 0}</span>
+            </div>
+        </div>
+    `;
+
+    showModal(company.name + ' の詳細', content);
 }
 
 // ============================================
