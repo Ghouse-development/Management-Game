@@ -1379,64 +1379,110 @@ html, body {
 /* レスポンシブデザイン */
 /* ============================================ */
 
-/* スマホ向け（480px以下） */
+/* スマホ向け（480px以下）- スクロールなしで全表示 */
 @media (max-width: 480px) {
-    .container { padding: 5px; }
-    .header { padding: 6px; margin-bottom: 6px; }
-    .period-info { gap: 4px; flex-wrap: wrap; }
-    .info-item { padding: 4px 8px; }
-    .info-label { font-size: 10px; }
-    .info-value { font-size: 12px; }
+    /* 縦に3分割: AIバッジ(10%) + カード&市場(35%) + 会社盤(55%) */
+    .container { padding: 2px; }
 
-    .center-area { flex-direction: column; }
-    .other-companies-left,
-    .other-companies-right { flex-direction: row; justify-content: center; flex-wrap: wrap; }
-    .market-center { max-width: 100%; }
+    /* AIバッジ - 1行に収める */
+    .ai-companies-bar {
+        flex: 0 0 auto;
+        gap: 2px;
+        padding: 2px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+    .ai-badge {
+        min-width: 55px;
+        max-width: 70px;
+        padding: 2px 3px;
+        gap: 0;
+        flex-shrink: 0;
+    }
+    .ai-badge-name { font-size: 7px; }
+    .ai-badge-cash { font-size: 7px; }
+    .ai-badge-row2 { padding: 0 2px; display: none; }
+    .ai-badge-row3 { display: none; }
 
-    .card-draw-section { padding: 10px; margin-bottom: 8px; position: relative; z-index: 10; }
-    .draw-card-btn { padding: 12px 24px; font-size: 14px; }
+    /* メインコンテンツ */
+    .main-content-wrapper { flex: 1; gap: 2px; }
 
-    .company-board { padding: 8px; }
-    .board-title { font-size: 14px; padding: 4px; }
-    .production-flow { gap: 4px; }
-    .flow-box { padding: 6px; }
-    .flow-box-title { font-size: 10px; }
-    .inv-block { width: 16px; height: 16px; }
+    /* カードボタン - 極小 */
+    .card-draw-section {
+        padding: 4px;
+        margin: 0;
+        flex: 0 0 auto;
+    }
+    .draw-card-btn {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+    .turn-info { font-size: 10px; margin-top: 2px; }
 
-    .personnel-row { gap: 4px; }
-    .personnel-box { padding: 6px; }
-    .personnel-box-title { font-size: 10px; }
-    .person-dot { width: 20px; height: 20px; font-size: 10px; }
-    .machine-dot { width: 24px; height: 24px; font-size: 9px; }
+    /* 市場盤 - コンパクト表示 */
+    .main-game-area {
+        flex: 0 0 auto;
+        padding: 2px;
+        gap: 2px;
+    }
+    .markets-board {
+        padding: 2px;
+        max-width: 100%;
+    }
+    .markets-board.compact {
+        flex: 0 0 auto;
+        min-height: 120px;
+    }
+    .markets-grid-compact {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        max-width: 100%;
+    }
+    .market-tile { border-radius: 3px; }
+    .market-color-band { padding: 1px; font-size: 6px; }
+    .market-pocket { padding: 1px; margin: 0; }
+    .market-tile .market-name { font-size: 6px; padding: 0 1px; }
+    .market-tile .market-volume { font-size: 5px; }
+    .market-tile .price-badge { width: 11px; height: 11px; font-size: 5px; }
+    .market-tile .stock-cube { width: 5px; height: 5px; margin: 0; }
 
-    .chips-row { gap: 3px; }
-    .chip-box { padding: 4px; }
-    .chip-box-title { font-size: 9px; }
-    .chip { width: 14px; height: 14px; }
-
-    /* スマホ版市場盤 */
-    .markets-board { max-width: 100%; }
-    .markets-board.compact { flex: 0 0 auto; min-height: 180px; }
-    .markets-inner { height: 360px; }
-    /* スマホ版：コンパクトグリッド調整 */
-    .markets-grid-compact { grid-template-columns: repeat(4, 1fr); gap: 3px; max-width: 100%; }
-    .market-color-band { padding: 2px 3px; }
-    .market-pocket { padding: 3px 2px; margin: 0 1px 1px 1px; }
-    .market-tile .market-name { font-size: 8px; padding: 1px 3px; }
-    .market-tile .market-volume { font-size: 7px; }
-    .market-tile .price-badge { width: 16px; height: 16px; font-size: 7px; }
-    .market-tile .stock-cube { width: 8px; height: 8px; }
+    /* 会社盤 - 残りスペースを使用 */
+    .player-area-wrapper { flex: 1; min-height: 0; }
+    .company-board {
+        padding: 4px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .board-info-bar { gap: 1px; margin-bottom: 2px; }
+    .info-badge { padding: 2px 4px; }
+    .info-badge-label { font-size: 7px; }
+    .info-badge-value { font-size: 10px; }
+    .capacity-summary { gap: 2px; margin: 2px 0; }
+    .capacity-item { padding: 2px 4px; }
+    .capacity-label { font-size: 7px; }
+    .capacity-value { font-size: 11px; }
+    .production-flow { gap: 1px; margin: 2px 0; flex: 1; }
+    .flow-box { padding: 2px; min-height: 0; flex: 1; }
+    .flow-box-title { font-size: 7px; }
+    .flow-arrow { font-size: 10px; }
+    .flow-arrow-label { font-size: 6px; }
+    .inv-block { width: 12px; height: 12px; font-size: 7px; }
+    .personnel-row { gap: 2px; margin: 2px 0; }
+    .personnel-box { padding: 2px; }
+    .personnel-box-title { font-size: 7px; }
+    .person-dot { width: 16px; height: 16px; font-size: 8px; }
+    .machine-dot { width: 18px; height: 18px; font-size: 7px; }
+    .chips-row { gap: 1px; margin: 2px 0; }
+    .chip-box { padding: 2px; }
+    .chip-box-title { font-size: 6px; }
+    .chip { width: 10px; height: 10px; }
 
     .player-area { grid-template-columns: 1fr; }
-    .ai-badge { min-width: 65px; padding: 3px 5px; }
-    .ai-badge-name { font-size: 9px; }
-    .ai-badge-cash { font-size: 9px; }
-    .ai-badge-inv { font-size: 8px; }
-    .ai-badge-row { font-size: 8px; }
-
-    .modal-content { width: 95%; max-height: 90vh; padding: 10px; }
-    .modal-title { font-size: 14px; }
-    .toast { min-width: 260px; max-width: 90vw; font-size: 12px; padding: 10px 14px; }
+    .modal-content { width: 95%; max-height: 90vh; padding: 8px; }
+    .modal-title { font-size: 13px; }
+    .toast { min-width: 200px; max-width: 90vw; font-size: 11px; padding: 8px 12px; }
 }
 
 /* タブレット向け（481px〜768px） */
