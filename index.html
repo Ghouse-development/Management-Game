@@ -7433,6 +7433,9 @@ function startPeriodWithBorrowing() {
         gameState.maxRows = gameState.maxRowsByPeriod[5];
     }
     gameState.periodStarted = true;
+    // AI会社の長期借入処理（プレイヤーの借入モーダル表示前に処理）
+    processAILongTermBorrowing();
+
     closeModal();
     updateDisplay();
     showToast(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n借入を実施するため、3行目からゲームスタートです。`, 'success', 5000);
@@ -7479,6 +7482,10 @@ function startPeriodWithoutBorrowing() {
         gameState.maxRows = gameState.maxRowsByPeriod[5];
     }
     gameState.periodStarted = true;
+
+    // AI会社の長期借入処理
+    processAILongTermBorrowing();
+
     closeModal();
     updateDisplay();
     saveGame();  // 期首を自動セーブ
@@ -7535,6 +7542,91 @@ function processBorrowing() {
     updateDisplay();
     saveGame();  // 借入後を自動セーブ
     showTurnStartOptions();
+}
+
+// AI会社の長期借入処理（3期以降の期首で実行）
+function processAILongTermBorrowing() {
+    if (gameState.currentPeriod < 3) return;
+
+    gameState.companies.forEach((company, index) => {
+        if (company.type !== 'ai') return;
+
+        // 借入上限計算（4期以降、自己資本300超なら1倍）
+        const loanMultiplier = (gameState.currentPeriod >= 4 && company.equity > 300) ? 1.0 : 0.5;
+        const maxLoanTotal = Math.round(company.equity * loanMultiplier);
+        const availableLoan = Math.max(0, maxLoanTotal - company.loans);
+
+        if (availableLoan <= 0) return;
+
+        // 戦略別の借入判断
+        let borrowRatio = 0;  // 借入可能額に対する借入割合
+        const mfgCapacity = getManufacturingCapacity(company);
+        const salesCapacity = getSalesCapacity(company);
+        const periodsRemaining = 5 - gameState.currentPeriod;
+        const needsInvestment = company.chips.research < 3 || mfgCapacity < 6 || salesCapacity < 6;
+
+        switch (company.strategy) {
+            case 'aggressive':
+                // 積極的：投資余力が必要なら積極的に借入
+                if (needsInvestment && company.cash < 150) {
+                    borrowRatio = 0.8;  // 80%まで借入
+                } else if (company.cash < 100) {
+                    borrowRatio = 0.5;
+                }
+                break;
+
+            case 'conservative':
+                // 保守的：最低限の借入のみ
+                if (company.cash < 50 && needsInvestment) {
+                    borrowRatio = 0.3;  // 30%まで
+                }
+                break;
+
+            case 'price_focused':
+                // 価格競争：研究チップ投資のため借入
+                if (company.chips.research < 4 && company.cash < 120) {
+                    borrowRatio = 0.6;
+                }
+                break;
+
+            case 'tech_focused':
+                // 技術重視：チップ投資のため積極借入
+                if ((company.chips.research < 4 || company.chips.education < 2) && company.cash < 150) {
+                    borrowRatio = 0.7;
+                }
+                break;
+
+            case 'balanced':
+                // バランス：中程度の借入
+                if (needsInvestment && company.cash < 120) {
+                    borrowRatio = 0.5;
+                }
+                break;
+
+            case 'unpredictable':
+                // 予測不能：ランダム
+                if (Math.random() > 0.5 && company.cash < 150) {
+                    borrowRatio = Math.random() * 0.7;
+                }
+                break;
+        }
+
+        // 残り期数が少ない場合は借入を控える（返済リスク）
+        if (periodsRemaining <= 1) {
+            borrowRatio *= 0.3;
+        }
+
+        // 借入実行
+        if (borrowRatio > 0) {
+            const loanAmount = Math.floor(availableLoan * borrowRatio / 50) * 50;  // 50円単位
+            if (loanAmount >= 50) {
+                company.loans += loanAmount;
+                const netAmount = Math.floor(loanAmount * 0.9);  // 10%金利控除
+                company.cash += netAmount;
+                console.log(`${company.name}が長期借入¥${loanAmount}（入金¥${netAmount}）を実行`);
+            }
+        }
+    });
 }
 
 // Show sales capacity detail
