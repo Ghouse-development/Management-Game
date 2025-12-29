@@ -2724,7 +2724,7 @@ function renderMarketsBoard() {
 
         // 物理盤風ポケット構造
         html += `
-            <div class="market-tile ${marketClass} ${closedClass} ${unavailableClass} ${selectedClass}" ${onClickHandler} style="position:relative;">
+            <div class="market-tile ${marketClass} ${closedClass} ${unavailableClass} ${selectedClass}" ${onClickHandler}>
                 ${selectedBadge}
                 <!-- 色帯（価格表示エリア） -->
                 <div class="market-color-band">
