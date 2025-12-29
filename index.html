@@ -1618,6 +1618,12 @@ function applyRiskCard(cardId) {
                     lostItems += remove;
                 }
 
+                // 失われた在庫を海外市場（ストッカー）に戻す
+                const overseasMarket = gameState.markets.find(m => m.name === '海外');
+                if (overseasMarket && lostItems > 0) {
+                    overseasMarket.currentStock += lostItems;
+                }
+
                 // 保険加入チェック
                 if (company.chips.insurance > 0) {
                     const compensation = lostItems * 10;  // 1個10円の保険金
@@ -3200,17 +3206,21 @@ function showBuyMaterialsModal() {
 function updateMaterialCost() {
     let totalCost = 0;
     let rowsUsed = 0;
-    
-    gameState.markets.forEach((market, i) => {
-        const qty = parseInt(document.getElementById(`market_${i}`).value || 0);
+
+    gameState.markets.forEach((market, marketIndex) => {
+        const selectElement = document.getElementById(`market_${marketIndex}`);
+        if (!selectElement) return;
+        const qty = parseInt(selectElement.value || 0);
         if (qty > 0) {
             totalCost += market.buyPrice * qty;
             rowsUsed++;
         }
     });
-    
-    document.getElementById('totalCost').textContent = `¥${totalCost}`;
-    document.getElementById('rowsUsed').textContent = rowsUsed;
+
+    const totalCostEl = document.getElementById('totalCost');
+    const rowsUsedEl = document.getElementById('rowsUsed');
+    if (totalCostEl) totalCostEl.textContent = `¥${totalCost}`;
+    if (rowsUsedEl) rowsUsedEl.textContent = rowsUsed;
 }
 
 // Buy materials from multiple markets
@@ -3300,9 +3310,13 @@ function buyMaterialsFromMultiple() {
 // Buy materials (single market - legacy support)
 function buyMaterials() {
     const company = gameState.companies[0];
-    const marketIndex = parseInt(document.getElementById('marketSelect').value);
-    const quantity = parseInt(document.getElementById('quantity').value);
+    const marketIndex = parseInt(document.getElementById('marketSelect')?.value || 0);
+    const quantity = parseInt(document.getElementById('quantity')?.value || 0);
     const market = gameState.markets[marketIndex];
+    if (!market || quantity <= 0) {
+        showToast('市場または数量が無効です', 'warning', 3000);
+        return;
+    }
     
     // Check warehouse capacity
     const newMaterialCount = company.materials + quantity;
@@ -3437,8 +3451,8 @@ function showProductionModal() {
 // Production
 function produce() {
     const company = gameState.companies[0];
-    const matToWip = parseInt(document.getElementById('matToWip').value);
-    const wipToProd = parseInt(document.getElementById('wipToProd').value);
+    const matToWip = parseInt(document.getElementById('matToWip')?.value || 0);
+    const wipToProd = parseInt(document.getElementById('wipToProd')?.value || 0);
     
     // Check capacity limits
     const newWip = company.wip + matToWip - wipToProd;
@@ -7063,22 +7077,31 @@ function applyRiskCardToAI(company, card) {
             if (totalInv > 20) {
                 let excess = totalInv - 20;
                 let lostVal = 0;
+                let lostItemsAI = 0;
                 if (company.products > 0 && excess > 0) {
                     const remove = Math.min(company.products, excess);
                     company.products -= remove;
                     lostVal += remove * 15;
+                    lostItemsAI += remove;
                     excess -= remove;
                 }
                 if (company.wip > 0 && excess > 0) {
                     const remove = Math.min(company.wip, excess);
                     company.wip -= remove;
                     lostVal += remove * 14;
+                    lostItemsAI += remove;
                     excess -= remove;
                 }
                 if (company.materials > 0 && excess > 0) {
                     const remove = Math.min(company.materials, excess);
                     company.materials -= remove;
                     lostVal += remove * 13;
+                    lostItemsAI += remove;
+                }
+                // 失われた在庫を海外市場（ストッカー）に戻す
+                const overseasMkt = gameState.markets.find(m => m.name === '海外');
+                if (overseasMkt && lostItemsAI > 0) {
+                    overseasMkt.currentStock += lostItemsAI;
                 }
                 company.specialLoss = (company.specialLoss || 0) + lostVal;
             }
