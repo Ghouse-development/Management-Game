@@ -87,7 +87,7 @@ const MARKETS = [
     { name: '名古屋', buyPrice: 13, sellPrice: 28, maxStock: 9,   initialStock: 9,  needsBid: true,  cssClass: 'nagoya' },
     { name: '大阪',   buyPrice: 14, sellPrice: 24, maxStock: 13,  initialStock: 13, needsBid: true,  cssClass: 'osaka' },
     { name: '東京',   buyPrice: 15, sellPrice: 20, maxStock: 20,  initialStock: 20, needsBid: false, cssClass: 'tokyo' },
-    { name: '海外',   buyPrice: 16, sellPrice: 16, maxStock: 100, initialStock: 45, needsBid: false, cssClass: 'overseas' }
+    { name: '海外',   buyPrice: 16, sellPrice: 16, maxStock: 100, initialStock: 21, needsBid: false, cssClass: 'overseas' }
 ];
 
 /** 市場名からインデックスを取得するマップ */

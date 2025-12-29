@@ -20,19 +20,21 @@
         <!-- 1. AI会社バッジ（タップで詳細表示） -->
         <div class="ai-companies-bar" id="aiCompaniesBar"></div>
 
-        <!-- 2. カード操作 + 市場盤 -->
-        <div class="main-game-area">
-            <div class="card-draw-section" id="cardDrawSection">
-                <button class="draw-card-btn" onclick="drawCard()">カードを引く</button>
-                <div class="turn-info" id="turnInfo">あなたのターンです</div>
+        <!-- 2. メインコンテンツ（PC:横並び / スマホ:縦並び） -->
+        <div class="main-content-wrapper">
+            <!-- 左: カード操作 + 市場盤 -->
+            <div class="main-game-area">
+                <div class="card-draw-section" id="cardDrawSection">
+                    <button class="draw-card-btn" onclick="drawCard()">カードを引く</button>
+                    <div class="turn-info" id="turnInfo">あなたのターンです</div>
+                </div>
+                <div class="markets-board compact">
+                    <div class="markets-grid-compact" id="marketsDisplay"></div>
+                </div>
             </div>
-            <div class="markets-board compact">
-                <div class="markets-grid-compact" id="marketsDisplay"></div>
-            </div>
-        </div>
 
-        <!-- 手元エリア：プレイヤーの会社盤 + 固定費 + 次繰盤 -->
-        <div class="player-area-wrapper">
+            <!-- 右: プレイヤーの会社盤 -->
+            <div class="player-area-wrapper">
         <div class="player-area">
             <!-- 会社盤（大きく表示） -->
             <div class="company-board" id="companyBoard">
@@ -160,6 +162,7 @@
             </div>
         </div>
         </div> <!-- player-area-wrapper -->
+        </div> <!-- main-content-wrapper -->
     </div>
 
     <div id="modalContainer"></div>
@@ -2817,10 +2820,16 @@ function renderOtherCompanies() {
     others.forEach((company, idx) => {
         const isCurrent = gameState.currentPlayerIndex === idx + 1;
         const rowWarning = (company.currentRow || 1) >= gameState.maxRows - 5;
-        // チップ数
-        const chipCount = (company.chips.research || 0) + (company.chips.education || 0) +
-                         (company.chips.advertising || 0) + (company.chips.computer || 0) +
-                         (company.chips.insurance || 0);
+        // チップ種類別表示
+        const chips = company.chips;
+        let chipStr = '';
+        if (chips.research) chipStr += `青${chips.research}`;
+        if (chips.education) chipStr += `黄${chips.education}`;
+        if (chips.advertising) chipStr += `赤${chips.advertising}`;
+        if (chips.computer) chipStr += `緑${chips.computer}`;
+        if (chips.insurance) chipStr += `橙${chips.insurance}`;
+        if (!chipStr) chipStr = '-';
+
         badgesHtml += `
             <div class="ai-badge ${isCurrent ? 'current-turn' : ''}" onclick="showAICompanyModal(${idx + 1})">
                 <div class="ai-badge-row1">
@@ -2833,8 +2842,8 @@ function renderOtherCompanies() {
                     <span class="ai-badge-label">製</span><span class="ai-badge-val">${company.products}</span>
                 </div>
                 <div class="ai-badge-row3">
-                    <span class="ai-badge-info">W${company.workers} 機${company.machines.length} S${company.salesmen}</span>
-                    <span class="ai-badge-info">chip${chipCount}</span>
+                    <span class="ai-badge-info">W${company.workers}機${company.machines.length}S${company.salesmen}</span>
+                    <span class="ai-badge-chips">${chipStr}</span>
                     <span class="ai-badge-rownum ${rowWarning ? 'warning' : ''}">${company.currentRow || 1}行</span>
                 </div>
             </div>
