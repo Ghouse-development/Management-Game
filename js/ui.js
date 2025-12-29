@@ -252,13 +252,23 @@ function renderOtherCompanies() {
         const isCurrent = gameState.currentPlayerIndex === idx + 1;
         const rowWarning = (company.currentRow || 1) >= gameState.maxRows - 5;
         const chips = company.chips;
-        let chipStr = '';
-        if (chips.research) chipStr += `青${chips.research}`;
-        if (chips.education) chipStr += `黄${chips.education}`;
-        if (chips.advertising) chipStr += `赤${chips.advertising}`;
-        if (chips.computer) chipStr += `緑${chips.computer}`;
-        if (chips.insurance) chipStr += `橙${chips.insurance}`;
-        if (!chipStr) chipStr = '-';
+        // チップをドットで表示（最大3個まで）
+        const makeChipDots = (count, color) => Array(Math.min(count, 3)).fill(`<span class="chip-dot" style="background:${color}"></span>`).join('');
+        let chipDots = '';
+        if (chips.research) chipDots += makeChipDots(chips.research, '#3b82f6');
+        if (chips.education) chipDots += makeChipDots(chips.education, '#eab308');
+        if (chips.advertising) chipDots += makeChipDots(chips.advertising, '#ef4444');
+        if (chips.computer) chipDots += makeChipDots(chips.computer, '#22c55e');
+        if (chips.insurance) chipDots += makeChipDots(chips.insurance, '#f97316');
+
+        // 在庫をドットで表示（最大5個まで表示、残りは+n）
+        const makeDots = (count, color, maxShow = 5) => {
+            const shown = Math.min(count, maxShow);
+            const extra = count - shown;
+            let html = Array(shown).fill(`<span class="inv-dot" style="background:${color}"></span>`).join('');
+            if (extra > 0) html += `<span class="inv-extra">+${extra}</span>`;
+            return html;
+        };
 
         badgesHtml += `
             <div class="ai-badge ${isCurrent ? 'current-turn' : ''}" onclick="showAICompanyModal(${idx + 1})">
@@ -267,13 +277,13 @@ function renderOtherCompanies() {
                     <span class="ai-badge-cash">¥${company.cash}</span>
                 </div>
                 <div class="ai-badge-row2">
-                    <span class="ai-badge-label">材</span><span class="ai-badge-val">${company.materials}</span>
-                    <span class="ai-badge-label">仕</span><span class="ai-badge-val">${company.wip}</span>
-                    <span class="ai-badge-label">製</span><span class="ai-badge-val">${company.products}</span>
+                    <span class="ai-inv-group"><span class="inv-label">材</span>${makeDots(company.materials, '#8b5cf6', 4)}</span>
+                    <span class="ai-inv-group"><span class="inv-label">仕</span>${makeDots(company.wip, '#3b82f6', 4)}</span>
+                    <span class="ai-inv-group"><span class="inv-label">製</span>${makeDots(company.products, '#22c55e', 4)}</span>
                 </div>
                 <div class="ai-badge-row3">
                     <span class="ai-badge-info">W${company.workers}機${company.machines.length}S${company.salesmen}</span>
-                    <span class="ai-badge-chips">${chipStr}</span>
+                    <span class="ai-badge-chips">${chipDots || '-'}</span>
                     <span class="ai-badge-rownum ${rowWarning ? 'warning' : ''}">${company.currentRow || 1}行</span>
                 </div>
             </div>

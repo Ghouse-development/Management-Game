@@ -685,11 +685,57 @@ function drawCard() {
     const cardType = gameState.cardDeck.pop();
     console.log(`カードを引きました: ${cardType}（残り${gameState.cardDeck.length}枚）`);
 
-    if (cardType === 'decision') {
-        showDecisionCard();
-    } else {
-        drawRiskCard();
-    }
+    // 臨場感のあるカードめくり演出
+    showCardDrawAnimation(cardType);
+}
+
+// カードめくりアニメーション
+function showCardDrawAnimation(cardType) {
+    const isRisk = cardType === 'risk';
+    const cardColor = isRisk ? '#dc2626' : '#3b82f6';
+    const cardLabel = isRisk ? 'リスクカード' : '意思決定カード';
+    const cardIcon = isRisk ? '⚠️' : '🎯';
+
+    const animationHtml = `
+        <div class="card-draw-overlay" id="cardDrawOverlay">
+            <div class="draw-deck">
+                <div class="deck-stack">
+                    <div class="deck-card"></div>
+                    <div class="deck-card"></div>
+                    <div class="deck-card"></div>
+                </div>
+                <div class="deck-count">残り ${gameState.cardDeck.length}枚</div>
+            </div>
+            <div class="drawn-card-container">
+                <div class="drawn-card" id="drawnCard">
+                    <div class="card-face card-back">
+                        <div class="card-pattern">MG</div>
+                    </div>
+                    <div class="card-face card-front" style="background: linear-gradient(135deg, ${cardColor} 0%, ${cardColor}dd 100%);">
+                        <div class="card-icon">${cardIcon}</div>
+                        <div class="card-type">${cardLabel}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('modalContainer').innerHTML = animationHtml;
+
+    // 0.5秒後にカードをめくる
+    setTimeout(() => {
+        document.getElementById('drawnCard').classList.add('flipped');
+    }, 500);
+
+    // 1.5秒後に結果画面へ
+    setTimeout(() => {
+        document.getElementById('modalContainer').innerHTML = '';
+        if (cardType === 'decision') {
+            showDecisionCard();
+        } else {
+            drawRiskCard();
+        }
+    }, 1500);
 }
 
 // Show decision card (会社盤が見える状態で表示)
@@ -4103,19 +4149,40 @@ function showSellMachineModal() {
             <label class="form-label">売却する機械（簿価の70%）:</label>
             <select id="machineIndex" class="form-control">
                 ${company.machines.map((m, i) => {
-                    const name = m.type === 'small' ? 
+                    const name = m.type === 'small' ?
                         (m.attachments > 0 ? '小型+アタッチメント' : '小型機械') : '大型機械';
-                    const bookValue = m.type === 'small' ? 
-                        (m.attachments > 0 ? 130 : 100) : 200;
+                    const bookValue = calculateMachineBookValue(m, gameState.currentPeriod);
                     const salePrice = Math.floor(bookValue * 0.7);
-                    return `<option value="${i}">${name} (売却額: ¥${salePrice})</option>`;
+                    return `<option value="${i}">${name} (簿価: ¥${bookValue}, 売却額: ¥${salePrice})</option>`;
                 }).join('')}
             </select>
         </div>
         <button class="submit-btn" onclick="sellMachine()">売却</button>
     `;
-    
+
     showModal('機械売却', content);
+}
+
+// Calculate machine book value based on depreciation
+function calculateMachineBookValue(machine, currentPeriod) {
+    const original = machine.type === 'small' ?
+        (machine.attachments > 0 ? 130 : 100) : 200;
+
+    // 減価償却費を計算（1期=0、2期からカウント）
+    let totalDepreciation = 0;
+    for (let period = 2; period <= currentPeriod; period++) {
+        if (machine.type === 'small') {
+            if (machine.attachments > 0) {
+                totalDepreciation += period === 2 ? DEPRECIATION.smallWithAttachment.period2 : DEPRECIATION.smallWithAttachment.period3plus;
+            } else {
+                totalDepreciation += period === 2 ? DEPRECIATION.small.period2 : DEPRECIATION.small.period3plus;
+            }
+        } else {
+            totalDepreciation += period === 2 ? DEPRECIATION.large.period2 : DEPRECIATION.large.period3plus;
+        }
+    }
+
+    return Math.max(0, original - totalDepreciation);
 }
 
 // Sell machine
@@ -4123,9 +4190,8 @@ function sellMachine() {
     const company = gameState.companies[0];
     const machineIndex = parseInt(document.getElementById('machineIndex').value);
     const machine = company.machines[machineIndex];
-    
-    const bookValue = machine.type === 'small' ? 
-        (machine.attachments > 0 ? 130 : 100) : 200;
+
+    const bookValue = calculateMachineBookValue(machine, gameState.currentPeriod);
     const salePrice = Math.floor(bookValue * 0.7);
     const loss = bookValue - salePrice;
     
@@ -6762,21 +6828,21 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
                 // Process bidding with all companies (player has no products)
                 const allBids = [];
                 
-                // 価格設定（性格により変動）
-                let priceMultiplier = 0.7 + Math.random() * 0.25;
+                // 価格設定（性格により変動）- 基本は上限の85-95%
+                let priceMultiplier = 0.85 + Math.random() * 0.10;
                 if (company.strategy === 'price_focused') {
-                    priceMultiplier = 0.6 + Math.random() * 0.2;  // D社：より低価格
+                    priceMultiplier = 0.78 + Math.random() * 0.12;  // D社：やや低価格
                 } else if (company.strategy === 'conservative') {
-                    priceMultiplier = 0.75 + Math.random() * 0.2; // C社：安定価格
+                    priceMultiplier = 0.85 + Math.random() * 0.12; // C社：高めの安定価格
                 } else if (company.strategy === 'aggressive') {
-                    priceMultiplier = 0.65 + Math.random() * 0.25; // A社：積極的価格
+                    priceMultiplier = 0.80 + Math.random() * 0.15; // A社：やや積極的
                 }
-                
-                // Current AI company's bid
-                const bidPrice = Math.floor(market.sellPrice * priceMultiplier) - getPriceCompetitiveness(company);
+
+                // Current AI company's bid (価格競争力は内部計算のみ使用、表示価格は変えない)
                 const displayPrice = Math.floor(market.sellPrice * priceMultiplier);
+                const bidPrice = displayPrice - getPriceCompetitiveness(company);
                 allBids.push({company: gameState.currentPlayerIndex, price: bidPrice, quantity: sellQty, displayPrice: displayPrice});
-                
+
                 // All other companies (including player) also bid if they have products
                 for (let i = 0; i < gameState.companies.length; i++) {
                     if (i !== gameState.currentPlayerIndex) {
@@ -6785,15 +6851,16 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
                             const otherCapacity = getSalesCapacity(otherCompany);
                             const otherQty = Math.min(otherCapacity, otherCompany.products, market.maxStock - market.currentStock);
                             if (otherQty > 0) {
-                                let otherPrice;
+                                let otherDisplayPrice;
                                 if (i === 0) {
                                     // Player company - use strategic pricing
-                                    otherPrice = Math.floor(market.sellPrice * 0.85) - getPriceCompetitiveness(otherCompany);
+                                    otherDisplayPrice = Math.floor(market.sellPrice * 0.90);
                                 } else {
-                                    // AI company
-                                    otherPrice = Math.floor(market.sellPrice * (0.7 + Math.random() * 0.25)) - getPriceCompetitiveness(otherCompany);
+                                    // AI company - 戦略に応じた価格
+                                    const otherMultiplier = 0.82 + Math.random() * 0.13;
+                                    otherDisplayPrice = Math.floor(market.sellPrice * otherMultiplier);
                                 }
-                                const otherDisplayPrice = i === 0 ? Math.floor(market.sellPrice * 0.85) : Math.floor(market.sellPrice * (0.7 + Math.random() * 0.25));
+                                const otherPrice = otherDisplayPrice - getPriceCompetitiveness(otherCompany);
                                 allBids.push({company: i, price: otherPrice, quantity: otherQty, displayPrice: otherDisplayPrice});
                             }
                         }
