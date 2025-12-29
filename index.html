@@ -1806,9 +1806,9 @@ function calculateChipCost(company, period) {
         cost += (company.chips.research || 0) * 40;  // 特急
         cost += (company.chips.education || 0) * 40; // 特急
         cost += (company.chips.advertising || 0) * 40; // 特急
-        cost += (company.nextPeriodChips.research || 0) * 20; // 繰越
-        cost += (company.nextPeriodChips.education || 0) * 20; // 繰越
-        cost += (company.nextPeriodChips.advertising || 0) * 20; // 繰越
+        cost += (company.nextPeriodChips?.research || 0) * 20; // 繰越
+        cost += (company.nextPeriodChips?.education || 0) * 20; // 繰越
+        cost += (company.nextPeriodChips?.advertising || 0) * 20; // 繰越
     }
     
     return cost;
@@ -1995,9 +1995,9 @@ function showFixedCostBreakdown() {
         if (company.chips.research > 0) html += `<div class="breakdown-item"><span>研究・特急(${company.chips.research}枚)</span><span>¥${company.chips.research * 40}</span></div>`;
         if (company.chips.education > 0) html += `<div class="breakdown-item"><span>教育・特急(${company.chips.education}枚)</span><span>¥${company.chips.education * 40}</span></div>`;
         if (company.chips.advertising > 0) html += `<div class="breakdown-item"><span>広告・特急(${company.chips.advertising}枚)</span><span>¥${company.chips.advertising * 40}</span></div>`;
-        if (company.nextPeriodChips.research > 0) html += `<div class="breakdown-item"><span>研究・繰越(${company.nextPeriodChips.research}枚)</span><span>¥${company.nextPeriodChips.research * 20}</span></div>`;
-        if (company.nextPeriodChips.education > 0) html += `<div class="breakdown-item"><span>教育・繰越(${company.nextPeriodChips.education}枚)</span><span>¥${company.nextPeriodChips.education * 20}</span></div>`;
-        if (company.nextPeriodChips.advertising > 0) html += `<div class="breakdown-item"><span>広告・繰越(${company.nextPeriodChips.advertising}枚)</span><span>¥${company.nextPeriodChips.advertising * 20}</span></div>`;
+        if (company.nextPeriodChips?.research > 0) html += `<div class="breakdown-item"><span>研究・繰越(${company.nextPeriodChips.research}枚)</span><span>¥${company.nextPeriodChips.research * 20}</span></div>`;
+        if (company.nextPeriodChips?.education > 0) html += `<div class="breakdown-item"><span>教育・繰越(${company.nextPeriodChips.education}枚)</span><span>¥${company.nextPeriodChips.education * 20}</span></div>`;
+        if (company.nextPeriodChips?.advertising > 0) html += `<div class="breakdown-item"><span>広告・繰越(${company.nextPeriodChips.advertising}枚)</span><span>¥${company.nextPeriodChips.advertising * 20}</span></div>`;
     }
     
     // 減価償却費
@@ -3667,24 +3667,24 @@ function renderCompanies() {
                     <div class="chip-row">
                         <span class="chip-label">研究:</span>
                         <div class="chip-dots">
-                            ${Array(5).fill(0).map((_, i) => 
-                                `<div class="chip-dot ${i < (company.chips.research + company.nextPeriodChips.research) ? 'filled research' : ''}"></div>`
+                            ${Array(5).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < (company.chips.research + (company.nextPeriodChips?.research || 0)) ? 'filled research' : ''}"></div>`
                             ).join('')}
                         </div>
                     </div>
                     <div class="chip-row">
                         <span class="chip-label">教育:</span>
                         <div class="chip-dots">
-                            ${Array(gameState.currentPeriod === 2 ? 2 : 1).fill(0).map((_, i) => 
-                                `<div class="chip-dot ${i < (company.chips.education + company.nextPeriodChips.education) ? 'filled education' : ''}"></div>`
+                            ${Array(gameState.currentPeriod === 2 ? 2 : 1).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < (company.chips.education + (company.nextPeriodChips?.education || 0)) ? 'filled education' : ''}"></div>`
                             ).join('')}
                         </div>
                     </div>
                     <div class="chip-row">
                         <span class="chip-label">広告:</span>
                         <div class="chip-dots">
-                            ${Array(5).fill(0).map((_, i) => 
-                                `<div class="chip-dot ${i < (company.chips.advertising + company.nextPeriodChips.advertising) ? 'filled advertising' : ''}"></div>`
+                            ${Array(5).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < (company.chips.advertising + (company.nextPeriodChips?.advertising || 0)) ? 'filled advertising' : ''}"></div>`
                             ).join('')}
                         </div>
                     </div>
@@ -3755,9 +3755,9 @@ function updateDisplay() {
     const nextPeriodBoard = document.getElementById('nextPeriodBoard');
     if (gameState.currentPeriod >= 3) {
         nextPeriodBoard.style.display = 'block';
-        document.getElementById('nextResearch').textContent = player.nextPeriodChips.research || 0;
-        document.getElementById('nextEducation').textContent = player.nextPeriodChips.education || 0;
-        document.getElementById('nextAdvertising').textContent = player.nextPeriodChips.advertising || 0;
+        document.getElementById('nextResearch').textContent = player.nextPeriodChips?.research || 0;
+        document.getElementById('nextEducation').textContent = player.nextPeriodChips?.education || 0;
+        document.getElementById('nextAdvertising').textContent = player.nextPeriodChips?.advertising || 0;
     } else {
         nextPeriodBoard.style.display = 'none';
     }
@@ -6000,7 +6000,7 @@ function moveWarehouse(newLocation) {
     alert(`倉庫を${newLocationName}に移動しました。`);
     updateDisplay();
     // 行を消費しないので、ターン選択に戻る
-    showTurnOptions();
+    showTurnStartOptions();
 }
 
 // Reassign modal (配置転換)
@@ -7242,7 +7242,7 @@ function startPeriodWithoutBorrowing() {
     closeModal();
     updateDisplay();
     saveGame();  // 期首を自動セーブ
-    alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理完了で3行目からゲームスタートです。`);
+    alert(`第${gameState.currentPeriod}期を開始します\n全社：コンピュータチップ(¥20)と保険チップ(¥5)を自動購入しました。\n期首処理完了で2行目からゲームスタートです。`);
     showTurnStartOptions();
 }
 
@@ -7703,7 +7703,8 @@ function buyChips() {
     
     // Check max limits
     const maxLimits = {research: 5, education: 1, advertising: 5};
-    const currentTotal = company.chips[chipType] + company.nextPeriodChips[chipType] + quantity;
+    const nextPeriodCount = company.nextPeriodChips?.[chipType] || 0;
+    const currentTotal = company.chips[chipType] + nextPeriodCount + quantity;
     if (currentTotal > maxLimits[chipType]) {
         alert(`${chipType}チップは最大${maxLimits[chipType]}個までです！`);
         return;
