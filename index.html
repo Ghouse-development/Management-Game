@@ -492,6 +492,7 @@
             position: relative;
             width: 380px;
             height: 380px;
+            margin: auto;
         }
         .market-tile {
             position: absolute;
@@ -504,14 +505,14 @@
             cursor: pointer;
         }
         .market-tile:hover { transform: scale(1.08); box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
-        /* 各市場の位置と色 */
-        .market-tile.tokyo { top: 5%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
-        .market-tile.nagoya { top: 20%; right: 5%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.osaka { top: 55%; right: 2%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.fukuoka { bottom: 5%; right: 18%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.overseas { bottom: 5%; left: 18%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
-        .market-tile.sapporo { top: 55%; left: 2%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
-        .market-tile.sendai { top: 20%; left: 5%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        /* 各市場の位置と色（六角形内に収まるよう調整） */
+        .market-tile.tokyo { top: 2%; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.nagoya { top: 22%; right: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.osaka { top: 52%; right: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.fukuoka { bottom: 8%; right: 22%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.overseas { bottom: 8%; left: 22%; background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%); border: 3px solid #3b82f6; }
+        .market-tile.sapporo { top: 52%; left: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
+        .market-tile.sendai { top: 22%; left: 8%; background: linear-gradient(180deg, #047857 0%, #065f46 100%); border: 3px solid #10b981; }
         .market-tile.closed { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; border-color: #6b7280 !important; opacity: 0.7; }
         .market-tile.closed .market-name { color: #9ca3af; text-decoration: line-through; }
 
@@ -1841,10 +1842,10 @@ function calculateFixedCost(company) {
     const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
 
     if (period === 2) {
-        // 2期：各チップ実際の枚数×20円
-        cost += (company.chips.research || 0) * 20;
-        cost += (company.chips.education || 0) * 20;
-        cost += (company.chips.advertising || 0) * 20;
+        // 2期：各種1枚だけ返却 → 各種最大20円のみ
+        if (company.chips.research > 0) cost += 20;  // 1枚分のみ
+        if (company.chips.education > 0) cost += 20;  // 1枚分のみ
+        if (company.chips.advertising > 0) cost += 20; // 1枚分のみ
     } else {
         // 3-5期：繰り越し分は20円、今期購入（特急）は40円
         // 繰り越しチップ（前期から持ち越し）= 20円/枚
@@ -2590,8 +2591,8 @@ function applyRiskCard(cardId) {
         case 16:
             company.cannotProduce = true;
             alert('労災発生！\n生産活動はできません\n（材料購入、商品販売・入札、DO NOTHINGは可能）');
-            rowUsed = false;
-            break;
+            showLaborAccidentActionModal();  // 行動選択モーダルを表示
+            return;  // ここでリターン（モーダルで行動を選択後にターン終了）
         case 17: // 広告政策失敗
         case 18:
             if (company.chips.advertising > 0) {
@@ -2816,32 +2817,58 @@ function applyRiskCard(cardId) {
             alert('社長、病気で倒れる！\n1回休み');
             rowUsed = false;
             break;
-        case 61: // 不良在庫発生（保険対象外）
+        case 61: // 不良在庫発生
         case 62:
             let totalInventory = company.materials + company.wip + company.products;
             if (totalInventory > 20) {
                 let excess = totalInventory - 20;
+                let lostItems = 0;
                 let lostValue = 0;
-                // 製品から順に処理（保険金なし）
+                // 製品から順に処理
                 if (company.products > 0 && excess > 0) {
                     const remove = Math.min(company.products, excess);
                     company.products -= remove;
                     lostValue += remove * 15;  // 製品1個=15円
+                    lostItems += remove;
                     excess -= remove;
                 }
                 if (company.wip > 0 && excess > 0) {
                     const remove = Math.min(company.wip, excess);
                     company.wip -= remove;
                     lostValue += remove * 14;  // 仕掛品1個=14円
+                    lostItems += remove;
                     excess -= remove;
                 }
                 if (company.materials > 0 && excess > 0) {
                     const remove = Math.min(company.materials, excess);
                     company.materials -= remove;
                     lostValue += remove * 13;  // 材料1個=13円
+                    lostItems += remove;
                 }
-                company.specialLoss = (company.specialLoss || 0) + lostValue;
-                alert(`不良在庫発生！\n総在庫20個超過分をストッカーへ\n特別損失: ¥${lostValue}（保険対象外）`);
+
+                // 保険加入チェック
+                if (company.chips.insurance > 0) {
+                    const compensation = lostItems * 10;  // 1個10円の保険金
+                    const netLoss = lostValue - compensation;
+                    company.cash += compensation;
+                    company.chips.insurance = 0;  // 保険使用後消失
+                    company.specialLoss = (company.specialLoss || 0) + netLoss;
+                    if (company.type === 'player') {
+                        showInsuranceRepurchaseModal('不良在庫発生', lostItems, compensation, netLoss);
+                        return;  // モーダルで再加入選択後に処理
+                    } else {
+                        // AI会社は自動で再加入
+                        if (company.cash >= 5) {
+                            company.cash -= 5;
+                            company.chips.insurance = 1;
+                        }
+                        alert(`不良在庫発生！\n${lostItems}個をストッカーへ\n保険金: ¥${compensation}\n特別損失: ¥${netLoss}`);
+                    }
+                } else {
+                    // 保険未加入
+                    company.specialLoss = (company.specialLoss || 0) + lostValue;
+                    alert(`不良在庫発生！\n${lostItems}個をストッカーへ\n特別損失: ¥${lostValue}（保険未加入）`);
+                }
             } else {
                 alert('不良在庫発生！\n（総在庫が20個以下のため効果なし）');
                 rowUsed = false;
@@ -3304,8 +3331,34 @@ function showForcedActionModal() {
             </div>
         </div>
     `;
-    
+
     showModal('消費者運動発生 - 行動選択', content);
+}
+
+// Show forced action modal for 労災発生
+function showLaborAccidentActionModal() {
+    const content = `
+        <div class="form-group">
+            <div style="background: #fee2e2; border: 2px solid #dc2626; border-radius: 8px; padding: 12px; margin-bottom: 15px; text-align: center;">
+                <div style="font-weight: bold; color: #b91c1c;">⚠️ 労災発生中</div>
+                <div style="font-size: 12px; color: #7f1d1d; margin-top: 5px;">生産活動はできません</div>
+            </div>
+            <label class="form-label">以下から行動を選択してください：</label>
+            <div style="margin: 10px 0;">
+                <button class="action-btn success" onclick="closeModal(); showSaleModal();" style="width: 100%; margin: 5px 0;">
+                    💰 商品販売
+                </button>
+                <button class="action-btn primary" onclick="closeModal(); showMaterialPurchaseModal();" style="width: 100%; margin: 5px 0;">
+                    📦 材料購入
+                </button>
+                <button class="action-btn secondary" onclick="closeModal(); doNothing();" style="width: 100%; margin: 5px 0;">
+                    ⏸️ Do Nothing（1行消費）
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('労災発生 - 行動選択', content);
 }
 
 // Show hiring choice modal for 縁故採用
@@ -4472,10 +4525,9 @@ function buyMaterials() {
 function showProductionModal() {
     const company = gameState.companies[0];
 
-    // 労災発生チェック
+    // 労災発生チェック（フラグはターン終了時にリセット）
     if (company.cannotProduce) {
-        alert('労災発生中のため生産できません！');
-        company.cannotProduce = false; // フラグをリセット
+        alert('労災発生中のため生産できません！\n（材料購入、商品販売・入札、DO NOTHINGは可能）');
         showDecisionCard();
         return;
     }
@@ -7798,6 +7850,9 @@ function incrementRow(companyIndex) {
 // End turn
 function endTurn() {
     const company = gameState.companies[gameState.currentPlayerIndex];
+
+    // 労災フラグをリセット（ターン終了時）
+    company.cannotProduce = false;
 
     // 行数を増やす（資源変更があったため）
     if (incrementRow(gameState.currentPlayerIndex)) {
