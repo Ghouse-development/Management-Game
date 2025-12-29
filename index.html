@@ -2541,9 +2541,8 @@ function applyRiskCard(cardId) {
         case 6:
             company.cannotSell = true;
             alert('消費者運動発生！\n商品の販売はできません\n（材料購入、完成・投入、DO NOTHINGは可能）');
-            showForcedActionModal();
-            rowUsed = false;
-            break;
+            showForcedActionModal();  // アクション選択モーダルを表示
+            return;  // ここでリターン（モーダルで行動を選択後にターン終了）
         case 7: // 得意先倒産
         case 8:
             if (gameState.currentPeriod !== 2) {
@@ -2608,9 +2607,8 @@ function applyRiskCard(cardId) {
             break;
         case 19: // 特別サービス
         case 20:
-            showSpecialServiceModal();
-            rowUsed = false;
-            break;
+            showSpecialServiceModal();  // 選択モーダルを表示
+            return;  // ここでリターン（モーダルで選択後にターン終了）
         case 21: // 返品発生
         case 22:
         case 23:
@@ -2888,7 +2886,8 @@ function applyRiskCard(cardId) {
     if (rowUsed) {
         endTurn();
     } else {
-        nextTurn();
+        // 行を消費しないリスクカードの場合、意思決定カードを表示
+        showDecisionCard();
     }
 }
 
@@ -2941,7 +2940,7 @@ function executeMaterialPurchase() {
 function confirmMaterialPurchase() {
     const company = gameState.companies[0];
     const buyQty = parseInt(document.getElementById('materialQty').value || 0);
-    
+
     if (buyQty > 0) {
         const cost = buyQty * 10;
         company.cash -= cost;
@@ -2953,8 +2952,9 @@ function confirmMaterialPurchase() {
         updateDisplay();
         nextTurn();
     } else {
+        // 購入しない場合は意思決定カードを表示（行を消費しない）
         closeModal();
-        nextTurn();
+        showDecisionCard();
     }
 }
 
@@ -2985,7 +2985,7 @@ function executeAdPurchase() {
 function confirmAdPurchase() {
     const company = gameState.companies[0];
     const buyQty = parseInt(document.getElementById('adChipQty').value || 0);
-    
+
     if (buyQty > 0) {
         const cost = buyQty * 20;
         company.cash -= cost;
@@ -2996,8 +2996,9 @@ function confirmAdPurchase() {
         updateDisplay();
         nextTurn();
     } else {
+        // 購入しない場合は意思決定カードを表示（行を消費しない）
         closeModal();
-        nextTurn();
+        showDecisionCard();
     }
 }
 
