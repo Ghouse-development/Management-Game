@@ -961,33 +961,34 @@ html, body {
 }
 .markets-board.buy-mode .market-tile.unavailable { opacity: 0.4; cursor: not-allowed; }
 
-/* インストラクションオーバーレイ */
+/* インストラクションオーバーレイ - 画面下部に配置（市場を隠さない） */
 .market-instruction {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
     border: 3px solid #f59e0b;
     border-radius: 12px;
-    padding: 12px 25px;
-    font-size: 16px;
+    padding: 10px 20px;
+    font-size: 14px;
     font-weight: bold;
     color: #78350f;
     z-index: 1000;
     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     display: flex;
     align-items: center;
-    gap: 15px;
-    animation: slideDown 0.3s ease-out;
+    gap: 12px;
+    animation: slideUp 0.3s ease-out;
+    max-width: 90vw;
 }
 .market-instruction.buy-mode {
     background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
     border-color: #22c55e;
     color: #166534;
 }
-@keyframes slideDown {
-    from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+@keyframes slideUp {
+    from { transform: translateX(-50%) translateY(100%); opacity: 0; }
     to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 .cancel-mode-btn {
@@ -1393,16 +1394,21 @@ html, body {
         overflow-x: auto;
     }
     .ai-badge {
-        min-width: 55px;
-        max-width: 70px;
-        padding: 2px 3px;
-        gap: 0;
+        min-width: 62px;
+        max-width: 75px;
+        padding: 3px 4px;
+        gap: 1px;
         flex-shrink: 0;
     }
-    .ai-badge-name { font-size: 7px; }
-    .ai-badge-cash { font-size: 7px; }
-    .ai-badge-row2 { padding: 0 2px; display: none; }
-    .ai-badge-row3 { display: none; }
+    .ai-badge-name { font-size: 8px; }
+    .ai-badge-cash { font-size: 8px; }
+    .ai-badge-row2 { padding: 1px 2px; display: flex; font-size: 7px; }
+    .ai-badge-row3 { display: flex; font-size: 6px; }
+    .ai-badge-label { font-size: 6px; }
+    .ai-badge-val { font-size: 7px; }
+    .ai-badge-info { font-size: 6px; }
+    .ai-badge-chips { font-size: 6px; }
+    .ai-badge-rownum { font-size: 6px; padding: 1px 3px; }
 
     /* メインコンテンツ */
     .main-content-wrapper { flex: 1; gap: 2px; }
@@ -1487,9 +1493,60 @@ html, body {
 
 /* タブレット向け（481px〜768px） */
 @media (min-width: 481px) and (max-width: 768px) {
+    .container { padding: 4px; }
+
+    /* AIバッジ - タブレット用サイズ */
+    .ai-companies-bar {
+        gap: 4px;
+        padding: 4px 8px;
+        flex-wrap: wrap;
+    }
+    .ai-badge {
+        min-width: 85px;
+        max-width: 100px;
+        padding: 5px 6px;
+        gap: 2px;
+    }
+    .ai-badge-name { font-size: 9px; }
+    .ai-badge-cash { font-size: 10px; }
+    .ai-badge-row2 { padding: 2px 4px; font-size: 8px; }
+    .ai-badge-row3 { font-size: 7px; }
+    .ai-badge-label { font-size: 7px; }
+    .ai-badge-val { font-size: 8px; }
+    .ai-badge-info { font-size: 7px; }
+    .ai-badge-chips { font-size: 7px; }
+    .ai-badge-rownum { font-size: 7px; padding: 2px 4px; }
+
+    /* 市場盤 */
     .markets-grid-compact { max-width: 380px; }
+    .market-tile .market-name { font-size: 8px; }
+    .market-tile .price-badge { width: 14px; height: 14px; font-size: 7px; }
+    .market-tile .stock-cube { width: 6px; height: 6px; }
+
+    /* 会社盤 */
     .player-area { grid-template-columns: 1fr; }
-    .ai-badge { min-width: 75px; }
+    .company-board { padding: 8px; }
+    .board-info-bar { gap: 3px; }
+    .info-badge { padding: 3px 6px; }
+    .info-badge-label { font-size: 8px; }
+    .info-badge-value { font-size: 12px; }
+    .capacity-item { padding: 3px 6px; }
+    .capacity-label { font-size: 8px; }
+    .capacity-value { font-size: 13px; }
+    .flow-box { padding: 4px; min-height: 50px; }
+    .flow-box-title { font-size: 9px; }
+    .inv-block { width: 14px; height: 14px; font-size: 9px; }
+    .personnel-box { padding: 4px; }
+    .personnel-box-title { font-size: 9px; }
+    .person-dot { width: 20px; height: 20px; font-size: 10px; }
+    .machine-dot { width: 22px; height: 22px; font-size: 9px; }
+    .chip-box { padding: 4px; }
+    .chip-box-title { font-size: 8px; }
+    .chip { width: 12px; height: 12px; }
+
+    /* モーダル */
+    .modal-content { width: 90%; max-height: 85vh; }
+    .modal-title { font-size: 15px; }
 }
 
 /* PC向け（769px以上） */

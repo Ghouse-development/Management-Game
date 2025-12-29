@@ -289,12 +289,7 @@ function initializeCardDeck() {
 // ============================================
 // ターン・行管理
 // ============================================
-function incrementRow(companyIndex) {
-    const company = gameState.companies[companyIndex];
-    company.currentRow++;
-    company.rowsUsed++;
-    return company.currentRow <= gameState.maxRows;
-}
+// incrementRowはindex.htmlに完全版あり（警告+期末処理）
 
 // ============================================
 // 市場初期化

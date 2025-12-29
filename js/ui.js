@@ -202,7 +202,11 @@ function renderFixedCostBreakdown(company) {
     let depreciationCost = 0;
     company.machines.forEach(m => {
         if (period === 2) {
-            depreciationCost += m.type === 'large' ? DEPRECIATION.large.period2 : DEPRECIATION.small.period2;
+            if (m.type === 'large') {
+                depreciationCost += DEPRECIATION.large.period2;
+            } else {
+                depreciationCost += m.attachments > 0 ? DEPRECIATION.smallWithAttachment.period2 : DEPRECIATION.small.period2;
+            }
         } else {
             if (m.type === 'large') depreciationCost += DEPRECIATION.large.period3plus;
             else depreciationCost += m.attachments > 0 ? DEPRECIATION.smallWithAttachment.period3plus : DEPRECIATION.small.period3plus;
