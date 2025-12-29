@@ -9,6 +9,7 @@
     <!-- 外部JSファイル -->
     <script src="js/constants.js"></script>
     <script src="js/state.js"></script>
+    <script src="js/bidding.js"></script>
 </head>
 <body>
     <!-- トースト通知コンテナ -->
@@ -5266,24 +5267,9 @@ function processBidsWithAllCompanies(marketIndex) {
         }
     }
     
-    // Sort by: 1) price (lowest), 2) research chips (most), 3) parent (priority)
-    allBids.sort((a, b) => {
-        // First compare actual bid price
-        if (a.price !== b.price) return a.price - b.price;
-        
-        // Same price: compare research chips (more chips wins)
-        const aResearch = gameState.companies[a.company].chips.research || 0;
-        const bResearch = gameState.companies[b.company].chips.research || 0;
-        if (aResearch !== bResearch) return bResearch - aResearch;
-        
-        // Same research chips: parent wins
-        const aIsParent = (gameState.currentPlayerIndex === a.company);
-        const bIsParent = (gameState.currentPlayerIndex === b.company);
-        if (aIsParent && !bIsParent) return -1;
-        if (!aIsParent && bIsParent) return 1;
-        
-        return 0;
-    });
+    // BiddingSystemを使用してソート
+    // 優先順位: 1) コール価格（低い）, 2) 研究チップ枚数（多い）, 3) 親
+    BiddingSystem.sortBids(allBids, gameState);
     
     // 入札結果を処理（販売上限は親の出した個数）
     // 親の入札数量を販売上限とする（市場枠とも比較）
@@ -5471,18 +5457,8 @@ function processBidsWithAllCompaniesTwoMarket() {
         }
     }
 
-    // Sort by: 1) price (lowest), 2) research chips (most), 3) parent (priority)
-    allBids.sort((a, b) => {
-        if (a.price !== b.price) return a.price - b.price;
-        const aResearch = gameState.companies[a.company].chips.research || 0;
-        const bResearch = gameState.companies[b.company].chips.research || 0;
-        if (aResearch !== bResearch) return bResearch - aResearch;
-        const aIsParent = (gameState.currentPlayerIndex === a.company);
-        const bIsParent = (gameState.currentPlayerIndex === b.company);
-        if (aIsParent && !bIsParent) return -1;
-        if (!aIsParent && bIsParent) return 1;
-        return 0;
-    });
+    // BiddingSystemを使用してソート
+    BiddingSystem.sortBids(allBids, gameState);
 
     // 2市場の合計容量
     const volume1 = market1.maxStock - market1.currentStock;
@@ -6425,24 +6401,9 @@ function processAIBidWithPlayer() {
         }
     }
     
-    // Sort by: 1) price (lowest), 2) research chips (most), 3) parent (priority)
-    allBids.sort((a, b) => {
-        // First compare actual bid price
-        if (a.price !== b.price) return a.price - b.price;
-        
-        // Same price: compare research chips (more chips wins)
-        const aResearch = gameState.companies[a.company].chips.research || 0;
-        const bResearch = gameState.companies[b.company].chips.research || 0;
-        if (aResearch !== bResearch) return bResearch - aResearch;
-        
-        // Same research chips: parent wins
-        const aIsParent = (gameState.currentPlayerIndex === a.company);
-        const bIsParent = (gameState.currentPlayerIndex === b.company);
-        if (aIsParent && !bIsParent) return -1;
-        if (!aIsParent && bIsParent) return 1;
-        
-        return 0;
-    });
+    // BiddingSystemを使用してソート
+    // 優先順位: 1) コール価格（低い）, 2) 研究チップ枚数（多い）, 3) 親
+    BiddingSystem.sortBids(allBids, gameState);
     
     // Process winner
     const winner = allBids[0];
@@ -7734,8 +7695,8 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
                     }
                 }
                 
-                // Sort by price (lowest wins)
-                allBids.sort((a, b) => a.price - b.price);
+                // BiddingSystemを使用してソート
+                BiddingSystem.sortBids(allBids, gameState);
                 
                 // Process winner's sale
                 const winner = allBids[0];
@@ -8519,18 +8480,8 @@ function processAIOnlyBidding() {
 
 // AI入札結果を処理
 function processAIBidsResult(maxSales, market, allBids) {
-    // 価格でソート（低い順=有利）
-    allBids.sort((a, b) => {
-        if (a.price !== b.price) return a.price - b.price;
-        const aResearch = gameState.companies[a.company].chips.research || 0;
-        const bResearch = gameState.companies[b.company].chips.research || 0;
-        if (aResearch !== bResearch) return bResearch - aResearch;
-        const aIsParent = (a.company === gameState.aiBidding.parentCompany);
-        const bIsParent = (b.company === gameState.aiBidding.parentCompany);
-        if (aIsParent && !bIsParent) return -1;
-        if (!aIsParent && bIsParent) return 1;
-        return 0;
-    });
+    // BiddingSystemを使用してソート（AI親の場合は親インデックスを指定）
+    BiddingSystem.sortBids(allBids, gameState, gameState.aiBidding.parentCompany);
 
     // 販売上限は親の数量
     let remainingCapacity = maxSales;
