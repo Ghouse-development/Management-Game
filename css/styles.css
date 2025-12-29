@@ -1448,69 +1448,87 @@ html, body {
 
 /* PC向け（769px以上） */
 @media (min-width: 769px) {
+    /* AIバッジを大きく見やすく */
+    .ai-companies-bar {
+        gap: 8px;
+        padding: 8px 15px;
+    }
+    .ai-badge {
+        min-width: 140px;
+        padding: 8px 12px;
+        gap: 4px;
+    }
+    .ai-badge-name { font-size: 12px; }
+    .ai-badge-cash { font-size: 13px; }
+    .ai-badge-row2 { padding: 3px 6px; }
+    .ai-badge-label { font-size: 10px; }
+    .ai-badge-val { font-size: 11px; }
+    .ai-badge-info { font-size: 10px; }
+    .ai-badge-chips { font-size: 10px; }
+    .ai-badge-rownum { font-size: 10px; padding: 2px 6px; }
+
+    /* メインコンテンツ - 2カラム均等配置 */
     .main-content-wrapper {
         flex-direction: row;
-        align-items: stretch;
-        justify-content: stretch;
-        gap: 15px;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 20px;
         flex: 1;
+        padding: 10px;
     }
     .main-game-area {
-        flex: 1;
+        flex: 0 0 45%;
+        max-width: 500px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start;
+        gap: 10px;
+    }
+    .card-draw-section {
+        width: 100%;
+        max-width: 300px;
     }
     .player-area-wrapper {
-        flex: 1;
+        flex: 0 0 50%;
+        max-width: 550px;
         display: flex;
         flex-direction: column;
     }
     .markets-board.compact {
-        flex: 1;
+        flex: 0 0 auto;
         width: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
     }
     .markets-grid-compact {
-        max-width: 100%;
+        max-width: 480px;
         width: 100%;
     }
     .player-area {
         grid-template-columns: 1fr;
-        flex: 1;
     }
-    .ai-badge { min-width: 85px; }
 
-    /* PC版会社盤 - 画面いっぱいに */
+    /* PC版会社盤 */
     .company-board {
         padding: 15px;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
     }
     .production-flow {
-        flex: 1;
         align-items: center;
     }
     .flow-box {
-        flex: 1;
-        min-height: 80px;
+        min-height: 70px;
     }
     .personnel-row {
         gap: 10px;
     }
     .personnel-box {
-        flex: 1;
         padding: 10px;
     }
     .chips-row {
         gap: 8px;
     }
     .chip-box {
-        flex: 1;
         padding: 8px;
     }
 }
