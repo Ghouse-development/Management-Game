@@ -3220,15 +3220,17 @@ function buyMaterialsFromMultiple() {
     let totalQty = 0;
     let rowsUsed = 0;
     let purchases = [];
-    
-    // 各市場からの購入を収集
-    gameState.markets.forEach((market, i) => {
-        const qty = parseInt(document.getElementById(`market_${i}`).value || 0);
+
+    // 各市場からの購入を収集（実際の市場インデックスを使用）
+    gameState.markets.forEach((market, marketIndex) => {
+        const selectElement = document.getElementById(`market_${marketIndex}`);
+        if (!selectElement) return; // 閉鎖市場などで要素が存在しない場合はスキップ
+        const qty = parseInt(selectElement.value || 0);
         if (qty > 0) {
             totalCost += market.buyPrice * qty;
             totalQty += qty;
             rowsUsed++;
-            purchases.push({market: market, qty: qty, cost: market.buyPrice * qty});
+            purchases.push({market: market, marketIndex: marketIndex, qty: qty, cost: market.buyPrice * qty});
         }
     });
     
@@ -3270,8 +3272,8 @@ function buyMaterialsFromMultiple() {
 
     // 各市場の在庫を減らす
     purchases.forEach(p => {
-        const marketIndex = gameState.markets.indexOf(p.market);
-        gameState.markets[marketIndex].currentStock -= p.qty;
+        gameState.markets[p.marketIndex].currentStock -= p.qty;
+        console.log(`${p.market.name}から${p.qty}個購入: 残り在庫${gameState.markets[p.marketIndex].currentStock}`);
     });
 
     // 行動ログ記録（複数市場からの購入）
