@@ -1460,13 +1460,14 @@ html, body {
     .player-area-wrapper {
         flex: 1;
         overflow-y: auto;
+        max-width: 500px;
     }
     .markets-grid-compact { max-width: 100%; }
     .player-area { grid-template-columns: 1fr; }
     .ai-badge { min-width: 85px; }
 
     /* PC版会社盤をコンパクトに */
-    .company-board { padding: 6px; }
+    .company-board { padding: 8px; max-width: 480px; }
     .board-info-bar { gap: 4px; }
     .info-badge { padding: 4px 8px; }
     .info-badge-label { font-size: 10px; }
