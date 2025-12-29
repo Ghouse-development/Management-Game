@@ -1081,8 +1081,7 @@ function applyRiskCard(cardId) {
         case 41: // 各社共通
         case 42:
             executeAllCompaniesCommonPurchase();
-            rowUsed = false;
-            break;
+            return; // モーダルで選択後にprocessCommonPurchaseで処理
         case 43: // ストライキ発生
         case 44:
             company.skipTurns = 1;
@@ -1289,33 +1288,47 @@ function showSpecialServiceModal() {
 // Execute material purchase from special service
 function executeMaterialPurchase() {
     const company = gameState.companies[0];
-    
-    // 購入数量を選択させる
+    const canBuy = [0, 1, 2, 3, 4, 5].map(i => company.cash >= i * 10);
+
     const content = `
-        <div class="form-group">
-            <label class="form-label">材料購入：数量を選択してください</label>
-            <p style="font-size: 12px; color: #666;">特別価格：1個10円（最大5個まで）</p>
-            <p style="font-size: 12px; color: #666;">現在の現金: ¥${company.cash}</p>
-            <p style="font-size: 12px; color: #666;">現在の材料: ${company.materials}個</p>
-            <select id="materialQty" class="form-control">
-                <option value="0">購入しない</option>
-                ${company.cash >= 10 ? '<option value="1">1個（¥10）</option>' : ''}
-                ${company.cash >= 20 ? '<option value="2">2個（¥20）</option>' : ''}
-                ${company.cash >= 30 ? '<option value="3">3個（¥30）</option>' : ''}
-                ${company.cash >= 40 ? '<option value="4">4個（¥40）</option>' : ''}
-                ${company.cash >= 50 ? '<option value="5">5個（¥50）</option>' : ''}
-            </select>
-            <button class="submit-btn" onclick="confirmMaterialPurchase()" style="margin-top: 10px;">購入</button>
+        <div style="text-align: center; margin-bottom: 15px;">
+            <p style="font-size: 14px; color: #4b5563; margin: 5px 0;">特別価格：1個10円（最大5個まで）</p>
+            <p style="font-size: 14px; color: #059669; font-weight: bold;">現金: ¥${company.cash} ｜ 材料: ${company.materials}個</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div onclick="confirmMaterialPurchase(0)" class="qty-card" style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); border: 2px solid #9ca3af; border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 24px; font-weight: bold;">0</div>
+                <div style="font-size: 11px; opacity: 0.8;">購入しない</div>
+            </div>
+            <div onclick="${canBuy[1] ? 'confirmMaterialPurchase(1)' : ''}" class="qty-card" style="background: ${canBuy[1] ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#374151'}; border: 2px solid ${canBuy[1] ? '#4ade80' : '#4b5563'}; border-radius: 10px; padding: 15px; text-align: center; cursor: ${canBuy[1] ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy[1] ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">1</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥10</div>
+            </div>
+            <div onclick="${canBuy[2] ? 'confirmMaterialPurchase(2)' : ''}" class="qty-card" style="background: ${canBuy[2] ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#374151'}; border: 2px solid ${canBuy[2] ? '#4ade80' : '#4b5563'}; border-radius: 10px; padding: 15px; text-align: center; cursor: ${canBuy[2] ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy[2] ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">2</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥20</div>
+            </div>
+            <div onclick="${canBuy[3] ? 'confirmMaterialPurchase(3)' : ''}" class="qty-card" style="background: ${canBuy[3] ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#374151'}; border: 2px solid ${canBuy[3] ? '#4ade80' : '#4b5563'}; border-radius: 10px; padding: 15px; text-align: center; cursor: ${canBuy[3] ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy[3] ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">3</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥30</div>
+            </div>
+            <div onclick="${canBuy[4] ? 'confirmMaterialPurchase(4)' : ''}" class="qty-card" style="background: ${canBuy[4] ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#374151'}; border: 2px solid ${canBuy[4] ? '#4ade80' : '#4b5563'}; border-radius: 10px; padding: 15px; text-align: center; cursor: ${canBuy[4] ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy[4] ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">4</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥40</div>
+            </div>
+            <div onclick="${canBuy[5] ? 'confirmMaterialPurchase(5)' : ''}" class="qty-card" style="background: ${canBuy[5] ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : '#374151'}; border: 2px solid ${canBuy[5] ? '#4ade80' : '#4b5563'}; border-radius: 10px; padding: 15px; text-align: center; cursor: ${canBuy[5] ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy[5] ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">5</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥50</div>
+            </div>
         </div>
     `;
-    
-    showModal('特別サービス - 材料購入', content);
+
+    showModal('🛒 材料購入', content);
 }
 
 // Confirm material purchase from special service
-function confirmMaterialPurchase() {
+function confirmMaterialPurchase(buyQty) {
     const company = gameState.companies[0];
-    const buyQty = parseInt(document.getElementById('materialQty').value || 0);
 
     if (buyQty > 0) {
         const cost = buyQty * 10;
@@ -1337,30 +1350,36 @@ function confirmMaterialPurchase() {
 // Execute ad chip purchase from special service
 function executeAdPurchase() {
     const company = gameState.companies[0];
-    
-    // 購入数量を選択させる
+    const canBuy1 = company.cash >= 20;
+    const canBuy2 = company.cash >= 40;
+
     const content = `
-        <div class="form-group">
-            <label class="form-label">広告チップ購入：数量を選択してください</label>
-            <p style="font-size: 12px; color: #666;">特別価格：1枚20円（最大2枚まで）</p>
-            <p style="font-size: 12px; color: #666;">現在の現金: ¥${company.cash}</p>
-            <p style="font-size: 12px; color: #666;">現在の広告チップ: ${company.chips.advertising || 0}枚</p>
-            <select id="adChipQty" class="form-control">
-                <option value="0">購入しない</option>
-                ${company.cash >= 20 ? '<option value="1">1枚（¥20）</option>' : ''}
-                ${company.cash >= 40 ? '<option value="2">2枚（¥40）</option>' : ''}
-            </select>
-            <button class="submit-btn" onclick="confirmAdPurchase()" style="margin-top: 10px;">購入</button>
+        <div style="text-align: center; margin-bottom: 15px;">
+            <p style="font-size: 14px; color: #4b5563; margin: 5px 0;">特別価格：1枚20円（最大2枚まで）</p>
+            <p style="font-size: 14px; color: #059669; font-weight: bold;">現金: ¥${company.cash} ｜ 広告: ${company.chips.advertising || 0}枚</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div onclick="confirmAdPurchase(0)" class="qty-card" style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); border: 2px solid #9ca3af; border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 24px; font-weight: bold;">0</div>
+                <div style="font-size: 11px; opacity: 0.8;">購入しない</div>
+            </div>
+            <div onclick="${canBuy1 ? 'confirmAdPurchase(1)' : ''}" class="qty-card" style="background: ${canBuy1 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#374151'}; border: 2px solid ${canBuy1 ? '#fbbf24' : '#4b5563'}; border-radius: 10px; padding: 20px; text-align: center; cursor: ${canBuy1 ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy1 ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">1</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥20</div>
+            </div>
+            <div onclick="${canBuy2 ? 'confirmAdPurchase(2)' : ''}" class="qty-card" style="background: ${canBuy2 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#374151'}; border: 2px solid ${canBuy2 ? '#fbbf24' : '#4b5563'}; border-radius: 10px; padding: 20px; text-align: center; cursor: ${canBuy2 ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy2 ? '1' : '0.5'};">
+                <div style="font-size: 24px; font-weight: bold;">2</div>
+                <div style="font-size: 11px; opacity: 0.8;">¥40</div>
+            </div>
         </div>
     `;
-    
-    showModal('特別サービス - 広告チップ購入', content);
+
+    showModal('📢 広告チップ購入', content);
 }
 
 // Confirm ad chip purchase from special service
-function confirmAdPurchase() {
+function confirmAdPurchase(buyQty) {
     const company = gameState.companies[0];
-    const buyQty = parseInt(document.getElementById('adChipQty').value || 0);
 
     if (buyQty > 0) {
         const cost = buyQty * 20;
@@ -1829,30 +1848,57 @@ function executeHiring(type) {
 // Execute common purchase for all companies (各社共通)
 function executeAllCompaniesCommonPurchase() {
     const triggerCompany = gameState.companies[gameState.currentPlayerIndex];
+    const player = gameState.companies[0];
+    const canBuy1 = player.cash >= 12;
+    const canBuy2 = player.cash >= 24;
+    const canBuy3 = player.cash >= 36;
+
     const content = `
-        <div class="risk-display">
-            <div class="risk-title">${triggerCompany.name}が「各社共通」を引きました</div>
-            <div class="risk-description">全社が12円で3個まで材料を購入できます<br>（まず市場から、不足分は海外から）</div>
+        <div class="risk-display" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-color: #a78bfa;">
+            <div class="risk-badge">📦 各社共通</div>
+            <div class="risk-title">${triggerCompany.name}が引きました</div>
+            <div class="risk-description">全社が¥12で3個まで材料を購入できます</div>
         </div>
-        <div class="form-group" style="margin-top: 20px;">
-            <label class="form-label">あなたの購入数量:</label>
-            <p>現在の現金: ¥${gameState.companies[0].cash}</p>
-            <select id="playerQuantity" class="form-control">
-                <option value="0">購入しない</option>
-                <option value="1">1個（¥12）</option>
-                <option value="2">2個（¥24）</option>
-                <option value="3">3個（¥36）</option>
-            </select>
+        <div style="text-align: center; margin: 15px 0; color: #4ade80; font-weight: bold;">
+            💰 現金: ¥${player.cash}　　📦 材料: ${player.materials}個
         </div>
-        <button class="submit-btn" onclick="processCommonPurchase()">決定</button>
+        <p style="text-align: center; margin-bottom: 10px; color: #666;">購入する数量をタップしてください</p>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            <div onclick="selectCommonPurchase(0)" class="qty-card" style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); border: 2px solid #9ca3af; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; color: white;">
+                <div style="font-size: 24px;">🚫</div>
+                <div style="font-size: 14px; font-weight: bold;">なし</div>
+                <div style="font-size: 11px; color: #d1d5db;">¥0</div>
+            </div>
+            <div onclick="${canBuy1 ? 'selectCommonPurchase(1)' : ''}" class="qty-card" style="background: ${canBuy1 ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : '#374151'}; border: 2px solid ${canBuy1 ? '#a78bfa' : '#4b5563'}; border-radius: 10px; padding: 12px; text-align: center; cursor: ${canBuy1 ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy1 ? '1' : '0.5'};">
+                <div style="font-size: 24px;">📦</div>
+                <div style="font-size: 14px; font-weight: bold;">1個</div>
+                <div style="font-size: 11px; color: #d1d5db;">¥12</div>
+            </div>
+            <div onclick="${canBuy2 ? 'selectCommonPurchase(2)' : ''}" class="qty-card" style="background: ${canBuy2 ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : '#374151'}; border: 2px solid ${canBuy2 ? '#a78bfa' : '#4b5563'}; border-radius: 10px; padding: 12px; text-align: center; cursor: ${canBuy2 ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy2 ? '1' : '0.5'};">
+                <div style="font-size: 24px;">📦📦</div>
+                <div style="font-size: 14px; font-weight: bold;">2個</div>
+                <div style="font-size: 11px; color: #d1d5db;">¥24</div>
+            </div>
+            <div onclick="${canBuy3 ? 'selectCommonPurchase(3)' : ''}" class="qty-card" style="background: ${canBuy3 ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : '#374151'}; border: 2px solid ${canBuy3 ? '#a78bfa' : '#4b5563'}; border-radius: 10px; padding: 12px; text-align: center; cursor: ${canBuy3 ? 'pointer' : 'not-allowed'}; color: white; opacity: ${canBuy3 ? '1' : '0.5'};">
+                <div style="font-size: 24px;">📦📦📦</div>
+                <div style="font-size: 14px; font-weight: bold;">3個</div>
+                <div style="font-size: 11px; color: #d1d5db;">¥36</div>
+            </div>
+        </div>
     `;
-    
+
     showModal('各社共通購入', content);
+}
+
+// 各社共通購入の数量選択
+function selectCommonPurchase(qty) {
+    window.selectedCommonQty = qty;
+    processCommonPurchase();
 }
 
 // Process common purchase
 function processCommonPurchase() {
-    const playerQty = parseInt(document.getElementById('playerQuantity').value || 0);
+    const playerQty = window.selectedCommonQty || 0;
     let purchaseLog = [];
     let playerPurchased = false;  // プレイヤーが購入したか追跡
 
@@ -2583,20 +2629,20 @@ function showProductionModal() {
             <div style="background: linear-gradient(180deg, #faf5ff 0%, #f3e8ff 100%); border-radius: 10px; padding: 12px; border: 2px solid #9b59b6;">
                 <div style="font-size: 12px; font-weight: bold; color: #7c3aed; margin-bottom: 8px; text-align: center;">🔧 材料→仕掛品</div>
                 <div style="font-size: 10px; color: #6b7280; text-align: center; margin-bottom: 5px;">（¥1/個）</div>
-                <select id="matToWip" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;">
-                    ${Array(Math.min(mfgCapacity, company.materials) + 1).fill(0).map((_, i) =>
-                        `<option value="${i}" ${i === Math.min(mfgCapacity, company.materials) ? 'selected' : ''}>${i}個</option>`
-                    ).join('')}
-                </select>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button type="button" onclick="adjustProduction('matToWip', -1, ${Math.min(mfgCapacity, company.materials)})" class="stepper-btn" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #7c3aed; color: white; font-size: 20px; font-weight: bold; cursor: pointer;">−</button>
+                    <input type="number" id="matToWip" value="${Math.min(mfgCapacity, company.materials)}" min="0" max="${Math.min(mfgCapacity, company.materials)}" readonly style="width: 60px; height: 40px; border-radius: 8px; border: 2px solid #9b59b6; font-size: 22px; font-weight: bold; text-align: center; background: white; color: #7c3aed;">
+                    <button type="button" onclick="adjustProduction('matToWip', 1, ${Math.min(mfgCapacity, company.materials)})" class="stepper-btn" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #7c3aed; color: white; font-size: 20px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
             </div>
             <div style="background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%); border-radius: 10px; padding: 12px; border: 2px solid #6366f1;">
                 <div style="font-size: 12px; font-weight: bold; color: #4f46e5; margin-bottom: 8px; text-align: center;">📦 仕掛品→製品</div>
                 <div style="font-size: 10px; color: #6b7280; text-align: center; margin-bottom: 5px;">（¥1/個）</div>
-                <select id="wipToProd" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;">
-                    ${Array(Math.min(mfgCapacity, company.wip) + 1).fill(0).map((_, i) =>
-                        `<option value="${i}" ${i === Math.min(mfgCapacity, company.wip) ? 'selected' : ''}>${i}個</option>`
-                    ).join('')}
-                </select>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button type="button" onclick="adjustProduction('wipToProd', -1, ${Math.min(mfgCapacity, company.wip)})" class="stepper-btn" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #4f46e5; color: white; font-size: 20px; font-weight: bold; cursor: pointer;">−</button>
+                    <input type="number" id="wipToProd" value="${Math.min(mfgCapacity, company.wip)}" min="0" max="${Math.min(mfgCapacity, company.wip)}" readonly style="width: 60px; height: 40px; border-radius: 8px; border: 2px solid #6366f1; font-size: 22px; font-weight: bold; text-align: center; background: white; color: #4f46e5;">
+                    <button type="button" onclick="adjustProduction('wipToProd', 1, ${Math.min(mfgCapacity, company.wip)})" class="stepper-btn" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #4f46e5; color: white; font-size: 20px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
             </div>
         </div>
 
@@ -2613,7 +2659,7 @@ function showProductionModal() {
     showModal('🏭 完成・投入', content);
 
     // Update cost display
-    const updateCost = () => {
+    window.updateProductionCost = () => {
         const matToWip = parseInt(document.getElementById('matToWip').value) || 0;
         const wipToProd = parseInt(document.getElementById('wipToProd').value) || 0;
         const cost = matToWip + wipToProd;
@@ -2621,11 +2667,39 @@ function showProductionModal() {
     };
 
     // Set initial cost display
-    updateCost();
+    window.updateProductionCost();
+}
 
-    document.getElementById('matToWip').addEventListener('change', updateCost);
-    document.getElementById('wipToProd').addEventListener('change', updateCost);
-    updateCost();
+// 製造ステッパー調整
+function adjustProduction(id, delta, max) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    const current = parseInt(input.value) || 0;
+    const newVal = Math.max(0, Math.min(max, current + delta));
+    input.value = newVal;
+    if (window.updateProductionCost) window.updateProductionCost();
+}
+
+// 汎用ステッパー調整
+function adjustStepper(id, delta, min, max) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    const current = parseInt(input.value) || 0;
+    const newVal = Math.max(min, Math.min(max, current + delta));
+    input.value = newVal;
+}
+
+// 購入ステッパー調整（コスト表示付き）
+function adjustBuyStepper(delta, max, price) {
+    const input = document.getElementById('buyQuantity');
+    if (!input) return;
+    const current = parseInt(input.value) || 0;
+    const newVal = Math.max(1, Math.min(max, current + delta));
+    input.value = newVal;
+    const costDisplay = document.getElementById('buyCostDisplay');
+    if (costDisplay) {
+        costDisplay.textContent = `合計: ¥${newVal * price}`;
+    }
 }
 
 // Production
@@ -3335,7 +3409,10 @@ function showSaleConfirmModal(marketIndex) {
     const market = gameState.markets[marketIndex];
     const company = gameState.companies[0];
     const salesCapacity = getSalesCapacity(company);
-    const maxQuantity = Math.min(salesCapacity, company.products, market.maxStock - market.currentStock);
+    // 海外のみ上限なし、東京含む他市場は市場容量制限あり
+    const isOverseas = market.name === '海外';
+    const marketLimit = isOverseas ? Infinity : (market.maxStock - market.currentStock);
+    const maxQuantity = Math.min(salesCapacity, company.products, marketLimit);
     const defaultPrice = market.sellPrice - 4;
 
     const content = `
@@ -3369,17 +3446,21 @@ function showSaleConfirmModal(marketIndex) {
 
         <div style="display: grid; grid-template-columns: 1fr ${market.needsBid ? '1fr' : ''}; gap: 12px;">
             <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">📦 販売数量</label>
-                <select id="quantity" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;">
-                    ${maxQuantity > 0 ? Array(maxQuantity).fill(0).map((_, i) =>
-                        `<option value="${i+1}" ${i+1 === maxQuantity ? 'selected' : ''}>${i+1}個</option>`
-                    ).join('') : '<option value="0">販売不可</option>'}
-                </select>
+                <label class="form-label" style="text-align: center;">📦 販売数量</label>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button type="button" onclick="adjustStepper('quantity', -1, 1, ${maxQuantity})" class="stepper-btn" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #2563eb; color: white; font-size: 22px; font-weight: bold; cursor: pointer;">−</button>
+                    <input type="number" id="quantity" value="${maxQuantity > 0 ? maxQuantity : 0}" min="${maxQuantity > 0 ? 1 : 0}" max="${maxQuantity}" readonly style="width: 65px; height: 44px; border-radius: 8px; border: 2px solid #2563eb; font-size: 24px; font-weight: bold; text-align: center; background: white; color: #1e40af;">
+                    <button type="button" onclick="adjustStepper('quantity', 1, 1, ${maxQuantity})" class="stepper-btn" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #2563eb; color: white; font-size: 22px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
             </div>
             ${market.needsBid ? `
             <div class="form-group" style="margin-bottom: 0;" id="bidPriceGroup">
-                <label class="form-label">💵 入札価格</label>
-                <input type="number" id="bidPrice" class="form-control" min="1" max="${market.sellPrice}" value="${defaultPrice}" style="font-size: 18px; text-align: center; font-weight: bold;">
+                <label class="form-label" style="text-align: center;">💵 入札価格</label>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button type="button" onclick="adjustStepper('bidPrice', -1, 1, ${market.sellPrice})" class="stepper-btn" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #059669; color: white; font-size: 22px; font-weight: bold; cursor: pointer;">−</button>
+                    <input type="number" id="bidPrice" value="${defaultPrice}" min="1" max="${market.sellPrice}" readonly style="width: 65px; height: 44px; border-radius: 8px; border: 2px solid #059669; font-size: 24px; font-weight: bold; text-align: center; background: white; color: #047857;">
+                    <button type="button" onclick="adjustStepper('bidPrice', 1, 1, ${market.sellPrice})" class="stepper-btn" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #059669; color: white; font-size: 22px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
             </div>
             ` : ''}
         </div>
@@ -3440,12 +3521,15 @@ function showBuyConfirmModal(marketIndex) {
         </div>
 
         <div class="form-group">
-            <label class="form-label">📦 購入数量</label>
-            <select id="buyQuantity" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;">
-                ${actualMax > 0 ? Array(actualMax).fill(0).map((_, i) =>
-                    `<option value="${i+1}" ${i+1 === Math.min(actualMax, 3) ? 'selected' : ''}>${i+1}個（¥${(i+1) * market.buyPrice}）</option>`
-                ).join('') : '<option value="0">購入不可</option>'}
-            </select>
+            <label class="form-label" style="text-align: center;">📦 購入数量</label>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <button type="button" onclick="adjustBuyStepper(-1, ${actualMax}, ${market.buyPrice})" class="stepper-btn" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #22c55e; color: white; font-size: 22px; font-weight: bold; cursor: pointer;">−</button>
+                <input type="number" id="buyQuantity" value="${actualMax > 0 ? Math.min(actualMax, 3) : 0}" min="${actualMax > 0 ? 1 : 0}" max="${actualMax}" readonly style="width: 65px; height: 44px; border-radius: 8px; border: 2px solid #22c55e; font-size: 24px; font-weight: bold; text-align: center; background: white; color: #166534;">
+                <button type="button" onclick="adjustBuyStepper(1, ${actualMax}, ${market.buyPrice})" class="stepper-btn" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #22c55e; color: white; font-size: 22px; font-weight: bold; cursor: pointer;">+</button>
+            </div>
+            <div id="buyCostDisplay" style="text-align: center; margin-top: 8px; font-size: 16px; color: #059669; font-weight: bold;">
+                合計: ¥${Math.min(actualMax, 3) * market.buyPrice}
+            </div>
         </div>
 
         <input type="hidden" id="buyMarketSelect" value="${marketIndex}">
@@ -3542,18 +3626,26 @@ function processSale() {
         return;  // Exit here, will continue after all bids collected
     } else {
         // 入札不要（東京・海外）
-        const actualQty = Math.min(quantity, market.maxStock - market.currentStock);
+        const isOverseas = market.name === '海外';
+        // 海外は無制限、東京は市場容量制限あり
+        const actualQty = isOverseas ? quantity : Math.min(quantity, market.maxStock - market.currentStock);
+
         if (actualQty > 0) {
             company.cash += market.sellPrice * actualQty;
             company.products -= actualQty;
             company.totalSales += market.sellPrice * actualQty;
             company.totalSoldQuantity = (company.totalSoldQuantity || 0) + actualQty;
-            market.currentStock += actualQty;
-            
+            // 海外以外は市場在庫を増やす（販売枠の消費）
+            if (!isOverseas) {
+                market.currentStock += actualQty;
+            }
+
             closeModal();
             updateDisplay();
             alert(`${market.name}に製品${actualQty}個を¥${market.sellPrice * actualQty}で販売しました`);
             endTurn();
+        } else {
+            alert('この市場はこれ以上販売できません');
         }
     }
 }
@@ -3616,22 +3708,20 @@ function showHireModal() {
             <div style="background: linear-gradient(180deg, #f5deb3 0%, #deb887 100%); border-radius: 10px; padding: 15px; border: 2px solid #a08060; text-align: center;">
                 <div style="font-size: 28px; margin-bottom: 5px;">👷</div>
                 <div style="font-size: 14px; font-weight: bold; color: #5d4037; margin-bottom: 8px;">ワーカー</div>
-                <select id="workerCount" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;">
-                    <option value="0">0人</option>
-                    <option value="1">1人</option>
-                    <option value="2">2人</option>
-                    <option value="3">3人</option>
-                </select>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <button type="button" onclick="adjustHire('workerCount', -1)" class="stepper-btn" style="width: 38px; height: 38px; border-radius: 50%; border: none; background: #5d4037; color: white; font-size: 20px; font-weight: bold; cursor: pointer;">−</button>
+                    <input type="number" id="workerCount" value="0" min="0" max="3" readonly style="width: 50px; height: 38px; border-radius: 8px; border: 2px solid #a08060; font-size: 20px; font-weight: bold; text-align: center; background: white; color: #5d4037;">
+                    <button type="button" onclick="adjustHire('workerCount', 1)" class="stepper-btn" style="width: 38px; height: 38px; border-radius: 50%; border: none; background: #5d4037; color: white; font-size: 20px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
             </div>
             <div style="background: linear-gradient(180deg, #ff6b6b 0%, #ee5a5a 100%); border-radius: 10px; padding: 15px; border: 2px solid #c44; text-align: center;">
                 <div style="font-size: 28px; margin-bottom: 5px;">💼</div>
                 <div style="font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 8px;">セールスマン</div>
-                <select id="salesmanCount" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;">
-                    <option value="0">0人</option>
-                    <option value="1">1人</option>
-                    <option value="2">2人</option>
-                    <option value="3">3人</option>
-                </select>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <button type="button" onclick="adjustHire('salesmanCount', -1)" class="stepper-btn" style="width: 38px; height: 38px; border-radius: 50%; border: none; background: #fff; color: #c44; font-size: 20px; font-weight: bold; cursor: pointer;">−</button>
+                    <input type="number" id="salesmanCount" value="0" min="0" max="3" readonly style="width: 50px; height: 38px; border-radius: 8px; border: 2px solid #fff; font-size: 20px; font-weight: bold; text-align: center; background: white; color: #c44;">
+                    <button type="button" onclick="adjustHire('salesmanCount', 1)" class="stepper-btn" style="width: 38px; height: 38px; border-radius: 50%; border: none; background: #fff; color: #c44; font-size: 20px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
             </div>
         </div>
 
@@ -3654,26 +3744,33 @@ function showHireModal() {
     showModal('👥 採用', content);
 
     // Update cost display
-    const updateCost = () => {
+    window.updateHireCost = () => {
         const workers = parseInt(document.getElementById('workerCount').value) || 0;
         const salesmen = parseInt(document.getElementById('salesmanCount').value) || 0;
         const total = workers + salesmen;
-
-        if (total > 3) {
-            alert('合計3名までです');
-            document.getElementById('workerCount').value = 0;
-            document.getElementById('salesmanCount').value = 0;
-            return;
-        }
-
         const cost = total * 5;
         document.getElementById('totalHires').textContent = `${total}人`;
         document.getElementById('totalCost').textContent = `¥${cost}`;
     };
 
-    document.getElementById('workerCount').addEventListener('change', updateCost);
-    document.getElementById('salesmanCount').addEventListener('change', updateCost);
-    updateCost();
+    window.updateHireCost();
+}
+
+// 雇用ステッパー調整
+function adjustHire(id, delta) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    const current = parseInt(input.value) || 0;
+    const workers = parseInt(document.getElementById('workerCount').value) || 0;
+    const salesmen = parseInt(document.getElementById('salesmanCount').value) || 0;
+    const currentTotal = workers + salesmen;
+
+    // 合計3名制限のチェック
+    if (delta > 0 && currentTotal >= 3) return;
+
+    const newVal = Math.max(0, Math.min(3, current + delta));
+    input.value = newVal;
+    if (window.updateHireCost) window.updateHireCost();
 }
 
 // Hire
@@ -5756,19 +5853,27 @@ function showChipModal(specificType = null) {
     }
 
     content += `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
-            <div style="background: #f1f5f9; border-radius: 10px; padding: 12px;">
-                <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">購入数</div>
-                <select id="quantity" class="form-control" style="font-size: 18px; text-align: center; font-weight: bold;" onchange="updateChipCost()">
-                    <option value="1">1個</option>
-                    <option value="2">2個</option>
-                    <option value="3">3個</option>
-                </select>
+        <div style="margin-bottom: 15px;">
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; text-align: center;">購入数を選択</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <div onclick="selectChipQty(1)" id="chipQty-1" class="qty-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: 3px solid #60a5fa; border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; color: white; transition: all 0.2s;">
+                    <div style="font-size: 28px; font-weight: bold;">1</div>
+                    <div style="font-size: 11px; opacity: 0.9;">個</div>
+                </div>
+                <div onclick="selectChipQty(2)" id="chipQty-2" class="qty-card" style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); border: 3px solid #9ca3af; border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; color: white; transition: all 0.2s;">
+                    <div style="font-size: 28px; font-weight: bold;">2</div>
+                    <div style="font-size: 11px; opacity: 0.9;">個</div>
+                </div>
+                <div onclick="selectChipQty(3)" id="chipQty-3" class="qty-card" style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); border: 3px solid #9ca3af; border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; color: white; transition: all 0.2s;">
+                    <div style="font-size: 28px; font-weight: bold;">3</div>
+                    <div style="font-size: 11px; opacity: 0.9;">個</div>
+                </div>
             </div>
-            <div style="background: #f1f5f9; border-radius: 10px; padding: 12px; text-align: center;">
-                <div style="font-size: 12px; color: #64748b;">合計金額</div>
-                <div id="chipTotalCost" style="font-size: 24px; font-weight: bold; color: #dc2626;">¥${period === 2 ? 20 : 40}</div>
-            </div>
+            <input type="hidden" id="quantity" value="1">
+        </div>
+        <div style="background: #f1f5f9; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 15px;">
+            <div style="font-size: 12px; color: #64748b;">合計金額</div>
+            <div id="chipTotalCost" style="font-size: 28px; font-weight: bold; color: #dc2626;">¥${period === 2 ? 20 : 40}</div>
         </div>
 
         <button class="submit-btn" onclick="buyChips()" style="width: 100%;">
@@ -5808,6 +5913,27 @@ function selectPurchaseType(type) {
         if (el) {
             el.style.transform = t === type ? 'scale(1.03)' : 'scale(1)';
             el.style.boxShadow = t === type ? '0 0 15px rgba(251,191,36,0.5)' : 'none';
+        }
+    });
+    updateChipCost();
+}
+
+// チップ購入数量を選択
+function selectChipQty(qty) {
+    document.getElementById('quantity').value = qty;
+
+    [1, 2, 3].forEach(q => {
+        const el = document.getElementById(`chipQty-${q}`);
+        if (el) {
+            if (q === qty) {
+                el.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                el.style.borderColor = '#60a5fa';
+                el.style.transform = 'scale(1.05)';
+            } else {
+                el.style.background = 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+                el.style.borderColor = '#9ca3af';
+                el.style.transform = 'scale(1)';
+            }
         }
     });
     updateChipCost();
@@ -7736,14 +7862,60 @@ function executeDefaultMaterialPurchase(company, targetQty) {
     const minBuyQty = gameState.currentPeriod >= 3 ? Math.ceil(mfgCapacity * 0.7) : 2;
     const actualTargetQty = gameState.currentPeriod >= 3 ? mfgCapacity : targetQty;
 
+    // 行数最多かチェック（分散購入の可否判定）
+    const companyRow = company.currentRow || 1;
+    const maxRow = Math.max(...gameState.companies.map(c => c.currentRow || 1));
+    const canDistribute = companyRow < maxRow;
+
     const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed)
         .sort((a, b) => a.buyPrice - b.buyPrice);
 
     if (availableMarkets.length > 0) {
+        if (canDistribute) {
+            // 分散購入可能：まず購入可能数をシミュレート
+            let simulatedTotal = 0;
+            let simulatedCash = company.cash;
+            let purchases = [];
+
+            for (const market of availableMarkets) {
+                if (simulatedTotal >= actualTargetQty) break;
+                const maxAffordable = Math.floor(simulatedCash / market.buyPrice);
+                const buyQty = Math.min(actualTargetQty - simulatedTotal, market.currentStock, maxAffordable);
+
+                if (buyQty > 0) {
+                    simulatedCash -= market.buyPrice * buyQty;
+                    simulatedTotal += buyQty;
+                    purchases.push({ market, qty: buyQty, cost: market.buyPrice * buyQty });
+                }
+            }
+
+            // 7割以上買えるなら実行
+            if (simulatedTotal >= minBuyQty && simulatedTotal >= 2) {
+                let totalCost = 0;
+                let purchaseDetails = [];
+
+                for (const p of purchases) {
+                    company.cash -= p.cost;
+                    company.materials += p.qty;
+                    company.totalMaterialCost += p.cost;
+                    p.market.currentStock -= p.qty;
+                    totalCost += p.cost;
+                    purchaseDetails.push(`${p.market.name}:${p.qty}`);
+                }
+
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, '材料仕入', '📦', purchaseDetails.join('、'), [
+                    { label: '購入数', value: `${simulatedTotal}個` },
+                    { label: '支払', value: `¥${totalCost}` }
+                ]);
+                return;
+            }
+        }
+
+        // 単一市場購入（行数最多または分散で7割未達の場合）
         const market = availableMarkets[0];
         const buyQty = Math.min(actualTargetQty, market.currentStock, Math.floor(company.cash / market.buyPrice));
 
-        // 7割に満たない場合は購入しない（行の無駄遣い防止）
         if (buyQty >= minBuyQty && buyQty >= 2) {
             const cost = market.buyPrice * buyQty;
             company.cash -= cost;
