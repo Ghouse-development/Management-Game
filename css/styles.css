@@ -810,6 +810,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 /* F（固定費）内訳パネル */
 /* ============================================ */
 .fixed-cost-panel {
+    display: none; /* F内訳は初期非表示、Fボタンクリックでモーダル表示 */
     background: linear-gradient(135deg, #7c2d12 0%, #9a3412 100%);
     border-radius: 12px;
     padding: 12px;
