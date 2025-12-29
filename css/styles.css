@@ -708,20 +708,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         inset 0 1px 1px rgba(255,255,255,0.3);
 }
 
-/* 各市場の位置と色（物理ボード配置 - 六角形内に収まるよう調整） */
-.market-tile.overseas { top: 8%; left: 50%; transform: translateX(-50%); }
+/* 各市場の位置と色（物理ボード配置 - 六角形内に収まるよう再調整） */
+/* 六角形: 左7%～右93%, 上部25%～下部75%が主要エリア */
+.market-tile.overseas { top: 5%; left: 50%; transform: translateX(-50%); }
 .market-tile.overseas .market-color-band { background: linear-gradient(180deg, #1e5aa8 0%, #1a4d90 100%); }
-.market-tile.sendai { top: 25%; left: 12%; }
+.market-tile.sendai { top: 20%; left: 15%; }
 .market-tile.sendai .market-color-band { background: linear-gradient(180deg, #0d8a6a 0%, #0a7058 100%); }
-.market-tile.tokyo { top: 25%; left: 60%; }
+.market-tile.tokyo { top: 20%; right: 15%; left: auto; }
 .market-tile.tokyo .market-color-band { background: linear-gradient(180deg, #0d8a6a 0%, #0a7058 100%); }
-.market-tile.sapporo { top: 45%; left: 10%; }
+.market-tile.sapporo { top: 40%; left: 8%; }
 .market-tile.sapporo .market-color-band { background: linear-gradient(180deg, #0d8a6a 0%, #0a7058 100%); }
-.market-tile.nagoya { top: 45%; left: 62%; }
+.market-tile.nagoya { top: 40%; right: 8%; left: auto; }
 .market-tile.nagoya .market-color-band { background: linear-gradient(180deg, #0d8a6a 0%, #0a7058 100%); }
-.market-tile.osaka { top: 65%; left: 18%; }
+.market-tile.osaka { top: 60%; left: 15%; }
 .market-tile.osaka .market-color-band { background: linear-gradient(180deg, #0d8a6a 0%, #0a7058 100%); }
-.market-tile.fukuoka { top: 65%; left: 54%; }
+.market-tile.fukuoka { top: 60%; right: 15%; left: auto; }
 .market-tile.fukuoka .market-color-band { background: linear-gradient(180deg, #0d8a6a 0%, #0a7058 100%); }
 .market-tile.closed { opacity: 0.6; }
 .market-tile.closed .market-color-band { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; }
