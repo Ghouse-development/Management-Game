@@ -519,67 +519,45 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .chip.insurance { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
 
 /* ============================================ */
-/* 市場盤 - 物理MGボード完全再現 */
+/* 市場盤 - 全7市場を確実に表示 */
 /* ============================================ */
 .markets-board {
     background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
-    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
-    padding: 0;
-    min-height: 440px;
+    border-radius: 20px;
+    padding: 15px;
+    min-height: 380px;
     width: 100%;
-    max-width: 460px;
+    max-width: 420px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     box-shadow:
-        0 20px 50px rgba(0,0,0,0.9),
-        inset 0 0 30px rgba(0,0,0,0.8);
+        0 10px 30px rgba(0,0,0,0.8),
+        inset 0 2px 10px rgba(255,255,255,0.05);
     position: relative;
-    border: none;
-}
-/* 黒いフレーム効果 */
-.markets-board::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
-    background:
-        linear-gradient(180deg, rgba(60,60,60,0.3) 0%, rgba(20,20,20,0.1) 50%, rgba(0,0,0,0.3) 100%);
-    pointer-events: none;
-    z-index: 1;
+    border: 3px solid #333;
 }
 .markets-inner {
     position: relative;
     width: 100%;
-    height: 100%;
-    min-height: 420px;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
 }
 
-/* 中央のカードデッキエリア（赤い円形 - 実物再現） */
+/* カードデッキエリア - 市場盤タイトルとして表示 */
 .card-deck-area {
-    position: absolute;
-    width: 100px;
-    height: 100px;
-    background:
-        radial-gradient(circle at 40% 35%, #8b2020 0%, #6b1515 40%, #4a0e0e 70%, #2d0808 100%);
-    border-radius: 50%;
-    border: 5px solid #1a0505;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10;
-    box-shadow:
-        inset 0 8px 20px rgba(0,0,0,0.7),
-        inset 0 -4px 10px rgba(100,30,30,0.3),
-        0 6px 15px rgba(0,0,0,0.6);
+    gap: 10px;
+    padding: 8px;
+    margin-bottom: 5px;
 }
 .deck-cards {
-    width: 58px;
-    height: 72px;
+    width: 50px;
+    height: 62px;
     background:
         linear-gradient(135deg, #8ecfaa 0%, #6ab98d 30%, #4a9a70 70%, #3a8560 100%);
     border-radius: 4px;
@@ -587,28 +565,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 9px;
+    font-size: 8px;
     font-weight: bold;
     color: #1a4030;
     box-shadow:
-        3px 3px 8px rgba(0,0,0,0.5),
+        2px 2px 6px rgba(0,0,0,0.5),
         inset 0 1px 2px rgba(255,255,255,0.3);
-    transform: rotate(-8deg);
-    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+    transform: rotate(-5deg);
 }
 
-/* 市場タイルコンテナ */
+/* 市場タイルコンテナ - 2列グリッドで販売上限価格順に表示 */
 .markets-ring {
     position: relative;
-    width: 380px;
-    height: 380px;
+    width: 100%;
+    max-width: 360px;
     margin: auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 10px;
 }
 
-/* 市場タイル - ポケット型デザイン（物理盤完全再現） */
+/* 市場タイル - グリッドアイテムとして配置 */
 .market-tile {
-    position: absolute !important;
-    width: 95px;
+    position: relative !important;
+    width: 100%;
+    max-width: 110px;
     padding: 0;
     text-align: center;
     border-radius: 10px;
@@ -620,13 +602,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         inset 0 4px 12px rgba(0,0,0,0.6),
         inset 0 -2px 6px rgba(255,255,255,0.05),
         0 3px 8px rgba(0,0,0,0.5);
+    justify-self: center;
 }
 .market-tile:hover {
-    transform: scale(1.03);
+    transform: scale(1.05);
     box-shadow:
         inset 0 4px 12px rgba(0,0,0,0.6),
         0 6px 20px rgba(0,0,0,0.6),
-        0 0 15px rgba(255,255,255,0.1);
+        0 0 15px rgba(255,255,255,0.2);
 }
 
 /* 色帯（外側の色付きエリア - 価格表示部分） */
@@ -720,52 +703,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         inset 0 1px 1px rgba(255,255,255,0.3);
 }
 
-/* 各市場の位置と色（物理ボード配置 - 六角形内に完全に収まるよう配置） */
-/* 六角形の可視領域を考慮し、タイルが切れないよう中央寄りに配置 */
-.market-tile.overseas {
-    top: 12%;
-    left: 50%;
-    transform: translateX(-50%);
-}
+/* 各市場の色（グリッド配置なので位置指定は不要） */
+/* グリッド順: 仙台, 海外, 札幌 / 福岡, DECK, 名古屋 / 大阪, 東京, - */
 .market-tile.overseas .market-color-band { background: linear-gradient(180deg, #1e5aa8 0%, #1a4d90 100%); }
-
-.market-tile.sendai {
-    top: 24%;
-    left: 18%;
-}
 .market-tile.sendai .market-color-band { background: linear-gradient(180deg, #16a34a 0%, #15803d 100%); }
-
-.market-tile.tokyo {
-    top: 24%;
-    right: 18%;
-    left: auto;
-}
 .market-tile.tokyo .market-color-band { background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%); }
-
-.market-tile.sapporo {
-    top: 44%;
-    left: 10%;
-}
 .market-tile.sapporo .market-color-band { background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%); }
-
-.market-tile.nagoya {
-    top: 44%;
-    right: 10%;
-    left: auto;
-}
 .market-tile.nagoya .market-color-band { background: linear-gradient(180deg, #eab308 0%, #ca8a04 100%); }
-
-.market-tile.osaka {
-    top: 64%;
-    left: 18%;
-}
 .market-tile.osaka .market-color-band { background: linear-gradient(180deg, #f97316 0%, #ea580c 100%); }
-
-.market-tile.fukuoka {
-    top: 64%;
-    right: 18%;
-    left: auto;
-}
 .market-tile.fukuoka .market-color-band { background: linear-gradient(180deg, #a855f7 0%, #9333ea 100%); }
 .market-tile.closed { opacity: 0.6; }
 .market-tile.closed .market-color-band { background: linear-gradient(180deg, #4b5563 0%, #374151 100%) !important; }

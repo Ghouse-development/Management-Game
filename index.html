@@ -1477,7 +1477,10 @@ function applyRiskCard(cardId) {
                 company.cash += revenue;
                 company.products -= sellQty;
                 company.totalSales += revenue;
-                alert(`研究開発成功！\n青チップ${company.chips.research}枚で${sellQty}個を¥32で販売\n入金額: ¥${revenue}（仕入れ不可）`);
+                // 100個保存: 販売した製品を海外市場に戻す
+                const overseasMarket = gameState.markets.find(m => m.name === '海外');
+                if (overseasMarket) overseasMarket.currentStock += sellQty;
+                alert(`研究開発成功！\n青チップ${company.chips.research}枚で${sellQty}個を¥32で販売\n入金額: ¥${revenue}`);
             } else {
                 alert('研究開発成功！\n（青チップまたは製品がないため効果なし）');
                 rowUsed = false;
@@ -2790,7 +2793,20 @@ function renderFixedCostBreakdown(company) {
     });
 
     const extraLabor = company.extraLaborCost || 0;
-    const totalFixed = salaryCost + depreciationCost + extraLabor;
+
+    // コンピュータ・保険チップコスト
+    const computerCost = (company.chips?.computer || 0) * 20;
+    const insuranceCost = (company.chips?.insurance || 0) * 5;
+
+    // 戦略チップコスト（2期は各種1枚×20円のみ）
+    let chipCost = 0;
+    if (period === 2) {
+        chipCost = Math.min(company.chips?.research || 0, 1) * 20 +
+                   Math.min(company.chips?.education || 0, 1) * 20 +
+                   Math.min(company.chips?.advertising || 0, 1) * 20;
+    }
+
+    const totalFixed = salaryCost + depreciationCost + computerCost + insuranceCost + chipCost + extraLabor;
 
     const html = `
         <div class="cost-item"><span>給料(機械×${unitCost})</span><span>¥${machineCost}</span></div>
@@ -2798,6 +2814,9 @@ function renderFixedCostBreakdown(company) {
         <div class="cost-item"><span>給料(S${effectiveSalesmen}×${unitCost})</span><span>¥${salesmenCost}</span></div>
         <div class="cost-item"><span>期中最大(${maxPersonnel}×${halfCost})</span><span>¥${maxPersonnelCost}</span></div>
         <div class="cost-item"><span>減価償却</span><span>¥${depreciationCost}</span></div>
+        ${computerCost > 0 ? `<div class="cost-item"><span>PC(${company.chips.computer}×20)</span><span>¥${computerCost}</span></div>` : ''}
+        ${insuranceCost > 0 ? `<div class="cost-item"><span>保険(${company.chips.insurance}×5)</span><span>¥${insuranceCost}</span></div>` : ''}
+        ${chipCost > 0 ? `<div class="cost-item"><span>戦略チップ</span><span>¥${chipCost}</span></div>` : ''}
         ${extraLabor > 0 ? `<div class="cost-item"><span>その他人件費</span><span>¥${extraLabor}</span></div>` : ''}
         <div class="cost-item cost-total"><span>F合計</span><span>¥${totalFixed}</span></div>
     `;
@@ -6864,11 +6883,14 @@ function applyRiskCardToAI(company, card) {
         case 3: // 教育成功
         case 4:
             if (company.chips.education > 0 && company.products > 0) {
-                const sellQty = Math.min(getSalesCapacity(company), company.products, 5);
-                company.cash += sellQty * 32;
-                company.products -= sellQty;
-                company.totalSales += sellQty * 32;
-                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQty;
+                const sellQtyEdu = Math.min(getSalesCapacity(company), company.products, 5);
+                company.cash += sellQtyEdu * 32;
+                company.products -= sellQtyEdu;
+                company.totalSales += sellQtyEdu * 32;
+                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyEdu;
+                // 100個保存: 海外市場に戻す
+                const overseasMktEdu = gameState.markets.find(m => m.name === '海外');
+                if (overseasMktEdu) overseasMktEdu.currentStock += sellQtyEdu;
             }
             break;
         case 5: // 消費者運動発生
@@ -6895,12 +6917,15 @@ function applyRiskCardToAI(company, card) {
         case 13:
         case 14:
             if (company.chips.advertising > 0 && company.products > 0) {
-                const maxSell = Math.min(company.chips.advertising * 2, 5);
-                const sellQty = Math.min(maxSell, company.products);
-                company.cash += sellQty * 32;
-                company.products -= sellQty;
-                company.totalSales += sellQty * 32;
-                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQty;
+                const maxSellAd = Math.min(company.chips.advertising * 2, 5);
+                const sellQtyAd = Math.min(maxSellAd, company.products);
+                company.cash += sellQtyAd * 32;
+                company.products -= sellQtyAd;
+                company.totalSales += sellQtyAd * 32;
+                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyAd;
+                // 100個保存: 海外市場に戻す
+                const overseasMktAd = gameState.markets.find(m => m.name === '海外');
+                if (overseasMktAd) overseasMktAd.currentStock += sellQtyAd;
             }
             break;
         case 15: // 労災発生
@@ -6941,12 +6966,15 @@ function applyRiskCardToAI(company, card) {
         case 26: // 商品の独占販売
         case 27:
         case 28:
-            const sellQtyMonopoly = Math.min(company.salesmen * 2, company.products, 5);
-            if (sellQtyMonopoly > 0) {
-                company.cash += sellQtyMonopoly * 32;
-                company.products -= sellQtyMonopoly;
-                company.totalSales += sellQtyMonopoly * 32;
-                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyMonopoly;
+            const sellQtyMono = Math.min(company.salesmen * 2, company.products, 5);
+            if (sellQtyMono > 0) {
+                company.cash += sellQtyMono * 32;
+                company.products -= sellQtyMono;
+                company.totalSales += sellQtyMono * 32;
+                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + sellQtyMono;
+                // 100個保存: 海外市場に戻す
+                const overseasMktMono = gameState.markets.find(m => m.name === '海外');
+                if (overseasMktMono) overseasMktMono.currentStock += sellQtyMono;
             }
             break;
         case 29: // 製造ミス発生
