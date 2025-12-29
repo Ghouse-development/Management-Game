@@ -1261,8 +1261,9 @@ function applyRiskCard(cardId) {
     if (rowUsed) {
         endTurn();
     } else {
-        // 行を消費しないリスクカードの場合、意思決定カードを表示
-        showDecisionCard();
+        // 行を消費しないリスクカードの場合、そのまま次の人へ（何もできない）
+        updateDisplay();
+        nextTurn();
     }
 }
 
