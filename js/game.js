@@ -41,6 +41,9 @@ function initializeCompanies() {
         chips: {...INITIAL_COMPANY_STATE.chips},
         nextPeriodChips: {research: 0, education: 0, advertising: 0},
         carriedOverChips: {research: 0, education: 0, advertising: 0},
+        // チップ購入トラッキング（F計算用）
+        chipsPurchasedThisPeriod: {research: 0, education: 0, advertising: 0},  // 2期用
+        expressChipsPurchased: {research: 0, education: 0, advertising: 0},     // 3期以降特急用
         periodStartInventory: {
             materials: INITIAL_COMPANY_STATE.materials,
             wip: INITIAL_COMPANY_STATE.wip,
@@ -226,21 +229,35 @@ function calculateFixedCost(company) {
     cost += (company.chips.insurance || 0) * CHIP_COSTS.insurance;
 
     const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
+    const purchased = company.chipsPurchasedThisPeriod || {research: 0, education: 0, advertising: 0};
+    const express = company.expressChipsPurchased || {research: 0, education: 0, advertising: 0};
 
     if (period === 2) {
-        if (company.chips.research > 0) cost += CHIP_COSTS.normal;
-        if (company.chips.education > 0) cost += CHIP_COSTS.normal;
-        if (company.chips.advertising > 0) cost += CHIP_COSTS.normal;
+        // 2期: 購入枚数 - 繰越枚数 = 今期消費枚数
+        // 繰越枚数 = min(期末所持, 3) - 1
+        const chipsAtEnd = {
+            research: company.chips.research || 0,
+            education: company.chips.education || 0,
+            advertising: company.chips.advertising || 0
+        };
+        const willCarryOver = {
+            research: Math.max(0, Math.min(chipsAtEnd.research, 3) - 1),
+            education: Math.max(0, Math.min(chipsAtEnd.education, 3) - 1),
+            advertising: Math.max(0, Math.min(chipsAtEnd.advertising, 3) - 1)
+        };
+        // F = (購入枚数 - 繰越枚数) × 20円
+        cost += Math.max(0, (purchased.research || 0) - willCarryOver.research) * CHIP_COSTS.normal;
+        cost += Math.max(0, (purchased.education || 0) - willCarryOver.education) * CHIP_COSTS.normal;
+        cost += Math.max(0, (purchased.advertising || 0) - willCarryOver.advertising) * CHIP_COSTS.normal;
     } else {
+        // 3期以降: 繰越チップ × 20円 + 特急チップ × 40円
+        // 次期予約は来期のFなので含めない
         cost += (carriedOver.research || 0) * CHIP_COSTS.normal;
         cost += (carriedOver.education || 0) * CHIP_COSTS.normal;
         cost += (carriedOver.advertising || 0) * CHIP_COSTS.normal;
-        cost += Math.max(0, (company.chips.research || 0) - (carriedOver.research || 0)) * CHIP_COSTS.express;
-        cost += Math.max(0, (company.chips.education || 0) - (carriedOver.education || 0)) * CHIP_COSTS.express;
-        cost += Math.max(0, (company.chips.advertising || 0) - (carriedOver.advertising || 0)) * CHIP_COSTS.express;
-        cost += (company.nextPeriodChips?.research || 0) * CHIP_COSTS.normal;
-        cost += (company.nextPeriodChips?.education || 0) * CHIP_COSTS.normal;
-        cost += (company.nextPeriodChips?.advertising || 0) * CHIP_COSTS.normal;
+        cost += (express.research || 0) * CHIP_COSTS.express;
+        cost += (express.education || 0) * CHIP_COSTS.express;
+        cost += (express.advertising || 0) * CHIP_COSTS.express;
     }
 
     cost += calculateDepreciation(company, period);

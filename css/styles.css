@@ -1371,14 +1371,14 @@ html, body {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .modal-content {
     background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-    border-radius: 20px 20px 0 0;
+    border-radius: 16px 16px 0 0;
     padding: 0;
     max-width: 500px;
     width: 100%;
-    max-height: 85vh;
+    max-height: 96vh;
     overflow: hidden;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
-    animation: slideFromBottom 0.3s ease-out;
+    animation: slideFromBottom 0.25s ease-out;
     position: fixed;
     bottom: 0;
     left: 50%;
@@ -1392,24 +1392,24 @@ html, body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 18px 24px;
+    padding: 12px 16px;
     background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
     color: white;
+    flex-shrink: 0;
 }
-.modal-title { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-.modal-header { flex-shrink: 0; }
-.modal-body { padding: 24px; overflow-y: auto; flex: 1; min-height: 0; }
-.close-btn { background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.2s; }
+.modal-title { font-size: 18px; font-weight: bold; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.modal-body { padding: 12px; overflow-y: auto; flex: 1; min-height: 0; }
+.close-btn { background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; transition: all 0.2s; }
 .close-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
-.form-group { margin-bottom: 20px; }
-.form-label { display: block; margin-bottom: 10px; font-size: 15px; font-weight: bold; color: #1e293b; }
-.form-control { width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 16px; background: #fff; transition: all 0.2s; }
-.form-control:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.15); }
-.submit-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4); transition: all 0.2s; }
-.submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(5, 150, 105, 0.5); }
+.form-group { margin-bottom: 12px; }
+.form-label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: bold; color: #1e293b; }
+.form-control { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; background: #fff; transition: all 0.2s; }
+.form-control:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+.submit-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 12px rgba(5, 150, 105, 0.4); transition: all 0.2s; }
+.submit-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 18px rgba(5, 150, 105, 0.5); }
 .submit-btn:active { transform: translateY(0); }
-.cancel-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(107, 114, 128, 0.4); transition: all 0.2s; }
-.cancel-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(107, 114, 128, 0.5); }
+.cancel-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 12px rgba(107, 114, 128, 0.4); transition: all 0.2s; }
+.cancel-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 18px rgba(107, 114, 128, 0.5); }
 .cancel-btn:active { transform: translateY(0); }
 
 /* アクションボタン（カード風） */
@@ -1733,8 +1733,11 @@ html, body {
     .chip { width: 10px; height: 10px; }
 
     .player-area { grid-template-columns: 1fr; }
-    .modal-content { width: 95%; max-height: 90vh; padding: 8px; }
-    .modal-title { font-size: 13px; }
+    .modal-content { width: 100%; max-height: 98vh; padding: 0; border-radius: 12px 12px 0 0; }
+    .modal-header { padding: 10px 12px; }
+    .modal-title { font-size: 14px; }
+    .modal-body { padding: 8px; }
+    .close-btn { padding: 6px 12px; font-size: 12px; }
     .toast { min-width: 200px; max-width: 90vw; font-size: 11px; padding: 8px 12px; }
 }
 
@@ -1792,8 +1795,10 @@ html, body {
     .chip { width: 12px; height: 12px; }
 
     /* モーダル */
-    .modal-content { width: 90%; max-height: 85vh; }
-    .modal-title { font-size: 15px; }
+    .modal-content { width: 95%; max-height: 96vh; }
+    .modal-header { padding: 12px 14px; }
+    .modal-title { font-size: 16px; }
+    .modal-body { padding: 10px; }
 }
 
 /* PC向け（769px以上） */
