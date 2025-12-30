@@ -1868,12 +1868,10 @@ function executeHiring(type) {
     const company = gameState.companies[0];
     const cost = 5;  // 縁故採用費用
 
-    // 現金不足時は短期借入
+    // 現金不足時は採用不可（短期借入で購入は不可）
     if (company.cash < cost) {
-        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため採用できません（必要: ¥${cost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
 
     // 5円支払い
@@ -2551,14 +2549,12 @@ function buyMaterialsFromMultiple() {
         return;
     }
     
-    // 現金チェックと短期借入
+    // 現金チェック（短期借入で購入は不可）
     if (company.cash < totalCost) {
-        const needed = Math.ceil((totalCost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため購入できません（必要: ¥${totalCost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
-    
+
     // 購入実行
     company.cash -= totalCost;
     company.materials += totalQty;
@@ -2615,15 +2611,13 @@ function buyMaterials() {
     }
     
     const cost = market.buyPrice * quantity;
-    
+
+    // 現金チェック（短期借入で購入は不可）
     if (company.cash < cost) {
-        // 短期借入
-        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため購入できません（必要: ¥${cost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
-    
+
     if (quantity > market.currentStock) {
         showToast('在庫が不足しています！', 'danger', 3000);
         return;
@@ -2786,15 +2780,13 @@ function produce() {
     }
     
     const cost = matToWip + wipToProd;
-    
+
+    // 現金チェック（短期借入で購入は不可）
     if (company.cash < cost) {
-        // 短期借入
-        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため生産できません（必要: ¥${cost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
-    
+
     company.cash -= cost;
     company.materials -= matToWip;
     company.wip = newWip;
@@ -4034,15 +4026,13 @@ function hire() {
     }
     
     const cost = total * 5;
-    
+
+    // 現金チェック（短期借入で購入は不可）
     if (company.cash < cost) {
-        // 短期借入
-        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため採用できません（必要: ¥${cost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
-    
+
     company.cash -= cost;
     company.extraLaborCost = (company.extraLaborCost || 0) + cost;  // 採用費は人件費
     company.workers += workers;
@@ -4184,15 +4174,13 @@ function buyMachine() {
     if (type === 'small') cost = 100;
     else if (type === 'large') cost = 200;
     else if (type === 'attachment') cost = 30;
-    
+
+    // 現金チェック（短期借入で購入は不可）
     if (company.cash < cost) {
-        // 短期借入
-        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため購入できません（必要: ¥${cost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
-    
+
     if (type === 'attachment') {
         // Find small machine without attachment
         const smallMachine = company.machines.find(m => m.type === 'small' && m.attachments === 0);
@@ -4958,11 +4946,14 @@ function processBidsWithAllCompanies(marketIndex) {
     let salesResults = [];
 
     // 入札順（価格が低い順）に市場枠を割り当て
+    // 販売上限は親が決めた数量（remainingCapacity）であり、入札者の希望数量ではない
     for (const bid of allBids) {
         if (remainingCapacity <= 0) break;
 
         const bidCompany = gameState.companies[bid.company];
-        const actualQty = Math.min(bid.quantity, remainingCapacity, bidCompany.products);
+        const bidderSalesCapacity = getSalesCapacity(bidCompany);
+        // 勝者は親の数量まで販売可能（製品在庫と販売能力の範囲内）
+        const actualQty = Math.min(remainingCapacity, bidCompany.products, bidderSalesCapacity);
 
         if (actualQty > 0) {
             const salePrice = bid.displayPrice || bid.price;
@@ -5004,6 +4995,9 @@ function processBidsWithAllCompanies(marketIndex) {
         const callPrice = bid.price;
         const displayPrice = bid.displayPrice || bid.price;
         const isWinner = (index === 0);
+        // 販売可能数（製品在庫と販売能力の小さい方）
+        const bidderSalesCapacity = getSalesCapacity(bidCompany);
+        const availableToSell = Math.min(bidCompany.products, bidderSalesCapacity);
 
         // 価格競争力の内訳
         let compStr = '';
@@ -5018,6 +5012,7 @@ function processBidsWithAllCompanies(marketIndex) {
                     <div class="price-card-value">${displayPrice}</div>
                 </div>
                 <div class="call-bubble ${isWinner ? 'winner' : ''}">¥${callPrice}</div>
+                <div class="bid-quantity" style="font-size: 10px; color: #666; margin-top: 3px;">📦${availableToSell}個可</div>
                 ${compStr ? `<div class="bid-competitiveness">${compStr}</div>` : ''}
             </div>
         `;
@@ -5148,11 +5143,14 @@ function processBidsWithAllCompaniesTwoMarket() {
     let salesResults = [];
 
     // 入札順に割り当て
+    // 販売上限は親が決めた数量（remainingCapacity）であり、入札者の希望数量ではない
     for (const bid of allBids) {
         if (remainingCapacity <= 0) break;
 
         const bidCompany = gameState.companies[bid.company];
-        const actualQty = Math.min(bid.quantity, remainingCapacity, bidCompany.products);
+        const bidderSalesCapacity = getSalesCapacity(bidCompany);
+        // 勝者は親の数量まで販売可能（製品在庫と販売能力の範囲内）
+        const actualQty = Math.min(remainingCapacity, bidCompany.products, bidderSalesCapacity);
 
         if (actualQty > 0) {
             const salePrice = bid.displayPrice || bid.price;
@@ -5199,9 +5197,13 @@ function processBidsWithAllCompaniesTwoMarket() {
         const bgColor = index === 0 ? '#d4edda' : '#fef3c7';
         const callPrice = result.bid.price;  // コール価格（勝敗判定用）
         const recordPrice = result.bid.displayPrice || result.bid.price;  // 記帳価格（売上計上用）
+        // 販売可能数（製品在庫と販売能力の小さい方）
+        const bidderSalesCapacity = getSalesCapacity(result.company);
+        const availableToSell = Math.min(result.company.products + result.quantity, bidderSalesCapacity);
 
         bidResultHtml += `<div style="background: ${bgColor}; padding: 10px; margin: 10px 0; border-radius: 5px;">`;
-        bidResultHtml += `<strong>${index === 0 ? '🏆 1位落札' : '✓ 残枠販売'}: ${result.company.name}</strong><br>`;
+        bidResultHtml += `<strong>${index === 0 ? '🏆 1位落札' : '✓ 残枠販売'}: ${result.company.name}</strong>`;
+        bidResultHtml += `<span style="font-size: 11px; color: #666; margin-left: 8px;">📦${availableToSell}個可</span><br>`;
         bidResultHtml += `<div style="display: flex; gap: 15px; margin: 5px 0;">`;
         bidResultHtml += `<span style="font-size: 12px; color: #666;">コール価格: ¥${callPrice}</span>`;
         bidResultHtml += `<span style="font-size: 12px; color: #2563eb;">記帳価格: ¥${recordPrice}</span>`;
@@ -5640,28 +5642,29 @@ function proceedToNextPeriod() {
             gameState.maxRows = gameState.maxRowsByPeriod[2];  // 2期は20行
             gameState.currentRow = 2;  // グローバル行カウンタ（表示用）
             
-            // 期首に自動でコンピュータと保険を購入
+            // 期首に自動でコンピュータと保険を購入（買えない場合は買わない）
             gameState.companies.forEach(company => {
                 const computerCost = 20;
                 const insuranceCost = 5;
                 const totalCost = computerCost + insuranceCost;
-                
+
                 // 各社の行数を2に設定（期首処理で1行使用）
                 company.currentRow = 2;
-                
+
                 if (company.cash >= totalCost) {
-                    company.cash -= totalCost;
-                    company.chips.computer = 1;  // 毎期1枚購入
-                    company.chips.insurance = 1;
-                } else {
-                    // Apply short loan if needed
-                    const needed = Math.ceil((totalCost - company.cash) / 0.8 / 50) * 50;
-                    company.shortLoans += needed;
-                    company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
                     company.cash -= totalCost;
                     company.chips.computer = 1;
                     company.chips.insurance = 1;
+                } else if (company.cash >= computerCost) {
+                    // PCのみ購入可能
+                    company.cash -= computerCost;
+                    company.chips.computer = 1;
+                } else if (company.cash >= insuranceCost) {
+                    // 保険のみ購入可能
+                    company.cash -= insuranceCost;
+                    company.chips.insurance = 1;
                 }
+                // 現金不足時は購入しない（短期借入で購入は不可）
             });
             
             gameState.periodStarted = true;
@@ -5825,18 +5828,17 @@ function startPeriodWithBorrowing() {
         
         // 期首処理で2行使用（借入あり）→3行目から開始
         company.currentRow = 3;
-        
+
+        // PC・保険購入（買えない場合は買わない - 短期借入で購入は不可）
         if (company.cash >= totalCost) {
             company.cash -= totalCost;
             company.chips.computer = 1;
             company.chips.insurance = 1;
-        } else {
-            // Apply short loan if needed
-            const needed = Math.ceil((totalCost - company.cash) / 0.8 / 50) * 50;
-            company.shortLoans += needed;
-            company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-            company.cash -= totalCost;
+        } else if (company.cash >= computerCost) {
+            company.cash -= computerCost;
             company.chips.computer = 1;
+        } else if (company.cash >= insuranceCost) {
+            company.cash -= insuranceCost;
             company.chips.insurance = 1;
         }
     });
@@ -5873,22 +5875,21 @@ function startPeriodWithoutBorrowing() {
         
         // 期首処理で1行使用（借入なし）→2行目から開始
         company.currentRow = 2;
-        
+
+        // PC・保険購入（買えない場合は買わない - 短期借入で購入は不可）
         if (company.cash >= totalCost) {
             company.cash -= totalCost;
             company.chips.computer = 1;
             company.chips.insurance = 1;
-        } else {
-            // Apply short loan if needed
-            const needed = Math.ceil((totalCost - company.cash) / 0.8 / 50) * 50;
-            company.shortLoans += needed;
-            company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-            company.cash -= totalCost;
+        } else if (company.cash >= computerCost) {
+            company.cash -= computerCost;
             company.chips.computer = 1;
+        } else if (company.cash >= insuranceCost) {
+            company.cash -= insuranceCost;
             company.chips.insurance = 1;
         }
     });
-    
+
     // Period 3-5: 借入なしの場合は2行目から開始
     gameState.currentRow = 2;  // Start from row 2 (period start processing uses 1 row)
     // Set maxRows based on period
@@ -6567,15 +6568,13 @@ function buyChips() {
         isExpress = purchaseType === 'express';
         cost = quantity * (isExpress ? CHIP_COSTS.express : CHIP_COSTS.normal);
     }
-    
+
+    // 現金チェック（短期借入で購入は不可）
     if (company.cash < cost) {
-        // 短期借入
-        const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-        company.shortLoans += needed;
-        company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-        showToast(`現金不足のため短期借入¥${needed}を実行しました`, 'warning', 4000);
+        showToast(`現金不足のため購入できません（必要: ¥${cost}、所持: ¥${company.cash}）`, 'error', 4000);
+        return;
     }
-    
+
     // Check max limits
     const maxLimits = {research: 5, education: 1, advertising: 5};
     const nextPeriodCount = company.nextPeriodChips?.[chipType] || 0;
@@ -6928,15 +6927,37 @@ function applyRiskCardToAI(company, card) {
                 company.materials = 0;
             }
             break;
-        case 33: // 縁故採用
+        case 33: // 縁故採用（強制実行）
         case 34:
-            company.cash = Math.max(0, company.cash - 5);
-            company.extraLaborCost = (company.extraLaborCost || 0) + 5;  // 人件費
-            // AIはランダムでワーカーかセールスマンを追加
-            if (Math.random() > 0.5) {
-                company.workers++;
-            } else {
-                company.salesmen++;
+            {
+                const hireCost = 5;
+                // 現金不足の場合、材料売却→短期借入で対応
+                if (company.cash < hireCost) {
+                    // 1. 材料売却（8円/個）
+                    while (company.cash < hireCost && company.materials > 0) {
+                        company.materials--;
+                        company.cash += 8;
+                    }
+                    // 2. それでも足りなければ短期借入
+                    if (company.cash < hireCost) {
+                        const shortage = hireCost - company.cash;
+                        // 短期借入: 借入額の80%を受け取る（20%は今期の金利）
+                        const loanNeeded = Math.ceil(shortage / 0.8);
+                        company.shortLoans += loanNeeded;
+                        company.cash += Math.floor(loanNeeded * 0.8);
+                        // 金利分を固定費に計上
+                        if (!company.additionalFixedCost) company.additionalFixedCost = 0;
+                        company.additionalFixedCost += loanNeeded - Math.floor(loanNeeded * 0.8);
+                    }
+                }
+                company.cash -= hireCost;
+                company.extraLaborCost = (company.extraLaborCost || 0) + hireCost;
+                // AIはランダムでワーカーかセールスマンを追加
+                if (Math.random() > 0.5) {
+                    company.workers++;
+                } else {
+                    company.salesmen++;
+                }
             }
             break;
         case 35: // 研究開発成功
@@ -7070,11 +7091,12 @@ function applyRiskCardToAI(company, card) {
             break;
     }
 
+    // 行数処理（ターン進行は呼び出し元で制御）
     if (rowUsed) {
-        endTurn();
-    } else {
-        nextTurn();
+        incrementRow(gameState.companies.indexOf(company));
     }
+
+    return rowUsed;  // 呼び出し元でターン進行を制御
 }
 
 // Execute common purchase when AI draws the card
@@ -7378,40 +7400,23 @@ function executeAITurn() {
         }
         
         const cost = (hireWorkers + hireSalesmen) * 5;
+        // 現金があれば採用（短期借入で購入は不可）
         if (company.cash >= cost) {
             company.cash -= cost;
             company.workers += hireWorkers;
             company.salesmen += hireSalesmen;
             incrementRow(gameState.companies.indexOf(company));
-            
-            let detail = '';
-            if (hireWorkers > 0) detail += `ワーカー ${hireWorkers}人`;
-            if (hireSalesmen > 0) detail += `${hireWorkers > 0 ? '、' : ''}セールスマン ${hireSalesmen}人`;
-
-            showAIActionModal(company, '採用', '👥', detail, [
-                { label: '採用費', value: `¥${cost}` }
-            ]);
-            return;
-        } else {
-            // 現金不足の場合は短期借入
-            const needed = Math.ceil((cost - company.cash) / 0.8 / 50) * 50;
-            company.shortLoans += needed;
-            company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
-            company.cash -= cost;
-            company.workers += hireWorkers;
-            company.salesmen += hireSalesmen;
-            incrementRow(gameState.companies.indexOf(company));
 
             let detail = '';
             if (hireWorkers > 0) detail += `ワーカー ${hireWorkers}人`;
             if (hireSalesmen > 0) detail += `${hireWorkers > 0 ? '、' : ''}セールスマン ${hireSalesmen}人`;
 
             showAIActionModal(company, '採用', '👥', detail, [
-                { label: '短期借入', value: `¥${needed}` },
                 { label: '採用費', value: `¥${cost}` }
             ]);
             return;
         }
+        // 現金不足時は採用をスキップして他の行動へ
     }
     
     // AI性格別戦略実行
@@ -7704,7 +7709,8 @@ const AIBrain = {
                 cost: period === 2 ? 20 : 40,
                 benefit: (1 + 1) * salesCycles * 13, // 製造+1、販売+1 × 販売回数 × MQ/個
                 longTermValue: periodsRemaining * 30,
-                priority: company.chips.education < 1 ? 'highest' : 'medium'
+                // 2期は2枚以上購入しないと期末に没収されて無駄
+                priority: company.chips.education < (period === 2 ? 2 : 1) ? 'highest' : 'medium'
             },
             advertising: {
                 cost: period === 2 ? 20 : 40,
@@ -7943,9 +7949,11 @@ const AIBrain = {
     findBestInvestment: function(company, roi, competitors) {
         const period = gameState.currentPeriod;
         const candidates = [];
+        // 2期は2枚以上購入しないと期末に没収されて無駄
+        const minEduChips = period === 2 ? 2 : 1;
 
         // 教育チップ（最優先：効率が最高）
-        if (company.chips.education < 1 && roi.education.priority !== 'none') {
+        if (company.chips.education < minEduChips && roi.education.priority !== 'none') {
             candidates.push({ type: 'education', score: 100, reason: '効率投資（製造+1、販売+1）' });
         }
 
@@ -8578,7 +8586,9 @@ function getAIFinancialAnalysis(company) {
     // コンピュータ: 製造+1 → Qを上げる（製造ボトルネック解消）
     // 保険: リスク軽減 → 損失を防ぐ
     const chipPriority = [];
-    if (company.chips.education < 1) chipPriority.push('education');  // 効率最高
+    // 2期は2枚以上購入しないと期末に没収されて無駄
+    const minEduChipsForAnalysis = period === 2 ? 2 : 1;
+    if (company.chips.education < minEduChipsForAnalysis) chipPriority.push('education');  // 効率最高
     if (company.chips.research < periodGoals.targetResearchChips) chipPriority.push('research');  // P向上
     if (capacityBalance > 2) chipPriority.push('advertising');  // 販売が足りない
     if (capacityBalance < -2) chipPriority.push('computer');  // 製造が足りない
@@ -8628,7 +8638,11 @@ function getAIFinancialAnalysis(company) {
         // 推奨アクション優先度
         shouldSellFirst: canSell && isCashTight && !isFinalPeriod,  // 5期は売り切り優先ではない
         shouldInvest: !isCashTight && rowsRemaining > 10 && !isRecoveryPhase,
-        shouldBeAggressive: equityRank > 3 && rowsRemaining > 5 && !isFinalPeriod
+        shouldBeAggressive: equityRank > 3 && rowsRemaining > 5 && !isFinalPeriod,
+        // 能力向上推奨（AIが意識すべき）
+        shouldHireWorker: periodGoals.shouldBuyMachine || (mfgCapacity < salesCapacity && company.workers < company.machines.length),
+        shouldHireSalesman: periodGoals.shouldHireSalesman || (salesCapacity < mfgCapacity && company.salesmen < 3),
+        shouldImproveCapacity: needsCapacityBalance && rowsRemaining > 10
     };
 }
 
@@ -8822,15 +8836,17 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
             executeDefaultSale(company, salesCapacity, 0.65); // 生存のため安値でも売る
             return;
         }
-        // 売る物がなければ短期借入
-        const needed = Math.ceil((analysis.periodEndCost - company.cash) / 0.8 / 50) * 50;
-        if (needed > 0 && needed <= 200) {
-            company.shortLoans += needed;
-            company.cash += needed * 0.8;
-            incrementRow(companyIndex);
-            showAIActionModal(company, '緊急借入', '💰', `短期借入 ¥${needed}（生存のため）`);
+        // 製品がなければ生産を試みる
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            executeDefaultProduction(company, mfgCapacity);
             return;
         }
+        // 材料もなければ購入して生産サイクルへ
+        if (company.cash >= 20 && mfgCapacity > 0) {
+            executeDefaultMaterialPurchase(company, mfgCapacity);
+            return;
+        }
+        // 何もできない場合は期末の自動短期借入に任せる（意図的借入は不可）
     }
 
     // === 戦略的設備投資：小型→大型機械アップグレード ===
@@ -8865,6 +8881,27 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         const cashFlow = AIBrain.forecastCashFlow(company);
         const hireCost = 5;
         const salaryCost = (BASE_SALARY_BY_PERIOD[period] || 22) * 1.5;
+
+        // 能力向上が推奨されている場合は優先的に対応
+        // ワーカー採用推奨（製造能力向上）
+        if (analysis.shouldHireWorker && company.workers < 3 && company.cash >= hireCost + salaryCost + cashFlow.safetyBuffer) {
+            company.cash -= hireCost;
+            company.workers++;
+            company.maxPersonnel = Math.max(company.maxPersonnel || 2, company.workers + company.salesmen);
+            incrementRow(companyIndex);
+            showAIActionModal(company, '戦略的採用', '👷', `ワーカー採用（製造能力向上）`);
+            return;
+        }
+
+        // セールスマン採用推奨（販売能力向上）
+        if (analysis.shouldHireSalesman && company.salesmen < 3 && company.cash >= hireCost + salaryCost + cashFlow.safetyBuffer) {
+            company.cash -= hireCost;
+            company.salesmen++;
+            company.maxPersonnel = Math.max(company.maxPersonnel || 2, company.workers + company.salesmen);
+            incrementRow(companyIndex);
+            showAIActionModal(company, '戦略的採用', '🧑‍💼', `セールスマン採用（販売能力向上）`);
+            return;
+        }
 
         // ワーカー不足（機械があるのにワーカーがいない）
         if (company.workers < company.machines.length && company.cash >= hireCost + salaryCost + cashFlow.safetyBuffer) {
@@ -9108,7 +9145,9 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
     // 4. 長期投資（残り期数を考慮）
     if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
         // 教育チップ優先（製造+1、販売+1で効率最強）
-        if (company.chips.education < 1 && company.cash >= chipCost + safetyMargin) {
+        // 2期は2枚以上購入しないと期末に没収されて無駄
+        const minEducationChips = gameState.currentPeriod === 2 ? 2 : 1;
+        if (company.chips.education < minEducationChips && company.cash >= chipCost + safetyMargin) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'education', chipCost);
             incrementRow(gameState.companies.indexOf(company));
@@ -9431,7 +9470,9 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
             return;
         }
         // 教育チップ（安定的な効率向上）
-        if (company.chips.education < 1 && company.cash >= chipCost + safetyMargin) {
+        // 2期は2枚以上購入しないと期末に没収されて無駄
+        const minEduChipsConservative = gameState.currentPeriod === 2 ? 2 : 1;
+        if (company.chips.education < minEduChipsConservative && company.cash >= chipCost + safetyMargin) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'education', chipCost);
             incrementRow(gameState.companies.indexOf(company));
@@ -9439,7 +9480,9 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
             return;
         }
         // 研究チップ（長期的に価格競争力向上）
-        if (analysis.shouldInvestForFuture && company.chips.research < 3 && company.cash >= chipCost + safetyMargin) {
+        // 2期は2枚以上購入しないと期末に没収されて無駄
+        const minResearchChipsConservative = gameState.currentPeriod === 2 ? 2 : 1;
+        if (analysis.shouldInvestForFuture && company.chips.research < Math.max(3, minResearchChipsConservative) && company.cash >= chipCost + safetyMargin) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'research', chipCost);
             incrementRow(gameState.companies.indexOf(company));
@@ -9552,7 +9595,9 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
     // 4. 長期投資（量を増やすための投資）
     if (company.cash > safetyMargin + 50 && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
         // 教育チップ（製造・販売両方向上で量に貢献）
-        if (company.chips.education < 1 && company.cash >= chipCost + safetyMargin) {
+        // 2期は2枚以上購入しないと期末に没収されて無駄
+        const minEduChipsPriceFocused = gameState.currentPeriod === 2 ? 2 : 1;
+        if (company.chips.education < minEduChipsPriceFocused && company.cash >= chipCost + safetyMargin) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'education', chipCost);
             incrementRow(gameState.companies.indexOf(company));
@@ -9561,7 +9606,9 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         }
 
         // 研究チップ（価格競争力で量を確保）
-        if (analysis.shouldInvestForFuture && company.chips.research < 3 && company.cash >= chipCost + safetyMargin) {
+        // 2期は2枚以上購入しないと期末に没収されて無駄
+        const minResearchChipsPriceFocused = gameState.currentPeriod === 2 ? 2 : 1;
+        if (analysis.shouldInvestForFuture && company.chips.research < Math.max(3, minResearchChipsPriceFocused) && company.cash >= chipCost + safetyMargin) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'research', chipCost);
             incrementRow(gameState.companies.indexOf(company));
@@ -9862,8 +9909,10 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
             else if (!isNextPeriod) {
                 const expressCost = gameState.currentPeriod >= 3 ? chipCost : chipCost;  // 3期以降は2倍だが、2期は通常
                 const reason = useExpress && gameState.currentPeriod >= 3 ? '（特急・追い上げ）' : '（計画投資）';
+                // 2期は2枚以上購入しないと期末に没収されて無駄
+                const minEduChipsForExpress = gameState.currentPeriod === 2 ? 2 : 1;
 
-                if (chipType === 'education' && company.chips.education < 1 && company.cash >= expressCost + safetyMargin) {
+                if (chipType === 'education' && company.chips.education < minEduChipsForExpress && company.cash >= expressCost + safetyMargin) {
                     company.cash -= expressCost;
                     aiPurchaseChip(company, 'education', expressCost);
                     incrementRow(gameState.companies.indexOf(company));
@@ -10477,11 +10526,14 @@ function processAIBidsResult(maxSales, market, allBids) {
     let salesResults = [];
     let winnerIndices = [];
 
+    // 販売上限は親が決めた数量（remainingCapacity）であり、入札者の希望数量ではない
     for (const bid of allBids) {
         if (remainingCapacity <= 0) break;
 
         const bidCompany = gameState.companies[bid.company];
-        const actualQty = Math.min(bid.quantity, remainingCapacity, bidCompany.products);
+        const bidderSalesCapacity = getSalesCapacity(bidCompany);
+        // 勝者は親の数量まで販売可能（製品在庫と販売能力の範囲内）
+        const actualQty = Math.min(remainingCapacity, bidCompany.products, bidderSalesCapacity);
 
         if (actualQty > 0) {
             const salePrice = bid.displayPrice || bid.price;
@@ -10524,6 +10576,11 @@ function showAIBiddingResultModal(market, allBids, salesResults, winnerIndices) 
         const recordPrice = bid.displayPrice || bid.price;  // 記帳価格
         const callPrice = bid.price;  // コール価格（競争力適用後）
         const isWinner = winnerIndices.includes(bid.company);
+        // 販売可能数（製品在庫と販売能力の小さい方）
+        // 販売後なので、勝者は販売数を足して元の在庫を表示
+        const soldQty = salesResults.find(r => r.companyIndex === bid.company)?.quantity || 0;
+        const bidderSalesCapacity = getSalesCapacity(bidCompany);
+        const availableToSell = Math.min(bidCompany.products + soldQty, bidderSalesCapacity);
 
         // 競争力の内訳表示
         let compBadges = '';
@@ -10533,6 +10590,7 @@ function showAIBiddingResultModal(market, allBids, salesResults, winnerIndices) 
         bidArenaHtml += `
             <div class="bid-player ${isPlayer ? 'is-you' : ''}">
                 <div class="bid-player-name ${isParent ? 'is-parent' : ''}">${bidCompany.name}${isPlayer ? '(あなた)' : ''}</div>
+                <div style="font-size: 10px; color: #666;">📦${availableToSell}個可</div>
                 <div class="bid-prices">
                     <div class="price-row">
                         <span class="price-label">記帳</span>
