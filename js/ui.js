@@ -303,13 +303,77 @@ function renderOtherCompanies() {
                 <div class="ai-badge-row3">
                     <span class="ai-badge-info">W${company.workers}機${company.machines.length}S${company.salesmen}</span>
                     <span class="ai-badge-chips">${chipDots || '-'}</span>
-                    <span class="ai-badge-rownum ${rowWarning ? 'warning' : ''}">${company.currentRow || 1}行</span>
+                    <span class="ai-badge-rownum ${rowWarning ? 'warning' : ''}" onclick="event.stopPropagation(); showAIActionHistory(${idx + 1})" style="cursor:pointer; text-decoration:underline;">${company.currentRow || 1}行</span>
                 </div>
             </div>
         `;
     });
 
     document.getElementById('aiCompaniesBar').innerHTML = badgesHtml;
+}
+
+// ============================================
+// AI行動履歴表示
+// ============================================
+function showAIActionHistory(companyIndex) {
+    const company = gameState.companies[companyIndex];
+    if (!company) return;
+
+    // この会社の今期の行動ログをフィルター
+    const companyLogs = (gameState.actionLog || []).filter(log => log.companyIndex === companyIndex);
+
+    let content = '';
+    if (companyLogs.length === 0) {
+        content = '<p style="color:#888; text-align:center; padding:20px;">今期の行動履歴はありません</p>';
+    } else {
+        content = '<div class="ai-action-history">';
+        companyLogs.forEach((log, idx) => {
+            const cashColor = log.cashChange > 0 ? '#22c55e' : (log.cashChange < 0 ? '#ef4444' : '#888');
+            const cashText = log.cashChange !== 0 ? (log.cashChange > 0 ? `+${log.cashChange}` : `${log.cashChange}`) : '';
+            const rowBadge = log.rowUsed ? `<span class="history-row-badge">${log.row}行目</span>` : '';
+
+            content += `
+                <div class="history-item ${log.rowUsed ? 'row-used' : ''}">
+                    <div class="history-header">
+                        ${rowBadge}
+                        <span class="history-action">${log.action}</span>
+                        ${cashText ? `<span class="history-cash" style="color:${cashColor}">¥${cashText}</span>` : ''}
+                    </div>
+                    <div class="history-details">${log.details}</div>
+                </div>
+            `;
+        });
+        content += '</div>';
+    }
+
+    // モーダル表示
+    const modalHtml = `
+        <div class="modal active" id="aiHistoryModal" onclick="if(event.target === this) closeAIHistoryModal()">
+            <div class="modal-content" style="max-width:450px; max-height:80vh;">
+                <div class="modal-header" style="background:#2563eb; color:white;">
+                    <h3 class="modal-title">${company.name} - ${gameState.currentPeriod}期 行動履歴</h3>
+                    <button class="close-btn" onclick="closeAIHistoryModal()" style="color:white;">✕</button>
+                </div>
+                <div class="modal-body" style="max-height:60vh; overflow-y:auto; padding:10px;">
+                    ${content}
+                </div>
+                <div class="modal-footer" style="padding:10px; text-align:center; border-top:1px solid #e5e7eb;">
+                    <button onclick="closeAIHistoryModal()" class="btn-primary" style="padding:8px 20px;">閉じる</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 既存のモーダルを閉じずに新しいモーダルを追加
+    const container = document.createElement('div');
+    container.id = 'aiHistoryModalContainer';
+    container.innerHTML = modalHtml;
+    document.body.appendChild(container);
+}
+
+function closeAIHistoryModal() {
+    const container = document.getElementById('aiHistoryModalContainer');
+    if (container) container.remove();
 }
 
 // ============================================

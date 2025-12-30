@@ -1625,36 +1625,41 @@ html, body {
 /* スマホ向け（480px以下）- スクロールなしで全表示 */
 @media (max-width: 480px) {
     /* 縦に3分割: AIバッジ(10%) + カード&市場(35%) + 会社盤(55%) */
-    .container { padding: 2px; }
+    /* 上部に余白追加（ステータスバー対策） */
+    .container {
+        padding: 2px;
+        padding-top: env(safe-area-inset-top, 20px);
+        padding-bottom: 2px;
+    }
 
-    /* AIバッジ - スマホ用拡大 */
+    /* AIバッジ - スマホ用拡大（少し大きく） */
     .ai-companies-bar {
         flex: 0 0 auto;
-        gap: 3px;
-        padding: 3px;
+        gap: 4px;
+        padding: 4px;
         flex-wrap: nowrap;
         overflow-x: auto;
     }
     .ai-badge {
-        min-width: 70px;
-        max-width: 85px;
-        padding: 4px 5px;
+        min-width: 75px;
+        max-width: 90px;
+        padding: 5px 6px;
         gap: 2px;
         flex-shrink: 0;
     }
-    .ai-badge-name { font-size: 9px; }
-    .ai-badge-cash { font-size: 9px; }
-    .ai-badge-inventory { padding: 2px 3px; gap: 3px; }
+    .ai-badge-name { font-size: 10px; }
+    .ai-badge-cash { font-size: 10px; }
+    .ai-badge-inventory { padding: 3px 4px; gap: 3px; }
     .ai-inv-item { gap: 2px; }
-    .ai-inv-label { font-size: 8px; min-width: 10px; }
-    .ai-inv-block { width: 8px; height: 8px; }
-    .ai-inv-extra { font-size: 8px; }
-    .ai-inv-zero { font-size: 8px; }
-    .ai-badge-row3 { display: flex; font-size: 7px; }
-    .ai-badge-info { font-size: 7px; }
-    .ai-badge-chips { font-size: 7px; }
-    .ai-badge-rownum { font-size: 7px; padding: 1px 3px; }
-    .chip-dot { width: 5px; height: 5px; }
+    .ai-inv-label { font-size: 9px; min-width: 11px; }
+    .ai-inv-block { width: 9px; height: 9px; }
+    .ai-inv-extra { font-size: 9px; }
+    .ai-inv-zero { font-size: 9px; }
+    .ai-badge-row3 { display: flex; font-size: 8px; }
+    .ai-badge-info { font-size: 8px; }
+    .ai-badge-chips { font-size: 8px; }
+    .ai-badge-rownum { font-size: 8px; padding: 1px 4px; }
+    .chip-dot { width: 6px; height: 6px; }
 
     /* メインコンテンツ */
     .main-content-wrapper { flex: 1; gap: 2px; }
@@ -1955,4 +1960,54 @@ html, body {
 }
 .qty-card:active {
     transform: scale(0.98);
+}
+
+/* ============================================ */
+/* AI行動履歴モーダル */
+/* ============================================ */
+.ai-action-history {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.history-item {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+.history-item.row-used {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    border-left: 3px solid #3b82f6;
+}
+.history-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.history-row-badge {
+    background: #3b82f6;
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: bold;
+}
+.history-action {
+    font-weight: bold;
+    color: #1f2937;
+    font-size: 13px;
+}
+.history-cash {
+    font-weight: bold;
+    font-size: 12px;
+    margin-left: auto;
+}
+.history-details {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 4px;
+    line-height: 1.4;
 }
