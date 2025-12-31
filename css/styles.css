@@ -38,6 +38,31 @@ html, body {
     flex-wrap: wrap;
     justify-content: center;
 }
+
+/* 全社一覧ボタン */
+.all-companies-btn {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 100;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.all-companies-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+}
+.all-companies-btn:active {
+    transform: scale(0.98);
+}
 .ai-badge {
     display: flex;
     flex-direction: column;

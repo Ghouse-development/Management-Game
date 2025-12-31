@@ -35,6 +35,8 @@
 
         <!-- 1. AI会社バッジ（タップで詳細表示） -->
         <div class="ai-companies-bar" id="aiCompaniesBar"></div>
+        <!-- 全社一覧ボタン -->
+        <button class="all-companies-btn" onclick="showAllCompaniesModal()" title="全社状況を表示">📊 全社</button>
 
         <!-- 2. メインコンテンツ（PC:横並び / スマホ:縦並び） -->
         <div class="main-content-wrapper">
@@ -2420,6 +2422,52 @@ function endPeriod() {
             advertising: company.nextPeriodChips?.advertising || 0
         };
 
+        // F詳細計算用（リセット前に保存）
+        const calcPeriod = gameState.currentPeriod;
+        let unitCostF = BASE_SALARY_BY_PERIOD[calcPeriod] || 22;
+        if (calcPeriod >= 3 && gameState.wageMultiplier > 1) {
+            unitCostF = Math.round(unitCostF * gameState.wageMultiplier);
+        }
+        const halfCostF = Math.round(unitCostF / 2);
+        const fStats = company.endOfPeriodStats;
+        const fMachineSalary = fStats.machines * unitCostF;
+        const fWorkerSalary = fStats.workers * unitCostF;
+        const fSalesmenSalary = fStats.salesmen * unitCostF;
+        const fMaxPersonnel = company.maxPersonnel || (fStats.workers + fStats.salesmen);
+        const fMaxPersonnelCost = fMaxPersonnel * halfCostF;
+        const fTotalSalary = fMachineSalary + fWorkerSalary + fSalesmenSalary + fMaxPersonnelCost;
+        const fDepreciation = calculateDepreciation(company, calcPeriod);
+        const fLongInterest = Math.floor((company.loans || 0) * 0.1);
+        const fShortInterest = Math.floor((company.shortLoans || 0) * 0.2);
+        const fPcCost = (company.chips.computer || 0) * 20;
+        const fInsuranceCost = (company.chips.insurance || 0) * 5;
+
+        // チップ費用計算
+        let fChipCost = 0;
+        if (calcPeriod === 2) {
+            const purchased = company.chipsPurchasedThisPeriod || {research: 0, education: 0, advertising: 0};
+            const chipsAtEnd = {
+                research: company.chips.research || 0,
+                education: company.chips.education || 0,
+                advertising: company.chips.advertising || 0
+            };
+            const willCarryOver = {
+                research: Math.max(0, Math.min(chipsAtEnd.research, 3) - 1),
+                education: Math.max(0, Math.min(chipsAtEnd.education, 3) - 1),
+                advertising: Math.max(0, Math.min(chipsAtEnd.advertising, 3) - 1)
+            };
+            fChipCost = (Math.max(0, (purchased.research || 0) - willCarryOver.research) +
+                        Math.max(0, (purchased.education || 0) - willCarryOver.education) +
+                        Math.max(0, (purchased.advertising || 0) - willCarryOver.advertising)) * 20;
+        } else {
+            const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
+            const express = company.expressChipsPurchased || {research: 0, education: 0, advertising: 0};
+            fChipCost = ((carriedOver.research || 0) + (carriedOver.education || 0) + (carriedOver.advertising || 0)) * 20;
+            fChipCost += ((express.research || 0) + (express.education || 0) + (express.advertising || 0)) * 40;
+        }
+        const fExtraLabor = company.extraLaborCost || 0;
+        const fAdditionalF = company.additionalFixedCost || 0;
+
         financialData.push({
             name: company.name,
             p: unitP,  // P=PQ/Q (単価)
@@ -2443,6 +2491,31 @@ function endPeriod() {
                 materials: company.materials || 0,
                 wip: company.wip || 0,
                 products: company.products || 0
+            },
+            // F詳細計算用（リセット前に保存）
+            fBreakdown: {
+                period: calcPeriod,
+                unitCost: unitCostF,
+                halfCost: halfCostF,
+                stats: {
+                    machines: fStats.machines,
+                    workers: fStats.workers,
+                    salesmen: fStats.salesmen
+                },
+                machineSalary: fMachineSalary,
+                workerSalary: fWorkerSalary,
+                salesmenSalary: fSalesmenSalary,
+                maxPersonnel: fMaxPersonnel,
+                maxPersonnelCost: fMaxPersonnelCost,
+                totalSalary: fTotalSalary,
+                depreciation: fDepreciation,
+                longInterest: fLongInterest,
+                shortInterest: fShortInterest,
+                pcCost: fPcCost,
+                insuranceCost: fInsuranceCost,
+                chipCost: fChipCost,
+                extraLabor: fExtraLabor,
+                additionalF: fAdditionalF
             },
             // チップ返却情報
             chipsBefore: chipsBefore,
@@ -2585,6 +2658,20 @@ function endPeriod() {
     
     // Store and show financial summary
     window.lastFinancialData = financialData;
+
+    // 次期のサイコロ担当（今期PQトップ）を記録
+    let maxPQ = 0;
+    let pqTopIndex = 0;
+    financialData.forEach((data, idx) => {
+        if (data.pq > maxPQ) {
+            maxPQ = data.pq;
+            pqTopIndex = idx;
+        }
+    });
+    gameState.previousPQTopIndex = pqTopIndex;
+    gameState.previousPQTopName = gameState.companies[pqTopIndex].name;
+    gameState.previousPQTopAmount = maxPQ;
+    console.log(`[PQトップ] 今期: ${gameState.previousPQTopName} (¥${maxPQ})`);
 
     // 期末返済処理（AI会社は自動返済、プレイヤーは選択）
     processEndPeriodLoanRepayments(financialData);

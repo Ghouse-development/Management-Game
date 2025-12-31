@@ -514,6 +514,79 @@ function showAICompanyModal(companyIndex) {
     showModal(company.name + ' の詳細', content);
 }
 
+// ============================================
+// 全社一覧モーダル
+// ============================================
+function showAllCompaniesModal() {
+    const companies = gameState.companies;
+    const emojis = ['👤', '🅰️', '🅱️', '©️', '🇩', '🇪'];
+
+    let content = '<div class="all-companies-modal">';
+
+    companies.forEach((company, idx) => {
+        const isPlayer = idx === 0;
+        const isCurrent = idx === gameState.currentPlayerIndex;
+        const emoji = emojis[idx] || '🏢';
+
+        // 在庫ブロック
+        const makeBlocks = (count, type) => {
+            if (count === 0) return '<span style="color:#999;">0</span>';
+            const colors = { material: '#7c3aed', wip: '#f59e0b', product: '#22c55e' };
+            return Array(Math.min(count, 10)).fill(`<span style="display:inline-block;width:8px;height:8px;background:${colors[type]};border-radius:2px;margin:1px;"></span>`).join('') + (count > 10 ? `+${count-10}` : '');
+        };
+
+        // チップ表示
+        const chipDisplay = (chips) => {
+            let html = '';
+            if (chips.research) html += `<span style="color:#3b82f6;">研${chips.research}</span> `;
+            if (chips.education) html += `<span style="color:#eab308;">育${chips.education}</span> `;
+            if (chips.advertising) html += `<span style="color:#a855f7;">広${chips.advertising}</span> `;
+            if (chips.computer) html += `<span style="color:#22c55e;">PC</span> `;
+            if (chips.insurance) html += `<span style="color:#f97316;">保</span> `;
+            return html || '-';
+        };
+
+        // 機械表示
+        const machineDisplay = company.machines.map(m => m.type === 'large' ? '大' : '小').join('') || '0';
+
+        const borderColor = isCurrent ? '#f59e0b' : (isPlayer ? '#3b82f6' : '#e5e7eb');
+        const bgColor = isPlayer ? '#eff6ff' : '#f9fafb';
+
+        content += `
+            <div class="company-card" style="background:${bgColor}; border:2px solid ${borderColor}; border-radius:12px; padding:10px; margin-bottom:10px; ${isCurrent ? 'box-shadow: 0 0 10px rgba(245,158,11,0.5);' : ''}">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e5e7eb; padding-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:20px;">${emoji}</span>
+                        <span style="font-weight:bold; font-size:14px; color:${isPlayer ? '#2563eb' : '#374151'};">${company.name}</span>
+                        ${isCurrent ? '<span style="background:#f59e0b; color:white; font-size:10px; padding:2px 6px; border-radius:4px;">ターン中</span>' : ''}
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:bold; color:#059669;">¥${company.cash}</div>
+                        <div style="font-size:10px; color:#666;">${company.currentRow || 1}/${gameState.maxRows}行</div>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; font-size:11px; margin-bottom:6px;">
+                    <div><span style="color:#7c3aed;">材:</span>${makeBlocks(company.materials, 'material')}</div>
+                    <div><span style="color:#f59e0b;">仕:</span>${makeBlocks(company.wip, 'wip')}</div>
+                    <div><span style="color:#22c55e;">製:</span>${makeBlocks(company.products, 'product')}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#666; margin-bottom:4px;">
+                    <span>W:${company.workers} 機:${machineDisplay} S:${company.salesmen}</span>
+                    <span>製造:${getManufacturingCapacity(company)} 販売:${getSalesCapacity(company)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:10px;">
+                    <span>チップ: ${chipDisplay(company.chips)}</span>
+                    ${(company.loans > 0 || company.shortLoans > 0) ? `<span style="color:#dc2626;">借:長¥${company.loans || 0}/短¥${company.shortLoans || 0}</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    content += '</div>';
+
+    showModal('全社状況一覧', content);
+}
+
 // グローバル公開
 if (typeof window !== 'undefined') {
     window.updateDisplay = updateDisplay;
@@ -525,4 +598,5 @@ if (typeof window !== 'undefined') {
     window.showModal = showModal;
     window.closeModal = closeModal;
     window.showAICompanyModal = showAICompanyModal;
+    window.showAllCompaniesModal = showAllCompaniesModal;
 }

@@ -109,9 +109,13 @@ function showNextCompanySettlement() {
 // ============================================
 function showPQBreakdown(companyIndex) {
     const company = gameState.companies[companyIndex];
+    const data = window.lastFinancialData ? window.lastFinancialData[companyIndex] : null;
     const salesLogs = (gameState.actionLog || []).filter(log =>
         log.companyIndex === companyIndex && (log.action === '商品販売' || log.action.includes('販売'))
     );
+
+    // 保存されたPQを使用（リセット後も正しい値を表示）
+    const storedPQ = data ? data.pq : (company.totalSales || 0);
 
     let content = '<div style="max-height: 60vh; overflow-y: auto; padding: 10px;">';
     content += '<div style="font-size: 14px; color: #1e40af; font-weight: bold; margin-bottom: 10px;">売上明細（PQ）</div>';
@@ -133,11 +137,18 @@ function showPQBreakdown(companyIndex) {
                 </div>
             `;
         });
-        content += `<div style="background: #1e40af; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 10px;">
-            <div style="font-size: 12px;">売上高合計 (PQ)</div>
-            <div style="font-size: 20px; font-weight: bold;">¥${total}</div>
-        </div>`;
+        // ログ合計と保存されたPQが異なる場合は両方表示
+        if (total !== storedPQ && storedPQ > 0) {
+            content += `<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 8px; border-radius: 6px; margin-top: 10px; font-size: 11px; color: #92400e;">
+                ※ログ集計: ¥${total}（一部取引がログに記録されていない可能性があります）
+            </div>`;
+        }
     }
+
+    content += `<div style="background: #1e40af; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 10px;">
+        <div style="font-size: 12px;">売上高合計 (PQ)</div>
+        <div style="font-size: 20px; font-weight: bold;">¥${storedPQ}</div>
+    </div>`;
     content += '</div>';
     content += `<div style="text-align: center; margin-top: 10px;">
         <button onclick="closeBreakdownModal()" class="btn-primary" style="padding: 8px 20px;">閉じる</button>
@@ -153,11 +164,13 @@ function showVQBreakdown(companyIndex) {
     const company = gameState.companies[companyIndex];
     const data = window.lastFinancialData ? window.lastFinancialData[companyIndex] : null;
 
-    const materialCost = company.totalMaterialCost || 0;
-    const productionCost = company.totalProductionCost || 0;
-    const startInv = company.periodStartInventory || {materials: 0, wip: 0, products: 0};
+    // 保存されたデータがあれば使用（リセット後も正しい値を表示）
+    const materialCost = data ? data.materialCost : (company.totalMaterialCost || 0);
+    const productionCost = data ? data.productionCost : (company.totalProductionCost || 0);
+    const startInv = data ? data.startInventory : (company.periodStartInventory || {materials: 0, wip: 0, products: 0});
+    const endInv = data ? data.endInventory : {materials: company.materials, wip: company.wip, products: company.products};
     const startValue = (startInv.materials * 13) + (startInv.wip * 14) + (startInv.products * 15);
-    const endValue = (company.materials * 13) + (company.wip * 14) + (company.products * 15);
+    const endValue = (endInv.materials * 13) + (endInv.wip * 14) + (endInv.products * 15);
 
     let content = '<div style="max-height: 60vh; overflow-y: auto; padding: 10px;">';
     content += '<div style="font-size: 14px; color: #d97706; font-weight: bold; margin-bottom: 10px;">変動費明細（VQ）</div>';
@@ -210,12 +223,12 @@ function showVQBreakdown(companyIndex) {
         <span>+¥${startValue}</span>
     </div>`;
     content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 4px 0;">
-        <span>期末在庫評価額（材${company.materials}×13 + 仕${company.wip}×14 + 製${company.products}×15）</span>
+        <span>期末在庫評価額（材${endInv.materials}×13 + 仕${endInv.wip}×14 + 製${endInv.products}×15）</span>
         <span>-¥${endValue}</span>
     </div>`;
     content += '</div>';
 
-    const vq = materialCost + productionCost + startValue - endValue;
+    const vq = data ? data.vq : (materialCost + productionCost + startValue - endValue);
     content += `<div style="background: #f59e0b; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 10px;">
         <div style="font-size: 12px;">変動費合計 (VQ)</div>
         <div style="font-size: 20px; font-weight: bold;">¥${vq}</div>
@@ -234,40 +247,42 @@ function showVQBreakdown(companyIndex) {
 // ============================================
 function showFBreakdown(companyIndex) {
     const company = gameState.companies[companyIndex];
-    const period = gameState.currentPeriod;
+    const data = window.lastFinancialData ? window.lastFinancialData[companyIndex] : null;
+    const fb = data?.fBreakdown;
 
-    let unitCost = BASE_SALARY_BY_PERIOD[period] || 22;
-    if (period >= 3 && gameState.wageMultiplier > 1) {
-        unitCost = Math.round(unitCost * gameState.wageMultiplier);
-    }
-    const halfCost = Math.round(unitCost / 2);
+    // 保存されたデータがあれば使用（リセット後も正しい値を表示）
+    const period = fb ? fb.period : gameState.currentPeriod;
+    const unitCost = fb ? fb.unitCost : (BASE_SALARY_BY_PERIOD[period] || 22);
+    const halfCost = fb ? fb.halfCost : Math.round(unitCost / 2);
 
     // 給与計算
-    const stats = company.endOfPeriodStats || {
+    const stats = fb ? fb.stats : (company.endOfPeriodStats || {
         machines: company.machines.length,
         workers: company.workers,
         salesmen: company.salesmen
-    };
-    const machineSalary = stats.machines * unitCost;
-    const workerSalary = stats.workers * unitCost;
-    const salesmenSalary = stats.salesmen * unitCost;
-    const maxPersonnel = company.maxPersonnel || (stats.workers + stats.salesmen);
-    const maxPersonnelCost = maxPersonnel * halfCost;
-    const totalSalary = machineSalary + workerSalary + salesmenSalary + maxPersonnelCost;
+    });
+    const machineSalary = fb ? fb.machineSalary : (stats.machines * unitCost);
+    const workerSalary = fb ? fb.workerSalary : (stats.workers * unitCost);
+    const salesmenSalary = fb ? fb.salesmenSalary : (stats.salesmen * unitCost);
+    const maxPersonnel = fb ? fb.maxPersonnel : (company.maxPersonnel || (stats.workers + stats.salesmen));
+    const maxPersonnelCost = fb ? fb.maxPersonnelCost : (maxPersonnel * halfCost);
+    const totalSalary = fb ? fb.totalSalary : (machineSalary + workerSalary + salesmenSalary + maxPersonnelCost);
 
     // 減価償却
-    const depreciation = calculateDepreciation(company, period);
+    const depreciation = fb ? fb.depreciation : calculateDepreciation(company, period);
 
     // 金利
-    const longInterest = Math.floor((company.loans || 0) * 0.1);
-    const shortInterest = Math.floor((company.shortLoans || 0) * 0.2);
+    const longInterest = fb ? fb.longInterest : Math.floor((company.loans || 0) * 0.1);
+    const shortInterest = fb ? fb.shortInterest : Math.floor((company.shortLoans || 0) * 0.2);
 
     // チップ費用
-    const pcCost = (company.chips.computer || 0) * 20;
-    const insuranceCost = (company.chips.insurance || 0) * 5;
+    const pcCost = fb ? fb.pcCost : ((company.chips.computer || 0) * 20);
+    const insuranceCost = fb ? fb.insuranceCost : ((company.chips.insurance || 0) * 5);
 
     let chipCost = 0;
-    if (period === 2) {
+    if (fb) {
+        chipCost = fb.chipCost;
+    } else if (period === 2) {
         const purchased = company.chipsPurchasedThisPeriod || {research: 0, education: 0, advertising: 0};
         const chipsAtEnd = {
             research: company.chips.research || 0,
@@ -289,10 +304,10 @@ function showFBreakdown(companyIndex) {
         chipCost += ((express.research || 0) + (express.education || 0) + (express.advertising || 0)) * 40;
     }
 
-    const extraLabor = company.extraLaborCost || 0;
-    const additionalF = company.additionalFixedCost || 0;
+    const extraLabor = fb ? fb.extraLabor : (company.extraLaborCost || 0);
+    const additionalF = fb ? fb.additionalF : (company.additionalFixedCost || 0);
 
-    const totalF = totalSalary + depreciation + longInterest + shortInterest + pcCost + insuranceCost + chipCost + extraLabor + additionalF;
+    const totalF = data ? data.f : (totalSalary + depreciation + longInterest + shortInterest + pcCost + insuranceCost + chipCost + extraLabor + additionalF);
 
     let content = '<div style="max-height: 60vh; overflow-y: auto; padding: 10px;">';
     content += '<div style="font-size: 14px; color: #4f46e5; font-weight: bold; margin-bottom: 10px;">固定費明細（F）</div>';

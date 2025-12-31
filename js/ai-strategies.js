@@ -6,6 +6,17 @@
  */
 
 // ============================================
+// AI「何もしない」行動（行は消費しない - お金の動きがないため）
+// ============================================
+function aiDoNothing(company, reason = '') {
+    const companyIndex = gameState.companies.indexOf(company);
+    // 行は消費しない（お金の動きがある時だけ行を消費）
+    const detail = reason || '行動条件なし';
+    logAction(companyIndex, '待機', detail, 0, false);  // rowUsed = false
+    showAIActionModal(company, '待機', '⏳', detail);
+}
+
+// ============================================
 // AIチップ購入ヘルパー（F計算用トラッキング付き）
 // ============================================
 function aiPurchaseChip(company, chipType, cost) {
@@ -819,7 +830,7 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
             return;
         }
 
-        nextTurn();
+        aiDoNothing(company, '在庫調整中');
         return;
     }
 
@@ -965,7 +976,7 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
             return;
         }
 
-        nextTurn();
+        aiDoNothing(company, '積極投資待ち');
         return;
     }
 
@@ -1059,7 +1070,7 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
         }
     }
 
-    nextTurn();
+    aiDoNothing(company, '技術投資検討中');
 }
 
 // ============================================
@@ -1109,7 +1120,7 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
             return;
         }
 
-        nextTurn();
+        aiDoNothing(company, '安定経営維持');
         return;
     }
 
@@ -1198,7 +1209,7 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         }
     }
 
-    nextTurn();
+    aiDoNothing(company, '品質管理中');
 }
 
 // ============================================
@@ -1248,7 +1259,7 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
             return;
         }
 
-        nextTurn();
+        aiDoNothing(company, '技術開発待ち');
         return;
     }
 
@@ -1392,7 +1403,7 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
             return;
         }
 
-        nextTurn();
+        aiDoNothing(company, '販売機会待ち');
         return;
     }
 
@@ -1503,7 +1514,7 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
         }
     }
 
-    nextTurn();
+    aiDoNothing(company, '分散投資検討中');
 }
 
 // ============================================
@@ -1567,7 +1578,7 @@ function executeUnpredictableStrategy(company, mfgCapacity, salesCapacity, analy
                 break;
             case 4:
                 if (Math.random() > 0.3) {
-                    nextTurn();
+                    aiDoNothing(company, '様子見中');
                     return;
                 }
                 break;
@@ -1612,7 +1623,7 @@ function executeUnpredictableStrategy(company, mfgCapacity, salesCapacity, analy
             return;
         }
 
-        nextTurn();
+        aiDoNothing(company, '気まぐれ待機');
         return;
     }
 
@@ -1846,7 +1857,7 @@ function executeDefaultMaterialPurchase(company, targetQty) {
         return;
     }
 
-    nextTurn();
+    aiDoNothing(company, '材料・資金不足');
 }
 
 // ============================================
@@ -1891,7 +1902,7 @@ function executeDefaultInvestment(company) {
     const periodsRemaining = 5 - gameState.currentPeriod;
 
     if (rowsRemaining < 5) {
-        nextTurn();
+        aiDoNothing(company, '期末間近');
         return;
     }
 
@@ -1903,7 +1914,7 @@ function executeDefaultInvestment(company) {
     if (company.strategy === 'conservative') safetyMargin = periodEndCost + 50;
 
     if (company.cash <= safetyMargin) {
-        nextTurn();
+        aiDoNothing(company, '資金温存');
         return;
     }
 
@@ -1993,5 +2004,276 @@ function executeDefaultInvestment(company) {
         return;
     }
 
-    nextTurn();
+    aiDoNothing(company, 'チップ投資見送り');
+}
+
+// ============================================
+// AI入札開始（AIが親で市場に販売を試みる場合）
+// ============================================
+function startAIBidding(aiCompany, market, aiQty, strategicPrice) {
+    const companyIndex = gameState.companies.indexOf(aiCompany);
+    const marketIndex = gameState.markets.indexOf(market);
+
+    // AI入札情報を保存
+    const isAIParent = (gameState.currentPlayerIndex === companyIndex);
+    const aiCompetitiveness = getPriceCompetitiveness(aiCompany, isAIParent);
+    const aiDisplayPrice = Math.min(Math.round(strategicPrice * market.sellPrice), market.sellPrice);
+    const aiCallPrice = aiDisplayPrice - aiCompetitiveness;
+
+    gameState.pendingAIBid = {
+        company: companyIndex,
+        price: aiCallPrice,
+        displayPrice: aiDisplayPrice,
+        quantity: aiQty,
+        market: marketIndex,
+        competitiveness: aiCompetitiveness,
+        isParent: isAIParent
+    };
+
+    // プレイヤーに入札参加を確認
+    const playerCompany = gameState.companies[0];
+    const playerProducts = playerCompany.products || 0;
+    const playerSalesCapacity = getSalesCapacity(playerCompany);
+    const canPlayerBid = playerProducts > 0 && playerSalesCapacity > 0 && !playerCompany.cannotSell;
+
+    const content = `
+        <div class="bid-display" style="text-align: center;">
+            <div style="font-size: 14px; color: #6366f1; margin-bottom: 10px;">📢 ${aiCompany.name}が入札を開始</div>
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: white; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                <div style="font-size: 18px; font-weight: bold;">${market.name}市場</div>
+                <div style="font-size: 14px; opacity: 0.9;">基準価格: ¥${market.sellPrice}</div>
+            </div>
+            ${canPlayerBid ? `
+                <div style="background: #e0f2fe; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #0369a1;">あなたの状況</div>
+                    <div style="font-size: 14px; font-weight: bold;">製品: ${playerProducts}個 / 販売能力: ${playerSalesCapacity}個</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 12px; color: #374151;">入札数量:</label>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px;">
+                        <button onclick="adjustAIBidQty(-1)" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #6366f1; color: white; font-size: 20px; cursor: pointer;">−</button>
+                        <input type="number" id="aiBidQty" value="${Math.min(playerSalesCapacity, playerProducts)}" min="1" max="${Math.min(playerSalesCapacity, playerProducts)}" readonly style="width: 60px; height: 40px; text-align: center; font-size: 18px; border: 2px solid #6366f1; border-radius: 8px;">
+                        <button onclick="adjustAIBidQty(1)" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #6366f1; color: white; font-size: 20px; cursor: pointer;">+</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 12px; color: #374151;">入札価格 (¥26〜¥${market.sellPrice}):</label>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px;">
+                        <button onclick="adjustAIBidPrice(-1)" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #6366f1; color: white; font-size: 20px; cursor: pointer;">−</button>
+                        <input type="number" id="aiBidPrice" value="${market.sellPrice}" min="26" max="${market.sellPrice}" readonly style="width: 70px; height: 40px; text-align: center; font-size: 18px; border: 2px solid #6366f1; border-radius: 8px;">
+                        <button onclick="adjustAIBidPrice(1)" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #6366f1; color: white; font-size: 20px; cursor: pointer;">+</button>
+                    </div>
+                </div>
+                <button class="submit-btn" onclick="playerJoinAIBid(${marketIndex})" style="width: 100%; margin-bottom: 10px;">入札に参加</button>
+            ` : `
+                <div style="background: #fef3c7; padding: 10px; border-radius: 8px; margin-bottom: 15px; color: #92400e;">
+                    ${!playerProducts ? '製品がないため入札できません' :
+                      !playerSalesCapacity ? '販売能力がないため入札できません' :
+                      '消費者運動中のため販売できません'}
+                </div>
+            `}
+            <button class="cancel-btn" onclick="skipAIBid()" style="width: 100%;">入札に参加しない</button>
+        </div>
+    `;
+
+    showModal('入札参加', content);
+}
+
+// AI入札の数量調整
+function adjustAIBidQty(delta) {
+    const input = document.getElementById('aiBidQty');
+    if (!input) return;
+    const max = parseInt(input.max) || 1;
+    const min = parseInt(input.min) || 1;
+    const current = parseInt(input.value) || 1;
+    input.value = Math.max(min, Math.min(max, current + delta));
+}
+
+// AI入札の価格調整
+function adjustAIBidPrice(delta) {
+    const input = document.getElementById('aiBidPrice');
+    if (!input) return;
+    const max = parseInt(input.max) || 32;
+    const min = parseInt(input.min) || 26;
+    const current = parseInt(input.value) || 32;
+    input.value = Math.max(min, Math.min(max, current + delta));
+}
+
+// プレイヤーがAI入札に参加
+function playerJoinAIBid(marketIndex) {
+    const market = gameState.markets[marketIndex];
+    const playerCompany = gameState.companies[0];
+    const playerQty = parseInt(document.getElementById('aiBidQty').value) || 1;
+    const playerDisplayPrice = parseInt(document.getElementById('aiBidPrice').value) || market.sellPrice;
+
+    const isPlayerParent = (gameState.currentPlayerIndex === 0);
+    const playerCompetitiveness = getPriceCompetitiveness(playerCompany, isPlayerParent);
+    const playerCallPrice = playerDisplayPrice - playerCompetitiveness;
+
+    // 全入札を集める
+    const allBids = [
+        gameState.pendingAIBid,
+        {
+            company: 0,
+            price: playerCallPrice,
+            displayPrice: playerDisplayPrice,
+            quantity: playerQty,
+            competitiveness: playerCompetitiveness,
+            isParent: isPlayerParent
+        }
+    ];
+
+    // 他のAIも入札に参加
+    for (let i = 1; i < gameState.companies.length; i++) {
+        if (i === gameState.pendingAIBid.company) continue; // 親AIはすでに入札済み
+        const otherAI = gameState.companies[i];
+        if (otherAI.products > 0 && !otherAI.cannotSell) {
+            const otherSalesCapacity = getSalesCapacity(otherAI);
+            const otherQty = Math.min(otherSalesCapacity, otherAI.products);
+            if (otherQty > 0) {
+                const isOtherParent = (gameState.currentPlayerIndex === i);
+                const otherCompetitiveness = getPriceCompetitiveness(otherAI, isOtherParent);
+                const otherDisplayPrice = Math.max(26, Math.floor(market.sellPrice * (0.85 + Math.random() * 0.10)));
+                const otherCallPrice = otherDisplayPrice - otherCompetitiveness;
+                allBids.push({
+                    company: i,
+                    price: otherCallPrice,
+                    displayPrice: otherDisplayPrice,
+                    quantity: otherQty,
+                    competitiveness: otherCompetitiveness,
+                    isParent: isOtherParent
+                });
+            }
+        }
+    }
+
+    processAIBidResults(marketIndex, allBids);
+}
+
+// プレイヤーがAI入札をスキップ
+function skipAIBid() {
+    const marketIndex = gameState.pendingAIBid?.market;
+    if (marketIndex === undefined) {
+        closeModal();
+        nextTurn();
+        return;
+    }
+
+    // プレイヤーは不参加、AIのみで入札処理
+    const allBids = [gameState.pendingAIBid];
+
+    // 他のAIも入札に参加
+    const market = gameState.markets[marketIndex];
+    for (let i = 1; i < gameState.companies.length; i++) {
+        if (i === gameState.pendingAIBid.company) continue;
+        const otherAI = gameState.companies[i];
+        if (otherAI.products > 0 && !otherAI.cannotSell) {
+            const otherSalesCapacity = getSalesCapacity(otherAI);
+            const otherQty = Math.min(otherSalesCapacity, otherAI.products);
+            if (otherQty > 0) {
+                const isOtherParent = (gameState.currentPlayerIndex === i);
+                const otherCompetitiveness = getPriceCompetitiveness(otherAI, isOtherParent);
+                const otherDisplayPrice = Math.max(26, Math.floor(market.sellPrice * (0.85 + Math.random() * 0.10)));
+                const otherCallPrice = otherDisplayPrice - otherCompetitiveness;
+                allBids.push({
+                    company: i,
+                    price: otherCallPrice,
+                    displayPrice: otherDisplayPrice,
+                    quantity: otherQty,
+                    competitiveness: otherCompetitiveness,
+                    isParent: isOtherParent
+                });
+            }
+        }
+    }
+
+    processAIBidResults(marketIndex, allBids);
+}
+
+// AI入札結果を処理
+function processAIBidResults(marketIndex, allBids) {
+    const market = gameState.markets[marketIndex];
+
+    // 入札をソート
+    BiddingSystem.sortBids(allBids, gameState, gameState.pendingAIBid.company);
+
+    // 親の数量分だけ販売可能
+    const parentBid = allBids.find(b => b.company === gameState.pendingAIBid.company);
+    const parentQuantity = parentBid ? parentBid.quantity : 3;
+    let remainingCapacity = Math.min(parentQuantity, market.maxStock - market.currentStock);
+    let salesResults = [];
+
+    for (const bid of allBids) {
+        if (remainingCapacity <= 0) break;
+
+        const bidCompany = gameState.companies[bid.company];
+        const bidderSalesCapacity = getSalesCapacity(bidCompany);
+        const actualQty = Math.min(remainingCapacity, bidCompany.products, bidderSalesCapacity);
+
+        if (actualQty > 0) {
+            const salePrice = bid.displayPrice;
+            const revenue = salePrice * actualQty;
+            bidCompany.cash += revenue;
+            bidCompany.products -= actualQty;
+            bidCompany.totalSales += revenue;
+            bidCompany.totalSoldQuantity = (bidCompany.totalSoldQuantity || 0) + actualQty;
+            market.currentStock += actualQty;
+            remainingCapacity -= actualQty;
+
+            bidCompany.currentRow = (bidCompany.currentRow || 1) + 1;
+            bidCompany.rowsUsed = (bidCompany.rowsUsed || 0) + 1;
+
+            logAction(bid.company, '商品販売', `${market.name}に¥${salePrice}×${actualQty}個`, revenue, true);
+
+            salesResults.push({
+                company: bidCompany,
+                quantity: actualQty,
+                price: salePrice,
+                callPrice: bid.price,
+                competitiveness: bid.competitiveness || 0,
+                displayPrice: bid.displayPrice
+            });
+
+            if (typeof AIBrain !== 'undefined') {
+                AIBrain.recordBidResult(salePrice, true, market.name);
+            }
+        }
+    }
+
+    // 結果表示
+    let resultHtml = `<div style="text-align: center; margin-bottom: 10px;">
+        <div style="font-size: 14px; color: #666;">📍 ${market.name}市場の入札結果</div>
+    </div>`;
+
+    salesResults.forEach((result, idx) => {
+        const isPlayer = (gameState.companies.indexOf(result.company) === 0);
+        const rankStyle = idx === 0 ? 'background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white;' :
+                          'background: #f1f5f9; color: #374151;';
+        const rankLabel = idx === 0 ? '🏆 落札' : `${idx + 1}位`;
+
+        resultHtml += `
+            <div style="${rankStyle} padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-weight: bold;">${rankLabel}</span>
+                        <span style="${isPlayer ? 'color: #2563eb; font-weight: bold;' : ''}">${result.company.name}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px;">表示価格¥${result.displayPrice} → コール¥${result.callPrice}</div>
+                        <div style="font-weight: bold;">${result.quantity}個 = ¥${result.price * result.quantity}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    if (salesResults.length === 0) {
+        resultHtml += '<div style="color: #666; text-align: center; padding: 20px;">販売できる会社がありませんでした</div>';
+    }
+
+    resultHtml += '<button class="submit-btn" onclick="closeModal(); updateDisplay(); nextTurn();" style="width: 100%; margin-top: 15px;">OK</button>';
+
+    closeModal();
+    gameState.pendingAIBid = null;
+    showModal('入札結果', resultHtml);
 }

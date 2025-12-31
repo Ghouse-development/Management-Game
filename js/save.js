@@ -28,7 +28,15 @@ function saveGame() {
         cardDeck: gameState.cardDeck,
         deckInitialized: gameState.deckInitialized,
         markets: gameState.markets,
-        companies: gameState.companies
+        companies: gameState.companies,
+        // サイコロ関連
+        previousPQTopIndex: gameState.previousPQTopIndex,
+        previousPQTopName: gameState.previousPQTopName,
+        previousPQTopAmount: gameState.previousPQTopAmount,
+        diceRoll: gameState.diceRoll,
+        wageMultiplier: gameState.wageMultiplier,
+        osakaMaxPrice: gameState.osakaMaxPrice,
+        periodStartPlayerIndex: gameState.periodStartPlayerIndex
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
     console.log('ゲームを自動保存しました（期' + gameState.currentPeriod + '）');
@@ -70,4 +78,12 @@ function restoreGame(saveData) {
     gameState.deckInitialized = saveData.deckInitialized;
     gameState.markets = saveData.markets;
     gameState.companies = saveData.companies;
+    // サイコロ関連
+    gameState.previousPQTopIndex = saveData.previousPQTopIndex;
+    gameState.previousPQTopName = saveData.previousPQTopName;
+    gameState.previousPQTopAmount = saveData.previousPQTopAmount;
+    gameState.diceRoll = saveData.diceRoll;
+    gameState.wageMultiplier = saveData.wageMultiplier || 1.0;
+    gameState.osakaMaxPrice = saveData.osakaMaxPrice;
+    gameState.periodStartPlayerIndex = saveData.periodStartPlayerIndex;
 }

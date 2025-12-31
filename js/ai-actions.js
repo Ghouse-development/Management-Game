@@ -606,10 +606,27 @@ function executeAITurn() {
             }
 
             // Apply risk card effect to AI
-            applyRiskCardToAI(company, card);
+            const rowUsed = applyRiskCardToAI(company, card);
 
-            // リスクカードを引いたことを通知
-            showAIActionModal(company, `リスクカード: ${card.name}`, '⚠️', card.description);
+            // リスクカードを引いたことを通知（行動ログに記録）
+            const companyIndex = gameState.companies.indexOf(company);
+            let effectDescription = card.description;
+
+            // 特別な効果の説明を追加
+            if (card.id === 15 || card.id === 16) {
+                effectDescription += '（今期は生産不可）';
+            } else if (card.id === 5 || card.id === 6) {
+                effectDescription += '（今期は販売不可）';
+            } else if (card.id === 43 || card.id === 44) {
+                effectDescription += '（行消費なし）';
+            } else if (card.id === 47 || card.id === 48) {
+                effectDescription += '（1回休み付与、行消費なし）';
+            } else if (card.id === 59 || card.id === 60) {
+                effectDescription += '（行消費なし）';
+            }
+
+            logAction(companyIndex, `リスク: ${card.name}`, effectDescription, 0, rowUsed);
+            showAIActionModal(company, `リスクカード: ${card.name}`, '⚠️', effectDescription);
             return; // リスクカードを引いたらターン終了
         }
         // 利用可能なリスクカードがない場合は意思決定へ
