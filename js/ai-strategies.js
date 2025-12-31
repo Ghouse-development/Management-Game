@@ -840,41 +840,42 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
         return;
     }
 
-    // 2期は投資優先
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5) {
-        if (company.chips.education < 2 && company.cash >= chipCost + safetyMargin) {
+    // === 基本サイクル優先: 販売→生産→仕入 ===
+    // 販売優先（製品があれば売る）
+    if (company.products > 0 && salesCapacity > 0) {
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
+        return;
+    }
+
+    // 生産最大化（材料/仕掛品があれば生産）
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+        executeDefaultProduction(company, mfgCapacity);
+        return;
+    }
+
+    // 材料購入（製品も材料もない時は仕入れる）
+    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // === 基本サイクル後のチップ投資 ===
+    // 2期は投資も行う（余裕がある時のみ）
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
+        if (company.chips.education < 2) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'education', chipCost);
             incrementRow(gameState.companies.indexOf(company));
             showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期攻め投資）');
             return;
         }
-        if (company.chips.research < 2 && company.cash >= chipCost + safetyMargin) {
+        if (company.chips.research < 2) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'research', chipCost);
             incrementRow(gameState.companies.indexOf(company));
             showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期攻め投資）');
             return;
         }
-    }
-
-    // 販売優先
-    const minSellQty = Math.ceil(salesCapacity * 0.7);
-    if (company.products >= minSellQty && salesCapacity > 0) {
-        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
-        return;
-    }
-
-    // 生産最大化
-    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
-    }
-
-    // 材料購入
-    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
-        executeDefaultMaterialPurchase(company, mfgCapacity);
-        return;
     }
 
     // 長期投資
@@ -985,44 +986,45 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5) {
-        if (!company.chips.insurance && company.cash >= chipCost + safetyMargin) {
+    // === 基本サイクル優先: 販売→生産→仕入 ===
+    if (company.products > 0 && salesCapacity > 0) {
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.85);
+        return;
+    }
+
+    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+        executeDefaultProduction(company, mfgCapacity);
+        return;
+    }
+
+    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // === 基本サイクル後のチップ投資（2期） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 50) {
+        if (!company.chips.insurance) {
             company.cash -= 5;
             company.chips.insurance = 1;
             incrementRow(gameState.companies.indexOf(company));
             showAIActionModal(company, 'チップ購入', '🛡️', '保険チップ購入（2期リスク対策）');
             return;
         }
-        if (company.chips.education < 2 && company.cash >= chipCost + safetyMargin) {
+        if (company.chips.education < 2) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'education', chipCost);
             incrementRow(gameState.companies.indexOf(company));
             showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期堅実投資）');
             return;
         }
-        if (company.chips.research < 2 && company.cash >= chipCost + safetyMargin) {
+        if (company.chips.research < 2) {
             company.cash -= chipCost;
             aiPurchaseChip(company, 'research', chipCost);
             incrementRow(gameState.companies.indexOf(company));
             showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期堅実投資）');
             return;
         }
-    }
-
-    const minSellQty = Math.ceil(salesCapacity * 0.7);
-    if (company.products >= minSellQty && salesCapacity > 0) {
-        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.85);
-        return;
-    }
-
-    if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0 && company.products < 4) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
-    }
-
-    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
-        executeDefaultMaterialPurchase(company, mfgCapacity);
-        return;
     }
 
     if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 8 && !analysis.isRecoveryPhase) {
@@ -1129,25 +1131,8 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5) {
-        if (company.chips.research < 2 && company.cash >= chipCost + safetyMargin) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期価格戦略）');
-            return;
-        }
-        if (company.chips.advertising < 2 && company.cash >= chipCost + safetyMargin) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'advertising', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（2期販売強化）');
-            return;
-        }
-    }
-
-    const minSellQty = Math.ceil(salesCapacity * 0.7);
-    if (company.products >= minSellQty && salesCapacity > 0) {
+    // === 基本サイクル優先: 販売→生産→仕入 ===
+    if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
         return;
     }
@@ -1157,9 +1142,27 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
+    }
+
+    // === 基本サイクル後のチップ投資（2期） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
+        if (company.chips.research < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'research', chipCost);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期価格戦略）');
+            return;
+        }
+        if (company.chips.advertising < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'advertising', chipCost);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（2期販売強化）');
+            return;
+        }
     }
 
     if (company.cash > safetyMargin + 50 && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
@@ -1268,25 +1271,8 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
         return;
     }
 
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5) {
-        if (company.chips.education < 2 && company.cash >= chipCost + safetyMargin) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'education', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期技術投資）');
-            return;
-        }
-        if (company.chips.research < 2 && company.cash >= chipCost + safetyMargin) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期技術投資）');
-            return;
-        }
-    }
-
-    const minSellQty = Math.ceil(salesCapacity * 0.7);
-    if (company.products >= minSellQty && salesCapacity > 0) {
+    // === 基本サイクル優先: 販売→生産→仕入 ===
+    if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.80);
         return;
     }
@@ -1294,6 +1280,29 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
     if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
         executeDefaultProduction(company, mfgCapacity);
         return;
+    }
+
+    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+        executeDefaultMaterialPurchase(company, mfgCapacity);
+        return;
+    }
+
+    // === 基本サイクル後のチップ投資（2期） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
+        if (company.chips.education < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'education', chipCost);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期技術投資）');
+            return;
+        }
+        if (company.chips.research < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'research', chipCost);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期技術投資）');
+            return;
+        }
     }
 
     if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
@@ -1412,24 +1421,8 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
         return;
     }
 
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5) {
-        if (company.chips.education < 2 && company.cash >= chipCost + safetyMargin) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'education', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期投資）');
-            return;
-        }
-        if (company.chips.research < 2 && company.cash >= chipCost + safetyMargin) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期投資）');
-            return;
-        }
-    }
-
-    if (company.products >= 1 && salesCapacity > 0) {
+    // === 基本サイクル優先: 販売→生産→仕入 ===
+    if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.80);
         return;
     }
@@ -1439,9 +1432,27 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
         return;
     }
 
-    if (company.cash > safetyMargin + 40 && company.materials < mfgCapacity) {
+    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
+    }
+
+    // === 基本サイクル後のチップ投資（2期） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
+        if (company.chips.education < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'education', chipCost);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期投資）');
+            return;
+        }
+        if (company.chips.research < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'research', chipCost);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期投資）');
+            return;
+        }
     }
 
     if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 6 && !analysis.isRecoveryPhase) {
