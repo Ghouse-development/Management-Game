@@ -118,6 +118,53 @@ html, body {
     color: #fff;
 }
 
+/* AIバッジ - 借入表示 */
+.ai-badge-loans {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    margin-top: 2px;
+}
+.ai-loan-badge {
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+.ai-loan-badge.long {
+    background: #1e40af;
+    color: #93c5fd;
+}
+.ai-loan-badge.short {
+    background: #991b1b;
+    color: #fca5a5;
+}
+
+/* プレイヤー会社盤 - 借入表示 */
+.info-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+}
+.info-badge.loan-long {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    color: #93c5fd;
+}
+.info-badge.loan-short {
+    background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
+    color: #fca5a5;
+}
+.info-badge-label {
+    font-size: 10px;
+    opacity: 0.8;
+}
+.info-badge-value {
+    font-weight: bold;
+}
+
 /* AIバッジ - ドット表示 */
 .ai-inv-group {
     display: inline-flex;
@@ -655,8 +702,8 @@ html, body {
 
 /* 次繰盤 */
 .next-period-board {
-    background: #faf5ff;
-    border: 2px solid #9333ea;
+    background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+    border: 2px solid #ca8a04;
     border-radius: 8px;
     padding: 8px;
     margin-top: 10px;
@@ -667,13 +714,15 @@ html, body {
     gap: 12px;
     justify-content: center;
     font-size: 12px;
-    color: #581c87;
+    color: #78350f;
 }
 .next-chip-item {
-    background: #e9d5ff;
+    background: #fef3c7;
     padding: 4px 10px;
     border-radius: 12px;
-    border: 1px solid #a855f7;
+    border: 1px solid #d97706;
+    color: #78350f;
+    font-weight: 500;
 }
 
 /* ============================================ */
@@ -1022,6 +1071,18 @@ html, body {
 }
 .price-badge.buy { color: #c41e3a; }
 .price-badge.sell { color: #c41e3a; }
+
+/* マーケットボリューム（空き容量）- 仕入価格と販売価格の間に表示 */
+.market-volume-inline {
+    font-size: 8px;
+    font-weight: bold;
+    color: white;
+    background: rgba(0,0,0,0.35);
+    padding: 1px 3px;
+    border-radius: 3px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    white-space: nowrap;
+}
 
 /* 在庫表示（ポケット内の材料チップ - 5個ずつ並べる） */
 .market-stock {
@@ -1624,42 +1685,43 @@ html, body {
 
 /* スマホ向け（480px以下）- スクロールなしで全表示 */
 @media (max-width: 480px) {
-    /* 縦に3分割: AIバッジ(10%) + カード&市場(35%) + 会社盤(55%) */
-    /* 上部に余白追加（ステータスバー対策） */
+    /* 縦に3分割: AIバッジ(12%) + カード&市場(33%) + 会社盤(55%) */
+    /* 上部に余白追加（ステータスバー・ノッチ対策） */
     .container {
         padding: 2px;
-        padding-top: env(safe-area-inset-top, 20px);
-        padding-bottom: 2px;
+        padding-top: max(env(safe-area-inset-top, 0px), 35px);
+        padding-bottom: env(safe-area-inset-bottom, 2px);
     }
 
-    /* AIバッジ - スマホ用拡大（少し大きく） */
+    /* AIバッジ - スマホ用拡大（見やすく） */
     .ai-companies-bar {
         flex: 0 0 auto;
-        gap: 4px;
-        padding: 4px;
+        gap: 5px;
+        padding: 5px 4px;
         flex-wrap: nowrap;
         overflow-x: auto;
+        min-height: 68px;
     }
     .ai-badge {
-        min-width: 75px;
-        max-width: 90px;
-        padding: 5px 6px;
-        gap: 2px;
+        min-width: 85px;
+        max-width: 100px;
+        padding: 6px 7px;
+        gap: 3px;
         flex-shrink: 0;
     }
-    .ai-badge-name { font-size: 10px; }
-    .ai-badge-cash { font-size: 10px; }
-    .ai-badge-inventory { padding: 3px 4px; gap: 3px; }
-    .ai-inv-item { gap: 2px; }
-    .ai-inv-label { font-size: 9px; min-width: 11px; }
-    .ai-inv-block { width: 9px; height: 9px; }
-    .ai-inv-extra { font-size: 9px; }
-    .ai-inv-zero { font-size: 9px; }
-    .ai-badge-row3 { display: flex; font-size: 8px; }
-    .ai-badge-info { font-size: 8px; }
-    .ai-badge-chips { font-size: 8px; }
-    .ai-badge-rownum { font-size: 8px; padding: 1px 4px; }
-    .chip-dot { width: 6px; height: 6px; }
+    .ai-badge-name { font-size: 11px; }
+    .ai-badge-cash { font-size: 11px; }
+    .ai-badge-inventory { padding: 4px 5px; gap: 4px; }
+    .ai-inv-item { gap: 3px; }
+    .ai-inv-label { font-size: 10px; min-width: 12px; }
+    .ai-inv-block { width: 10px; height: 10px; }
+    .ai-inv-extra { font-size: 10px; }
+    .ai-inv-zero { font-size: 10px; }
+    .ai-badge-row3 { display: flex; font-size: 9px; }
+    .ai-badge-info { font-size: 9px; }
+    .ai-badge-chips { font-size: 9px; }
+    .ai-badge-rownum { font-size: 9px; padding: 2px 5px; }
+    .chip-dot { width: 7px; height: 7px; }
 
     /* メインコンテンツ */
     .main-content-wrapper { flex: 1; gap: 2px; }

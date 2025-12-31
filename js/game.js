@@ -320,30 +320,7 @@ function initializeMarkets() {
 }
 
 // ============================================
-// セーブ・ロード
+// セーブ・ロード - index.htmlで定義（重複防止）
 // ============================================
-function saveGame() {
-    localStorage.setItem('mgGameSave', JSON.stringify({
-        gameState: gameState,
-        timestamp: Date.now(),
-        version: '1.0'
-    }));
-    return true;
-}
-
-function loadGame() {
-    const data = localStorage.getItem('mgGameSave');
-    return data ? JSON.parse(data) : null;
-}
-
-function hasSavedGame() {
-    return localStorage.getItem('mgGameSave') !== null;
-}
-
-function deleteSavedGame() {
-    localStorage.removeItem('mgGameSave');
-}
-
-function restoreGame(saveData) {
-    Object.assign(gameState, saveData.gameState);
-}
+// saveGame, loadGame, hasSavedGame, deleteSavedGame, restoreGame
+// はindex.htmlのscriptセクションで定義されています

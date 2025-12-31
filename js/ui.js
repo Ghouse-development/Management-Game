@@ -106,6 +106,26 @@ function renderCompanyBoard(company) {
         Array(company.chips.computer || 0).fill('<div class="chip computer"></div>').join('') || '-';
     document.getElementById('insuranceChipsDisplay').innerHTML =
         Array(company.chips.insurance || 0).fill('<div class="chip insurance"></div>').join('') || '-';
+
+    // 借入表示
+    const loanLongBadge = document.getElementById('loanLongBadge');
+    const loanShortBadge = document.getElementById('loanShortBadge');
+    if (loanLongBadge) {
+        if (company.loans > 0) {
+            loanLongBadge.style.display = 'flex';
+            document.getElementById('loanLong').textContent = `¥${company.loans}`;
+        } else {
+            loanLongBadge.style.display = 'none';
+        }
+    }
+    if (loanShortBadge) {
+        if (company.shortLoans > 0) {
+            loanShortBadge.style.display = 'flex';
+            document.getElementById('loanShort').textContent = `¥${company.shortLoans}`;
+        } else {
+            loanShortBadge.style.display = 'none';
+        }
+    }
 }
 
 // ============================================
@@ -153,7 +173,9 @@ function renderMarketsBoard() {
             }
         }
 
-        const volumeText = market.name === '海外' ? '∞' : market.maxStock;
+        // マーケットボリューム（空き容量）を計算
+        const currentVolume = market.name === '海外' ? '∞' : Math.max(0, market.maxStock - market.currentStock);
+        const maxVolume = market.name === '海外' ? '∞' : market.maxStock;
         const selectedClass = isSelected ? 'selected' : '';
         const selectedBadge = isSelected ? '<div style="position:absolute;top:2px;right:2px;background:#8b5cf6;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;z-index:5;">✓</div>' : '';
 
@@ -162,11 +184,11 @@ function renderMarketsBoard() {
                 ${selectedBadge}
                 <div class="market-color-band">
                     <span class="price-badge buy">${market.buyPrice}</span>
+                    <span class="market-volume-inline">空${currentVolume}/${maxVolume}</span>
                     <span class="price-badge sell">${market.sellPrice}</span>
                 </div>
                 <div class="market-pocket">
                     <div class="market-name">${market.name}</div>
-                    <div class="market-volume">MV:${volumeText}</div>
                     <div class="market-stock">${stockHtml}${stockExtra ? `<span style="color:#fff;font-size:10px;margin-left:2px;">${stockExtra}</span>` : ''}</div>
                 </div>
             </div>
@@ -305,6 +327,11 @@ function renderOtherCompanies() {
                     <span class="ai-badge-chips">${chipDots || '-'}</span>
                     <span class="ai-badge-rownum ${rowWarning ? 'warning' : ''}" onclick="event.stopPropagation(); showAIActionHistory(${idx + 1})" style="cursor:pointer; text-decoration:underline;">${company.currentRow || 1}行</span>
                 </div>
+                ${(company.loans > 0 || company.shortLoans > 0) ? `
+                <div class="ai-badge-loans">
+                    ${company.loans > 0 ? `<span class="ai-loan-badge long">長¥${company.loans}</span>` : ''}
+                    ${company.shortLoans > 0 ? `<span class="ai-loan-badge short">短¥${company.shortLoans}</span>` : ''}
+                </div>` : ''}
             </div>
         `;
     });
