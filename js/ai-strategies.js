@@ -1716,6 +1716,7 @@ function calculateStrategicPrice(company, market, basePrice) {
 
 // ============================================
 // 共通関数：販売実行
+// 高い価格を狙う。大量販売者は名古屋・大阪など市場容量も考慮
 // ============================================
 function executeDefaultSale(company, salesCapacity, priceBase) {
     const targetSellQty = salesCapacity;
@@ -1726,33 +1727,92 @@ function executeDefaultSale(company, salesCapacity, priceBase) {
 
     if (sellQty >= minSellQty || (isCriticalCash && sellQty >= 1)) {
         const availableMarkets = gameState.markets
-            .filter(m => m.currentStock < m.maxStock && !m.closed && (gameState.currentPeriod > 2 || m.name !== '海外'))
-            .sort((a, b) => b.sellPrice - a.sellPrice);
+            .filter(m => m.currentStock < m.maxStock && !m.closed && (gameState.currentPeriod > 2 || m.name !== '海外'));
 
-        if (availableMarkets.length > 0) {
-            const market = availableMarkets[0];
-            const actualQty = Math.min(sellQty, market.maxStock - market.currentStock);
-            const strategicPrice = calculateStrategicPrice(company, market, priceBase);
+        if (availableMarkets.length === 0) {
+            if (company.materials > 0 || company.wip > 0) {
+                const mfgCapacity = getManufacturingCapacity(company);
+                executeDefaultProduction(company, mfgCapacity);
+                return;
+            }
+            const mfgCapacity = getManufacturingCapacity(company);
+            executeDefaultMaterialPurchase(company, mfgCapacity);
+            return;
+        }
 
-            if (actualQty > 0) {
-                if (!market.needsBid) {
-                    const revenue = market.sellPrice * actualQty;
-                    company.cash += revenue;
-                    company.products -= actualQty;
-                    company.totalSales += revenue;
-                    company.totalSoldQuantity = (company.totalSoldQuantity || 0) + actualQty;
-                    market.currentStock += actualQty;
+        // 市場選択ロジック：高い価格を狙いつつ、大量販売時は容量も考慮
+        let selectedMarket = null;
+        let selectedQty = 0;
+        let bestScore = -Infinity;
 
-                    incrementRow(gameState.companies.indexOf(company));
-                    showAIActionModal(company, '商品販売', '💰', `${market.name}に${actualQty}個販売`, [
-                        { label: '販売価格', value: `¥${market.sellPrice}/個` },
-                        { label: '売上', value: `¥${revenue}`, highlight: true }
-                    ]);
-                    return;
-                } else {
-                    startAIBidding(company, market, actualQty, strategicPrice);
-                    return;
+        for (const market of availableMarkets) {
+            const marketCapacity = market.maxStock - market.currentStock;
+            const canSellQty = Math.min(sellQty, marketCapacity);
+
+            if (canSellQty <= 0) continue;
+
+            // スコア計算: 売上額を基本に、高価格市場を優先
+            // 大量販売時(5個以上)は容量の大きい市場も検討
+            const baseRevenue = market.sellPrice * canSellQty;
+            const priceBonus = market.sellPrice * 2; // 高価格市場優先
+            const capacityBonus = sellQty >= 5 && canSellQty >= sellQty ? 50 : 0; // 全量販売可能ならボーナス
+            const fillBonus = canSellQty >= sellQty * 0.8 ? 30 : 0; // 80%以上販売可能ならボーナス
+
+            const score = baseRevenue + priceBonus + capacityBonus + fillBonus;
+
+            // 同じスコアなら高い価格の市場を優先
+            if (score > bestScore || (score === bestScore && market.sellPrice > (selectedMarket?.sellPrice || 0))) {
+                bestScore = score;
+                selectedMarket = market;
+                selectedQty = canSellQty;
+            }
+        }
+
+        // 大量販売時の特別処理: 複数市場を検討
+        if (sellQty >= 5) {
+            const highPriceMarkets = availableMarkets
+                .filter(m => m.sellPrice >= 28) // 名古屋以上の価格帯
+                .sort((a, b) => b.sellPrice - a.sellPrice);
+
+            const largeCapacityMarkets = availableMarkets
+                .filter(m => (m.maxStock - m.currentStock) >= sellQty && m.sellPrice >= 20)
+                .sort((a, b) => b.sellPrice - a.sellPrice);
+
+            // 全量を1市場で販売できる最高価格の市場があれば、それを選択
+            if (largeCapacityMarkets.length > 0) {
+                const bestLargeMarket = largeCapacityMarkets[0];
+                const highPriceRevenue = selectedMarket ? selectedMarket.sellPrice * selectedQty : 0;
+                const largeMarketRevenue = bestLargeMarket.sellPrice * sellQty;
+
+                // 全量販売の売上が高価格市場の部分販売より高ければ、大容量市場を選択
+                if (largeMarketRevenue >= highPriceRevenue) {
+                    selectedMarket = bestLargeMarket;
+                    selectedQty = sellQty;
+                    console.log(`[AI販売戦略] ${company.name}: 大量販売のため${selectedMarket.name}(容量${selectedMarket.maxStock})を選択`);
                 }
+            }
+        }
+
+        if (selectedMarket && selectedQty > 0) {
+            const strategicPrice = calculateStrategicPrice(company, selectedMarket, priceBase);
+
+            if (!selectedMarket.needsBid) {
+                const revenue = selectedMarket.sellPrice * selectedQty;
+                company.cash += revenue;
+                company.products -= selectedQty;
+                company.totalSales += revenue;
+                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + selectedQty;
+                selectedMarket.currentStock += selectedQty;
+
+                incrementRow(gameState.companies.indexOf(company));
+                showAIActionModal(company, '商品販売', '💰', `${selectedMarket.name}に${selectedQty}個販売`, [
+                    { label: '販売価格', value: `¥${selectedMarket.sellPrice}/個` },
+                    { label: '売上', value: `¥${revenue}`, highlight: true }
+                ]);
+                return;
+            } else {
+                startAIBidding(company, selectedMarket, selectedQty, strategicPrice);
+                return;
             }
         }
     }
