@@ -2812,6 +2812,526 @@ const AIBrain = {
                 dynamicMode: dynamicAdj.reasoning
             }
         };
+    },
+
+    // ========================================
+    // === 究極AI: リスクカード確率モデル ===
+    // ========================================
+
+    /**
+     * リスクカードの確率分布を計算
+     */
+    RISK_CARD_PROBABILITIES: {
+        // 各カードの出現確率（48枚中の枚数）
+        'クレーム発生': { count: 2, probability: 2/48, impact: -5, type: 'cost' },
+        '教育成功': { count: 2, probability: 2/48, impact: 32, type: 'benefit', requires: 'education' },
+        '消費者運動発生': { count: 2, probability: 2/48, impact: -20, type: 'cost' },
+        '得意先倒産': { count: 2, probability: 2/48, impact: -30, type: 'cost' },
+        '研究開発失敗': { count: 3, probability: 3/48, impact: -20, type: 'cost', affectsChip: 'research' },
+        '広告成功': { count: 3, probability: 3/48, impact: 64, type: 'benefit', requires: 'advertising' },
+        '労災発生': { count: 2, probability: 2/48, impact: -15, type: 'cost' },
+        '広告政策失敗': { count: 2, probability: 2/48, impact: -20, type: 'cost', affectsChip: 'advertising' },
+        '特別サービス': { count: 2, probability: 2/48, impact: 15, type: 'benefit' },
+        '返品発生': { count: 3, probability: 3/48, impact: -20, type: 'cost' },
+        'コンピュータートラブル': { count: 2, probability: 2/48, impact: -10, type: 'cost' },
+        '商品の独占販売': { count: 3, probability: 3/48, impact: 64, type: 'benefit' },
+        '製造ミス発生': { count: 2, probability: 2/48, impact: -14, type: 'cost' },
+        '倉庫火災': { count: 2, probability: 2/48, impact: -40, type: 'cost', mitigatedBy: 'insurance' },
+        '縁故採用': { count: 2, probability: 2/48, impact: -5, type: 'cost' },
+        '研究開発成功': { count: 6, probability: 6/48, impact: 64, type: 'benefit', requires: 'research' },
+        '各社共通': { count: 2, probability: 2/48, impact: 6, type: 'special' },
+        'ストライキ発生': { count: 2, probability: 2/48, impact: -25, type: 'cost' },
+        '盗難発見': { count: 2, probability: 2/48, impact: -30, type: 'cost', mitigatedBy: 'insurance' },
+        '長期労務紛争': { count: 2, probability: 2/48, impact: -50, type: 'cost' }
+    },
+
+    /**
+     * 期待リスク/リターンを計算
+     */
+    calculateExpectedRisk: function(company) {
+        let expectedBenefit = 0;
+        let expectedCost = 0;
+        let variance = 0;
+
+        for (const [cardName, card] of Object.entries(this.RISK_CARD_PROBABILITIES)) {
+            let adjustedImpact = card.impact;
+
+            // チップ保有によるボーナス
+            if (card.requires === 'education' && (company.chips.education || 0) >= 1) {
+                adjustedImpact = Math.max(adjustedImpact, 32 * 3); // 教育チップで3個販売可能
+            }
+            if (card.requires === 'research' && (company.chips.research || 0) >= 1) {
+                const researchBonus = (company.chips.research || 0) * 2;
+                adjustedImpact = Math.max(adjustedImpact, 32 * researchBonus);
+            }
+            if (card.requires === 'advertising' && (company.chips.advertising || 0) >= 1) {
+                adjustedImpact = Math.max(adjustedImpact, 32 * (company.chips.advertising || 0) * 2);
+            }
+
+            // 保険によるリスク軽減
+            if (card.mitigatedBy === 'insurance' && (company.chips.insurance || 0) >= 1) {
+                adjustedImpact = adjustedImpact * 0.3; // 保険で70%軽減
+            }
+
+            if (card.type === 'benefit') {
+                expectedBenefit += card.probability * adjustedImpact;
+            } else if (card.type === 'cost') {
+                expectedCost += card.probability * Math.abs(adjustedImpact);
+            }
+
+            variance += card.probability * adjustedImpact * adjustedImpact;
+        }
+
+        return {
+            expectedBenefit,
+            expectedCost,
+            netExpected: expectedBenefit - expectedCost,
+            variance,
+            stdDev: Math.sqrt(variance),
+            riskAdjustedValue: (expectedBenefit - expectedCost) - 0.5 * Math.sqrt(variance)
+        };
+    },
+
+    /**
+     * リスクカードを考慮した行動価値調整
+     */
+    adjustActionForRisk: function(action, company, baseValue) {
+        const riskProfile = this.calculateExpectedRisk(company);
+
+        // 行動タイプ別のリスク調整
+        switch (action.type) {
+            case 'SELL':
+                // 販売前に消費者運動発生のリスク
+                return baseValue - riskProfile.expectedCost * 0.1;
+
+            case 'PRODUCE':
+            case 'COMPLETE':
+                // 製造前に労災発生のリスク
+                return baseValue - riskProfile.expectedCost * 0.15;
+
+            case 'BUY_CHIP':
+                if (action.chipType === 'research') {
+                    // 研究チップは研究開発成功(6/48)で大きなリターン
+                    return baseValue + 6/48 * 32 * 3;
+                }
+                if (action.chipType === 'insurance') {
+                    // 保険チップはリスク軽減
+                    return baseValue + riskProfile.expectedCost * 0.5;
+                }
+                return baseValue;
+
+            default:
+                return baseValue;
+        }
+    },
+
+    // ========================================
+    // === 究極AI: 5期全体の長期最適化 ===
+    // ========================================
+
+    /**
+     * 5期終了時の目標自己資本を逆算
+     */
+    calculateEquityTarget: function(company, targetRank = 1) {
+        const period = gameState.currentPeriod;
+        const currentEquity = company.equity;
+
+        // 競合の予測自己資本成長
+        const competitors = gameState.companies.filter((c, i) => i !== gameState.companies.indexOf(company));
+        const avgEquity = competitors.reduce((sum, c) => sum + c.equity, 0) / competitors.length;
+        const maxEquity = Math.max(...competitors.map(c => c.equity));
+
+        // 5期終了時の目標（1位狙いは最高+50、2位狙いは平均+30）
+        const remainingPeriods = 5 - period + 1;
+        const growthPerPeriod = (targetRank === 1) ?
+            (maxEquity - currentEquity + 50) / remainingPeriods :
+            (avgEquity - currentEquity + 30) / remainingPeriods;
+
+        return {
+            currentEquity,
+            targetEquity: currentEquity + growthPerPeriod * remainingPeriods,
+            requiredGrowthPerPeriod: growthPerPeriod,
+            competitorMax: maxEquity,
+            competitorAvg: avgEquity,
+            isLeader: currentEquity >= maxEquity,
+            gap: maxEquity - currentEquity
+        };
+    },
+
+    /**
+     * 期ごとの最適戦略マップ
+     */
+    PERIOD_STRATEGY_MAP: {
+        2: {
+            priority: ['research_investment', 'education_investment', 'production_setup'],
+            description: '投資重視期',
+            targetResearch: 3,
+            targetProduction: 5,
+            cashReserve: 0.3
+        },
+        3: {
+            priority: ['sales_maximization', 'next_period_chips', 'capacity_expansion'],
+            description: 'MQ獲得開始期',
+            targetResearch: 4,
+            targetProduction: 8,
+            cashReserve: 0.25
+        },
+        4: {
+            priority: ['sales_maximization', 'next_period_chips', 'inventory_buildup'],
+            description: 'MQ最大化期',
+            targetResearch: 5,
+            targetProduction: 10,
+            cashReserve: 0.2
+        },
+        5: {
+            priority: ['clear_conditions', 'final_sales', 'inventory_adjustment'],
+            description: '目標達成期',
+            targetInventory: 10,
+            targetNextChips: 3,
+            cashReserve: 0.15
+        }
+    },
+
+    /**
+     * 長期計画に基づく現在の最適行動
+     */
+    getLongTermOptimalAction: function(company, companyIndex) {
+        const period = gameState.currentPeriod;
+        const periodStrategy = this.PERIOD_STRATEGY_MAP[period] || this.PERIOD_STRATEGY_MAP[3];
+        const equityTarget = this.calculateEquityTarget(company, 1);
+
+        // 各優先事項に対する行動を生成
+        const recommendations = [];
+
+        for (const priority of periodStrategy.priority) {
+            switch (priority) {
+                case 'research_investment':
+                    if ((company.chips.research || 0) < periodStrategy.targetResearch) {
+                        const cost = period === 2 ? 20 : 30;
+                        if (company.cash > cost + 50) {
+                            recommendations.push({
+                                action: { type: 'BUY_CHIP', chipType: 'research' },
+                                score: 100 - (company.chips.research || 0) * 20,
+                                reason: `長期計画: 研究チップ目標${periodStrategy.targetResearch}枚`
+                            });
+                        }
+                    }
+                    break;
+
+                case 'education_investment':
+                    if ((company.chips.education || 0) < 1) {
+                        const cost = period === 2 ? 20 : 30;
+                        if (company.cash > cost + 50) {
+                            recommendations.push({
+                                action: { type: 'BUY_CHIP', chipType: 'education' },
+                                score: 80,
+                                reason: '長期計画: 教育チップ1枚確保'
+                            });
+                        }
+                    }
+                    break;
+
+                case 'sales_maximization':
+                    if (company.products > 0 && getSalesCapacity(company) > 0) {
+                        const salesQty = Math.min(company.products, getSalesCapacity(company));
+                        recommendations.push({
+                            action: { type: 'SELL', quantity: salesQty },
+                            score: 90,
+                            reason: '長期計画: MQ最大化のため販売'
+                        });
+                    }
+                    break;
+
+                case 'next_period_chips':
+                    const nextChips = (company.nextPeriodChips?.research || 0) +
+                                      (company.nextPeriodChips?.education || 0) +
+                                      (company.nextPeriodChips?.advertising || 0);
+                    if (nextChips < 3 && company.cash > 60) {
+                        recommendations.push({
+                            action: { type: 'BUY_NEXT_CHIP', chipType: 'research' },
+                            score: 70,
+                            reason: `長期計画: 次期チップ(${nextChips}/3)`
+                        });
+                    }
+                    break;
+
+                case 'clear_conditions':
+                    const totalInv = company.materials + company.wip + company.products;
+                    const nextChipCount = (company.nextPeriodChips?.research || 0) +
+                                          (company.nextPeriodChips?.education || 0) +
+                                          (company.nextPeriodChips?.advertising || 0);
+                    if (totalInv < 10) {
+                        recommendations.push({
+                            action: { type: 'BUILD_INVENTORY' },
+                            score: 100,
+                            reason: `5期クリア: 在庫(${totalInv}/10)`
+                        });
+                    }
+                    if (nextChipCount < 3) {
+                        recommendations.push({
+                            action: { type: 'BUY_NEXT_CHIP', chipType: 'research' },
+                            score: 100,
+                            reason: `5期クリア: チップ(${nextChipCount}/3)`
+                        });
+                    }
+                    break;
+            }
+        }
+
+        // 最高スコアの推奨を返す
+        recommendations.sort((a, b) => b.score - a.score);
+        return recommendations[0] || { action: { type: 'WAIT' }, score: 0, reason: '長期計画: 最適行動なし' };
+    },
+
+    // ========================================
+    // === 究極AI: 強化学習的戦略進化 ===
+    // ========================================
+
+    /**
+     * Q値テーブル（状態-行動価値）
+     */
+    getQValue: function(state, action) {
+        const data = this.loadLearningData();
+        if (!data.qTable) {
+            data.qTable = {};
+        }
+
+        const stateKey = this.encodeState(state);
+        const actionKey = action.type + '_' + (action.quantity || action.chipType || '');
+
+        return (data.qTable[stateKey] && data.qTable[stateKey][actionKey]) || 0;
+    },
+
+    /**
+     * Q値の更新（TD学習）
+     */
+    updateQValue: function(state, action, reward, nextState) {
+        const data = this.loadLearningData();
+        if (!data.qTable) {
+            data.qTable = {};
+        }
+
+        const stateKey = this.encodeState(state);
+        const actionKey = action.type + '_' + (action.quantity || action.chipType || '');
+        const nextStateKey = this.encodeState(nextState);
+
+        // 学習率とディスカウント率
+        const alpha = 0.1;
+        const gamma = 0.95;
+
+        // 現在のQ値
+        const currentQ = this.getQValue(state, action);
+
+        // 次の状態での最大Q値
+        let maxNextQ = 0;
+        if (data.qTable[nextStateKey]) {
+            maxNextQ = Math.max(...Object.values(data.qTable[nextStateKey]));
+        }
+
+        // Q値更新（TD学習）
+        const newQ = currentQ + alpha * (reward + gamma * maxNextQ - currentQ);
+
+        if (!data.qTable[stateKey]) {
+            data.qTable[stateKey] = {};
+        }
+        data.qTable[stateKey][actionKey] = newQ;
+
+        this.saveLearningData();
+    },
+
+    /**
+     * 状態をエンコード（Q学習用）
+     */
+    encodeState: function(state) {
+        // 状態の離散化
+        const period = state.period || gameState.currentPeriod;
+        const cashLevel = Math.floor((state.cash || 0) / 50); // 50円刻み
+        const productsLevel = Math.floor((state.products || 0) / 3); // 3個刻み
+        const researchChips = state.researchChips || 0;
+        const rank = state.rank || 3;
+
+        return `P${period}_C${cashLevel}_PR${productsLevel}_R${researchChips}_RK${rank}`;
+    },
+
+    /**
+     * ε-greedy方策による行動選択
+     */
+    selectActionEpsilonGreedy: function(company, companyIndex, epsilon = 0.1) {
+        const possibleActions = this.enumeratePossibleActions(company, companyIndex);
+
+        // 状態を構築
+        const competitors = this.analyzeCompetitors(company, companyIndex);
+        const state = {
+            period: gameState.currentPeriod,
+            cash: company.cash,
+            products: company.products,
+            researchChips: company.chips.research || 0,
+            rank: competitors.myRank
+        };
+
+        // ε確率でランダム探索
+        if (Math.random() < epsilon) {
+            const randomIndex = Math.floor(Math.random() * possibleActions.length);
+            return {
+                action: possibleActions[randomIndex],
+                isExploration: true,
+                qValue: 0
+            };
+        }
+
+        // 最大Q値の行動を選択
+        let bestAction = possibleActions[0];
+        let bestQ = -Infinity;
+
+        for (const action of possibleActions) {
+            const q = this.getQValue(state, action);
+            if (q > bestQ) {
+                bestQ = q;
+                bestAction = action;
+            }
+        }
+
+        return {
+            action: bestAction,
+            isExploration: false,
+            qValue: bestQ
+        };
+    },
+
+    // ========================================
+    // === 究極AI: 最適入札タイミング ===
+    // ========================================
+
+    /**
+     * 入札の最適タイミングを計算
+     */
+    calculateOptimalBidTiming: function(company, companyIndex) {
+        const period = gameState.currentPeriod;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+        const mfgCapacity = getManufacturingCapacity(company);
+        const salesCapacity = getSalesCapacity(company);
+
+        // 市場状況の分析
+        const markets = gameState.markets || [];
+        const totalMarketSpace = markets.reduce((sum, m) => sum + (m.maxStock - m.currentStock), 0);
+
+        // 競合の販売圧力
+        const competitors = this.analyzeCompetitors(company, companyIndex);
+        const competitorProducts = competitors.rivals.reduce((sum, r) => sum + r.products, 0);
+
+        // 入札タイミングスコア
+        let timingScore = 50; // ベーススコア
+
+        // 期末が近いほど入札優先度UP
+        if (rowsRemaining <= 3) timingScore += 30;
+        else if (rowsRemaining <= 5) timingScore += 15;
+
+        // 市場に空きが少ないほど早く入札
+        if (totalMarketSpace <= 5) timingScore += 25;
+        else if (totalMarketSpace <= 10) timingScore += 10;
+
+        // 競合の製品が多いほど早く入札（先手を取る）
+        if (competitorProducts > 10) timingScore += 20;
+        else if (competitorProducts > 5) timingScore += 10;
+
+        // 自社製品が多いほど入札優先
+        if (company.products > salesCapacity * 2) timingScore += 15;
+
+        // 研究チップで価格優位なら待てる
+        const myResearch = company.chips.research || 0;
+        const avgRivalResearch = competitors.averageResearch || 0;
+        if (myResearch > avgRivalResearch + 2) timingScore -= 15;
+
+        return {
+            score: timingScore,
+            shouldBidNow: timingScore >= 70,
+            reasoning: this.explainBidTiming(timingScore, rowsRemaining, totalMarketSpace, competitorProducts),
+            urgency: timingScore >= 80 ? 'high' : timingScore >= 60 ? 'medium' : 'low'
+        };
+    },
+
+    explainBidTiming: function(score, rows, marketSpace, competitorProducts) {
+        const reasons = [];
+        if (rows <= 3) reasons.push('期末接近');
+        if (marketSpace <= 5) reasons.push('市場枠少');
+        if (competitorProducts > 10) reasons.push('競合製品多');
+        if (score >= 80) reasons.push('緊急入札推奨');
+        return reasons.join('、') || '通常タイミング';
+    },
+
+    /**
+     * 究極の統合意思決定（全機能統合）
+     */
+    makeUltimateDecision: function(company, companyIndex) {
+        const period = gameState.currentPeriod;
+
+        // 1. 基本の統合意思決定
+        const baseDecision = this.makeOptimalDecision(company, companyIndex);
+
+        // 2. リスク調整
+        const riskProfile = this.calculateExpectedRisk(company);
+        const riskAdjustedValue = this.adjustActionForRisk(
+            baseDecision.action,
+            company,
+            baseDecision.score
+        );
+
+        // 3. 長期最適化
+        const longTermAction = this.getLongTermOptimalAction(company, companyIndex);
+
+        // 4. Q学習による選択
+        const rlAction = this.selectActionEpsilonGreedy(company, companyIndex, 0.05);
+
+        // 5. 入札タイミング
+        const bidTiming = this.calculateOptimalBidTiming(company, companyIndex);
+
+        // 統合スコア計算
+        const scores = {
+            base: baseDecision.score,
+            riskAdjusted: riskAdjustedValue,
+            longTerm: longTermAction.score,
+            rl: rlAction.qValue * 10,
+            bidUrgency: baseDecision.action.type === 'SELL' ? bidTiming.score : 0
+        };
+
+        // 重み付け統合
+        const weightedScore =
+            scores.base * 0.30 +
+            scores.riskAdjusted * 0.20 +
+            scores.longTerm * 0.25 +
+            scores.rl * 0.15 +
+            scores.bidUrgency * 0.10;
+
+        // 最終アクション決定（最高スコアの行動を採用）
+        let finalAction = baseDecision.action;
+        let finalReason = baseDecision.reasoning;
+
+        if (longTermAction.score > baseDecision.score * 1.2) {
+            finalAction = longTermAction.action;
+            finalReason = longTermAction.reason;
+        }
+
+        // 入札緊急時は販売を優先
+        if (bidTiming.shouldBidNow && company.products > 0 && getSalesCapacity(company) > 0) {
+            if (bidTiming.urgency === 'high') {
+                finalAction = { type: 'SELL', quantity: Math.min(company.products, getSalesCapacity(company)) };
+                finalReason = `入札緊急: ${bidTiming.reasoning}`;
+            }
+        }
+
+        return {
+            action: finalAction,
+            score: weightedScore,
+            confidence: Math.min(0.98, baseDecision.confidence + 0.05),
+            reasoning: {
+                ...baseDecision.reasoning,
+                riskAdjustment: riskProfile.netExpected.toFixed(0),
+                longTermPlan: longTermAction.reason,
+                rlQValue: rlAction.qValue.toFixed(2),
+                bidTiming: bidTiming.reasoning
+            },
+            components: scores
+        };
     }
 };
 

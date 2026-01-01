@@ -808,11 +808,13 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
 
-    // === 超強化AI: 統合最適意思決定 ===
-    // ゲーム理論 + モンテカルロ + 期待値 + 学習を統合
-    const optimalDecision = AIBrain.makeOptimalDecision(company, companyIndex);
-    console.log(`[統合AI] ${company.name}: ${optimalDecision.action.type} (信頼度${(optimalDecision.confidence * 100).toFixed(0)}%)`);
-    console.log(`  理由: GT=${optimalDecision.reasoning.gameTheory.toFixed(0)}, MC=${optimalDecision.reasoning.monteCarlo.toFixed(0)}, EV=${optimalDecision.reasoning.evBased.toFixed(0)}`);
+    // === 究極AI: 全機能統合意思決定 ===
+    // ゲーム理論 + モンテカルロ + 期待値 + 学習 + リスク + 長期最適化 + Q学習
+    const ultimateDecision = AIBrain.makeUltimateDecision(company, companyIndex);
+    console.log(`[究極AI] ${company.name}: ${ultimateDecision.action.type} (信頼度${(ultimateDecision.confidence * 100).toFixed(0)}%)`);
+    console.log(`  スコア: Base=${ultimateDecision.components.base.toFixed(0)}, Risk=${ultimateDecision.components.riskAdjusted.toFixed(0)}, LT=${ultimateDecision.components.longTerm.toFixed(0)}, RL=${ultimateDecision.components.rl.toFixed(0)}`);
+    console.log(`  長期計画: ${ultimateDecision.reasoning.longTermPlan || 'なし'}`);
+    console.log(`  リスク調整: ${ultimateDecision.reasoning.riskAdjustment}, Q値: ${ultimateDecision.reasoning.rlQValue}`);
 
     // 相手戦略推定をログ
     for (let i = 1; i < gameState.companies.length; i++) {
