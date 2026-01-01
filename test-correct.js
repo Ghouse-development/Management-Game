@@ -267,20 +267,22 @@ function runSimulation(strategy) {
                 const sellQty = Math.min(state.products, sc());
                 const researchChips = state.chips.research || 0;
 
-                // 入札価格決定（研究チップで優位、高価格市場狙い）
-                // 仙台40、札幌36、福岡32、名古屋28が上限
-                // 研究チップ2枚で仙台¥36-38狙い（強気設定）
+                // 入札価格決定（実際のゲームルールに準拠）
+                // 研究0枚: ¥23-24、研究2枚: ¥27-28、研究5枚: ¥31-33
                 let winRate, avgPrice;
                 if (period === 2) {
-                    // 2期: 競争少なく研究2枚で¥36-38狙い
-                    if (researchChips >= 2) { winRate = 0.93; avgPrice = 36; }
-                    else if (researchChips >= 1) { winRate = 0.88; avgPrice = 32; }
-                    else { winRate = 0.82; avgPrice = 28; }
+                    // 2期: 競争が少ない
+                    if (researchChips >= 3) { winRate = 0.95; avgPrice = 30; }
+                    else if (researchChips >= 2) { winRate = 0.92; avgPrice = 28; }
+                    else if (researchChips >= 1) { winRate = 0.85; avgPrice = 26; }
+                    else { winRate = 0.80; avgPrice = 24; }
                 } else {
-                    // 3期以降: 研究2枚で¥35-36狙い
-                    if (researchChips >= 2) { winRate = 0.85; avgPrice = 35; }
-                    else if (researchChips >= 1) { winRate = 0.70; avgPrice = 30; }
-                    else { winRate = 0.45; avgPrice = 25; }
+                    // 3期以降: 競争激化、サイコロ次第
+                    if (researchChips >= 5) { winRate = 0.90; avgPrice = 32; }
+                    else if (researchChips >= 3) { winRate = 0.85; avgPrice = 29; }
+                    else if (researchChips >= 2) { winRate = 0.80; avgPrice = 27; }
+                    else if (researchChips >= 1) { winRate = 0.65; avgPrice = 25; }
+                    else { winRate = 0.45; avgPrice = 23; }
                 }
 
                 if (Math.random() < winRate) {
@@ -521,16 +523,19 @@ function runDetailedSimulation(strategy) {
                 const sellQty = Math.min(state.products, state.salesmen * 2);
                 const researchChips = state.chips.research || 0;
 
-                // 高価格市場狙い（仙台40、札幌36、福岡32）
+                // 実際のゲームルールに準拠
+                // 研究0枚: ¥23-24、研究2枚: ¥27-28、研究5枚: ¥31-33
                 let winRate, avgPrice;
                 if (period === 2) {
-                    // 2期: 競争少なく研究2枚で¥36-38狙い
-                    winRate = researchChips >= 2 ? 0.93 : researchChips >= 1 ? 0.88 : 0.82;
-                    avgPrice = researchChips >= 2 ? 36 : researchChips >= 1 ? 32 : 28;
+                    // 2期: 競争が少ない
+                    if (researchChips >= 2) { winRate = 0.92; avgPrice = 28; }
+                    else if (researchChips >= 1) { winRate = 0.85; avgPrice = 26; }
+                    else { winRate = 0.80; avgPrice = 24; }
                 } else {
-                    // 3期以降: 研究2枚で¥35-36狙い
-                    winRate = researchChips >= 2 ? 0.85 : researchChips >= 1 ? 0.70 : 0.45;
-                    avgPrice = researchChips >= 2 ? 35 : researchChips >= 1 ? 30 : 25;
+                    // 3期以降: 競争激化
+                    if (researchChips >= 2) { winRate = 0.80; avgPrice = 27; }
+                    else if (researchChips >= 1) { winRate = 0.65; avgPrice = 25; }
+                    else { winRate = 0.45; avgPrice = 23; }
                 }
 
                 if (Math.random() < winRate) {
