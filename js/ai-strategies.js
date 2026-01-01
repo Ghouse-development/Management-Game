@@ -2660,14 +2660,118 @@ function convertUltimateToGMaxAction(ultimateDecision, company, mfgCapacity, sal
 function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) {
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
+    const currentRow = company.currentRow || 1;
 
-    // === 【最重要】動的戦略エンジン（競合観察＋行別計画＋サイクル最適化） ===
+    // =========================================================
+    // 【最優先】2期初手：戦略別に多様な行動を強制
+    // 初期状態: 材料1、仕掛品2、製品1、製造能力1、販売能力2
+    // これを最初に評価し、他のロジックより優先する
+    // =========================================================
+    if (period === 2 && currentRow <= 5) {
+        const strategy = company.strategy || 'balanced';
+        const safeInvestment = company.cash - 80;
+        const hasProducts = company.products > 0;
+        const researchChips = company.chips.research || 0;
+        const educationChips = company.chips.education || 0;
+        const advertisingChips = company.chips.advertising || 0;
+
+        console.log(`[2期初手] ${company.name} 戦略=${strategy} 行=${currentRow} 材料=${company.materials} 仕掛=${company.wip} 製品=${company.products} 現金=${company.cash}`);
+
+        // 2期初手は戦略別に完全分岐（サイクル最適化より優先）
+        let forcedAction = null;
+
+        switch (strategy) {
+            case 'tech_focused':
+                // 技術重視：研究チップ3枚目標→教育チップ1枚→コンピュータ
+                // 2期中に研究チップを最大限積み上げて3期以降の価格競争力を確保
+                if (researchChips < 3 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: `tech_focused: 研究チップ${researchChips+1}枚目（価格+2）` };
+                } else if (educationChips < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'education', cost: 20 }, reason: 'tech_focused: 教育チップ（能力+1）' };
+                }
+                break;
+
+            case 'aggressive':
+                // 攻撃的：広告チップ→即売り→高速サイクル
+                // 販売力を上げて早くMQを稼ぐ
+                if (advertisingChips < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'advertising', cost: 20 }, reason: 'aggressive: 広告チップ（販売力+2）' };
+                } else if (hasProducts && salesCapacity > 0) {
+                    forcedAction = { action: 'SELL', params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.85 }, reason: 'aggressive: 即販売でMQ獲得' };
+                } else if (researchChips < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: 'aggressive: 研究チップ（入札優位）' };
+                }
+                break;
+
+            case 'price_focused':
+                // 価格重視：研究チップ優先（入札で勝つため）→材料仕入れ
+                if (researchChips < 2 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: `price_focused: 研究チップ${researchChips+1}枚目（価格優位）` };
+                } else if (company.materials <= 1 && safeInvestment >= 30) {
+                    forcedAction = { action: 'BUY_MATERIALS', params: { qty: 2 }, reason: 'price_focused: 材料仕入れ（在庫確保）' };
+                }
+                break;
+
+            case 'conservative':
+                // 保守的：教育チップ→研究チップ（安定的な成長）
+                // 保険は期首処理で購入済み
+                if (educationChips < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'education', cost: 20 }, reason: 'conservative: 教育チップ（製造販売+1）' };
+                } else if (researchChips < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: 'conservative: 研究チップ（安定投資）' };
+                } else if (hasProducts && salesCapacity > 0) {
+                    forcedAction = { action: 'SELL', params: { qty: 1, priceMultiplier: 0.90 }, reason: 'conservative: 慎重に1個販売' };
+                }
+                break;
+
+            case 'unpredictable':
+                // 予測不能：完全ランダム
+                const actions = [];
+                if (safeInvestment >= 20) {
+                    actions.push({ action: 'BUY_CHIP', params: { chipType: ['research', 'education', 'advertising'][Math.floor(Math.random() * 3)], cost: 20 }, reason: 'unpredictable: ランダムチップ' });
+                }
+                if (hasProducts && salesCapacity > 0) {
+                    actions.push({ action: 'SELL', params: { qty: Math.ceil(Math.random() * company.products), priceMultiplier: 0.70 + Math.random() * 0.25 }, reason: 'unpredictable: ランダム販売' });
+                }
+                if (safeInvestment >= 30) {
+                    actions.push({ action: 'BUY_MATERIALS', params: { qty: Math.ceil(Math.random() * 3) }, reason: 'unpredictable: ランダム仕入れ' });
+                }
+                actions.push({ action: 'PRODUCE', params: {}, reason: 'unpredictable: ランダム生産' });
+                if (actions.length > 0) {
+                    forcedAction = actions[Math.floor(Math.random() * actions.length)];
+                }
+                break;
+
+            case 'balanced':
+            default:
+                // バランス型：製品があれば販売→研究チップ→材料仕入れ
+                if (hasProducts && salesCapacity > 0 && currentRow <= 3) {
+                    forcedAction = { action: 'SELL', params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.80 }, reason: 'balanced: 製品販売でMQ獲得' };
+                } else if (researchChips < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: 'balanced: 研究チップ（基礎投資）' };
+                } else if (company.materials <= 1 && safeInvestment >= 30) {
+                    forcedAction = { action: 'BUY_MATERIALS', params: { qty: 2 }, reason: 'balanced: 材料仕入れ' };
+                }
+                break;
+        }
+
+        if (forcedAction) {
+            console.log(`[2期初手実行] ${company.name}: ${forcedAction.action} - ${forcedAction.reason}`);
+            if (executeGMaximizingAction(company, companyIndex, forcedAction)) {
+                return; // 成功したら終了
+            }
+            console.log(`[2期初手失敗] ${company.name}: ${forcedAction.action}が実行できなかった`);
+        }
+        // 強制アクションがない or 失敗した場合は通常ロジックへ
+    }
+
+    // === 【動的戦略エンジン】競合観察＋行別計画＋サイクル最適化 ===
     const strategicPlan = getStrategicPlan(company, period);
     const dynamicAction = getDynamicAction(company, companyIndex);
     const cycleAction = optimizeCycleAction(company, strategicPlan);
 
     // 戦略評価とスコア追跡
-    if ((company.currentRow || 1) === 1 || (company.currentRow || 1) % 5 === 0) {
+    if (currentRow === 1 || currentRow % 5 === 0) {
         logStrategyEvaluation(company, period);
     }
     trackScoreProgress(company, period);
@@ -2798,76 +2902,7 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         }
     }
 
-    // === 【最優先】2期初手：戦略別に多様な行動を強制 ===
-    if (period === 2 && (company.currentRow || 1) <= 2) {
-        const strategy = company.strategy || 'balanced';
-        const safeInvestment = company.cash - 80;
-
-        console.log(`[2期初手強制] ${company.name} 戦略=${strategy}`);
-
-        let forcedAction = null;
-
-        switch (strategy) {
-            case 'tech_focused':
-                // 技術重視：チップ購入最優先
-                if ((company.chips.research || 0) < 2 && safeInvestment >= 20) {
-                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: 'tech_focused: 研究チップ優先' };
-                }
-                break;
-
-            case 'aggressive':
-                // 攻撃的：広告チップ優先（製品があれば販売）
-                if (company.products > 0 && salesCapacity > 0) {
-                    forcedAction = { action: 'SELL', params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.75 }, reason: 'aggressive: 販売で現金回収' };
-                } else if (safeInvestment >= 20) {
-                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'advertising', cost: 20 }, reason: 'aggressive: 広告チップ' };
-                }
-                break;
-
-            case 'price_focused':
-                // 価格重視：材料仕入れ優先
-                if (safeInvestment >= 30) {
-                    forcedAction = { action: 'BUY_MATERIALS', params: { qty: Math.min(mfgCapacity, 3) }, reason: 'price_focused: 材料仕入れ優先' };
-                }
-                break;
-
-            case 'conservative':
-                // 保守的：保険チップ→教育チップ優先
-                if (!company.chips.insurance && safeInvestment >= 5) {
-                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'insurance', cost: 5 }, reason: 'conservative: 保険チップ' };
-                } else if ((company.chips.education || 0) < 1 && safeInvestment >= 20) {
-                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'education', cost: 20 }, reason: 'conservative: 教育チップ' };
-                }
-                break;
-
-            case 'unpredictable':
-                // 予測不能：ランダム
-                const rand = Math.random();
-                if (rand < 0.33 && safeInvestment >= 20) {
-                    const chips = ['research', 'education', 'advertising'];
-                    forcedAction = { action: 'BUY_CHIP', params: { chipType: chips[Math.floor(Math.random() * 3)], cost: 20 }, reason: 'unpredictable: ランダムチップ' };
-                } else if (rand < 0.66 && safeInvestment >= 30) {
-                    forcedAction = { action: 'BUY_MATERIALS', params: { qty: 2 }, reason: 'unpredictable: ランダム材料購入' };
-                }
-                // else: 通常ロジックへフォールスルー
-                break;
-
-            case 'balanced':
-            default:
-                // バランス型：販売優先
-                if (company.products > 0 && salesCapacity > 0) {
-                    forcedAction = { action: 'SELL', params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.80 }, reason: 'balanced: 販売' };
-                }
-                break;
-        }
-
-        if (forcedAction) {
-            console.log(`[2期初手実行] ${company.name}: ${forcedAction.action} - ${forcedAction.reason}`);
-            if (executeGMaximizingAction(company, companyIndex, forcedAction)) {
-                return; // 成功したら終了
-            }
-        }
-    }
+    // 2期初手ロジックは関数冒頭で処理済み
 
     // === 自己資本450目標戦略 ===
     if (AIBrain.getEquityMaximizingAction) {
