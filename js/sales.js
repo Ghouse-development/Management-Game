@@ -1321,6 +1321,10 @@ function processBuyFromModal() {
     market.currentStock -= quantity;
     company.totalMaterialCost = (company.totalMaterialCost || 0) + cost;
 
+    // ログ記録（VQ詳細表示用）
+    const details = `${market.name}¥${market.buyPrice}×${quantity}個`;
+    logAction(0, '材料購入', details, -cost, true);
+
     closeModal();
     updateDisplay();
     showToast(`${market.name}から材料${quantity}個を¥${cost}で購入しました`, 'success', 3000);

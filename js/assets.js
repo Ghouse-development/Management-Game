@@ -150,8 +150,10 @@ function hire() {
 
     closeModal();
     updateDisplay();
-    alert(`ワーカー${workers}人、セールスマン${salesmen}人を採用しました（人件費¥${cost}）`);
-    endTurn();
+    showToast(`ワーカー${workers}人、セールスマン${salesmen}人を採用しました（¥${cost}）`, 'success', 3000);
+
+    // カードを引く（意思決定カードで販売可能）
+    drawCard();
 }
 
 // Machine modal
@@ -280,10 +282,12 @@ function buyMachine() {
         company.machines.push({type: type, attachments: 0});
         showToast(`${type === 'small' ? '小型' : '大型'}機械を購入しました（¥${cost}）`, 'success', 3000);
     }
-    
+
     closeModal();
     updateDisplay();
-    endTurn();
+
+    // カードを引く（意思決定カードで販売可能）
+    drawCard();
 }
 
 // Warehouse modal (無災害倉庫)
@@ -628,9 +632,10 @@ function reassign() {
     company.extraLaborCost = (company.extraLaborCost || 0) + cost;
 
     closeModal();
+    updateDisplay();
 
-    // 1行使用してターン終了
-    endTurn();
+    // カードを引く（意思決定カードで販売可能）
+    drawCard();
 }
 
 // Sell machine modal

@@ -2055,9 +2055,10 @@ function endPeriod() {
             }
 
             // 次期チップ設定（2期→3期は全チップ1枚減って繰り越し、最大3枚まで）
-            const newResearch = Math.max(0, Math.min(totalResearch, maxCarryOver) - 1);
-            const newEducation = Math.max(0, Math.min(totalEducation, maxCarryOver) - 1);
-            const newAdvertising = Math.max(0, Math.min(totalAdvertising, maxCarryOver) - 1);
+            // 計算: まず1枚返却、その後最大3枚まで繰越
+            const newResearch = Math.min(Math.max(0, totalResearch - 1), maxCarryOver);
+            const newEducation = Math.min(Math.max(0, totalEducation - 1), maxCarryOver);
+            const newAdvertising = Math.min(Math.max(0, totalAdvertising - 1), maxCarryOver);
 
             company.chips.computer = 0;  // 返却
             company.chips.insurance = 0; // 返却
