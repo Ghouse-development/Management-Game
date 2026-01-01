@@ -777,6 +777,140 @@ function calcMaxLoan(period, equity) {
 }
 
 // ============================================
+// 行数別アクション計画（期首処理・リスク考慮）
+// ============================================
+function generateRowByRowPlan(state) {
+    const period = state.period;
+    const maxRows = GAME_RULES.MAX_ROWS[period] || 30;
+    const mfgCap = calcMfgCapacity(state);
+    const salesCap = calcSalesCapacity(state);
+    const plan = [];
+
+    // 期首処理（必須・1-2行目）
+    plan.push({
+        row: '1-2',
+        action: '期首処理',
+        detail: 'PC・保険購入（必須）、チップ適用',
+        type: 'required',
+        icon: '📋'
+    });
+
+    // 2期: チップ購入フェーズ（3-7行目）
+    if (period === 2) {
+        plan.push({
+            row: '3-4',
+            action: '研究チップ購入',
+            detail: '研究2枚（¥40）- 名古屋¥28市場確保',
+            type: 'investment',
+            icon: '🔬'
+        });
+        plan.push({
+            row: '5',
+            action: '教育チップ購入',
+            detail: '教育1枚（¥20）- 製造+1、販売+1',
+            type: 'investment',
+            icon: '📚'
+        });
+        plan.push({
+            row: '6',
+            action: '翌期チップ購入',
+            detail: '翌期研究1枚（¥20）- 成功率+12%',
+            type: 'investment',
+            icon: '⏰'
+        });
+    }
+
+    // 3期以降: 借入判断（期首直後）
+    if (period >= 3 && state.cash < 60) {
+        const maxLoan = calcMaxLoan(period, state.equity);
+        const borrowAmt = period === 3 ? 30 : 70;
+        plan.push({
+            row: '3',
+            action: '長期借入',
+            detail: `¥${Math.min(borrowAmt, maxLoan)}借入（動的戦略）`,
+            type: 'finance',
+            icon: '💳'
+        });
+    }
+
+    // 3期: 機械投資オプション
+    if (period === 3 && state.cash >= 120) {
+        plan.push({
+            row: '4-5',
+            action: '【オプション】機械投資',
+            detail: '小型機械¥100 + ワーカー¥20',
+            type: 'optional',
+            icon: '⚙️'
+        });
+        // アタッチメントオプション
+        if (state.machinesSmall >= 1 && state.cash >= 150) {
+            plan.push({
+                row: '6',
+                action: '【オプション】アタッチメント',
+                detail: 'アタッチメント¥30 - 製造能力+1',
+                type: 'optional',
+                icon: '🔧'
+            });
+        }
+    }
+
+    // 生産サイクル（メインフェーズ）
+    let currentRow = period === 2 ? 7 : 4;
+    const cycleRows = Math.floor((maxRows - currentRow) / 4);  // 約4行で1サイクル
+
+    for (let cycle = 1; cycle <= Math.min(cycleRows, 5); cycle++) {
+        const startRow = currentRow + (cycle - 1) * 4;
+
+        // 仕入れ
+        plan.push({
+            row: `${startRow}`,
+            action: '材料仕入れ',
+            detail: `仙台¥10狙い（${mfgCap * 2}個まで）`,
+            type: 'production',
+            icon: '🧱'
+        });
+
+        // 投入・完成
+        plan.push({
+            row: `${startRow + 1}`,
+            action: '投入・完成',
+            detail: `仕掛品→製品（製造能力${mfgCap}）`,
+            type: 'production',
+            icon: '🏭'
+        });
+
+        // 販売
+        plan.push({
+            row: `${startRow + 2}-${startRow + 3}`,
+            action: '販売',
+            detail: `名古屋¥28で販売（販売能力${salesCap}）`,
+            type: 'sales',
+            icon: '💰'
+        });
+    }
+
+    // リスクカード注意（約20%の確率で発生）
+    plan.push({
+        row: '随時',
+        action: '⚠️ リスクカード',
+        detail: '約20%で発生（保険で軽減可）',
+        type: 'risk',
+        icon: '🎲'
+    });
+
+    // 期末準備
+    plan.push({
+        row: `${maxRows - 2}～`,
+        action: '期末準備',
+        detail: '在庫確保・現金確保で期末支払に備える',
+        type: 'required',
+        icon: '📊'
+    });
+
+    return plan;
+}
+
+// ============================================
 // 提案結果モーダル
 // ============================================
 function showProposalModal(state, analysis) {
@@ -840,6 +974,31 @@ function showProposalModal(state, analysis) {
                             <div style="background: #4f46e5; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${i + 1}</div>
                         </div>
                     `).join('')}
+                </div>
+            </div>
+
+            <!-- 行数別アクション計画 -->
+            <div style="background: #fef3c7; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #92400e; margin-bottom: 10px;">📋 ${state.period}期 行数別アクション計画（全${GAME_RULES.MAX_ROWS[state.period]}行）</div>
+                <div style="max-height: 200px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                        ${generateRowByRowPlan(state).map(item => {
+                            const bgColor = item.type === 'required' ? '#fef3c7' :
+                                           item.type === 'investment' ? '#dbeafe' :
+                                           item.type === 'finance' ? '#dcfce7' :
+                                           item.type === 'production' ? '#f3e8ff' :
+                                           item.type === 'sales' ? '#fce7f3' :
+                                           item.type === 'risk' ? '#fee2e2' :
+                                           item.type === 'optional' ? '#e5e7eb' : '#fff';
+                            return `
+                                <tr style="background: ${bgColor};">
+                                    <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-weight: bold; width: 50px;">${item.row}行</td>
+                                    <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.icon} ${item.action}</td>
+                                    <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; color: #6b7280;">${item.detail}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </table>
                 </div>
             </div>
 
@@ -918,4 +1077,5 @@ if (typeof window !== 'undefined') {
     window.calcSalesCapacity = calcSalesCapacity;
     window.calcMaxLoan = calcMaxLoan;
     window.generateRecommendations = generateRecommendations;
+    window.generateRowByRowPlan = generateRowByRowPlan;
 }

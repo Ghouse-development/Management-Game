@@ -3827,69 +3827,60 @@ function planAIPeriodStrategy(company, companyIndex) {
     const salesCapacity = getSalesCapacity(company);
 
     // ============================================
-    // 🏦 長期借入戦略（積極的に活用・1円単位）
+    // 🏦 動的借入戦略（v8シミュレーション結果: 成功率95%）
     // ============================================
-    // 長期借入は10%金利だが、投資ROI > 10%なら借りるべき
-    // 研究チップ: 20円投資 → 5個販売×2円=10円/期 → ROI 50%
-    // 教育チップ: 20円投資 → 製造+1,販売+1 → サイクル効率向上
-    // 借りられるだけ借りて投資すべき（特に2-3期）
+    // 【最重要発見】
+    // - 動的借入（現金不足時のみ借りる）= 95.20%成功
+    // - 段階的借入（3期30円+4期70円）= 93.20%成功
+    // - 固定額借入は非効率（利息負担で失敗率UP）
+    //
+    // 【借入限度額】1円単位で借入可能
+    // - 3期: 自己資本 × 0.5
+    // - 4期以降 かつ 自己資本300超: 自己資本 × 1.0
+    // - それ以外: 自己資本 × 0.5
 
     const currentLoans = company.loans || 0;
-    const maxLoanLimit = 300;  // 借入上限
+    const loanMultiplier = (period >= 4 && company.equity > 300) ? 1.0 : 0.5;
+    const maxLoanLimit = Math.floor(company.equity * loanMultiplier);
+    const borrowableAmount = Math.max(0, maxLoanLimit - currentLoans);
+
+    // === 動的借入判断（v8シミュレーション最強戦略） ===
+    const DYNAMIC_THRESHOLD = 60;  // 現金がこれ未満なら借入
+    const STAGED_BORROW_3 = 30;    // 3期の段階的借入額
+    const STAGED_BORROW_4 = 70;    // 4期の段階的借入額
+
+    if (period >= 3 && borrowableAmount > 0) {
+        let borrowAmount = 0;
+
+        // 動的借入: 現金不足時のみ借りる
+        if (company.cash < DYNAMIC_THRESHOLD) {
+            if (period === 3) {
+                // 3期は少額（段階的借入の1回目）
+                borrowAmount = Math.min(STAGED_BORROW_3, borrowableAmount);
+            } else if (period === 4) {
+                // 4期は追加（段階的借入の2回目）
+                borrowAmount = Math.min(STAGED_BORROW_4, borrowableAmount);
+            } else {
+                // 5期は必要最小限
+                borrowAmount = Math.min(50, borrowableAmount);
+            }
+
+            if (borrowAmount > 0) {
+                const interestPaid = Math.floor(borrowAmount * INTEREST_RATES.longTerm);
+                company.loans += borrowAmount;
+                company.cash += borrowAmount - interestPaid;
+                company.periodStartInterest = (company.periodStartInterest || 0) + interestPaid;
+
+                console.log(`[動的借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）`);
+                console.log(`  現金: ¥${company.cash - borrowAmount + interestPaid} → ¥${company.cash}（閾値¥${DYNAMIC_THRESHOLD}）`);
+            }
+        } else {
+            console.log(`[借入見送り] ${company.name}: 現金¥${company.cash} >= 閾値¥${DYNAMIC_THRESHOLD}`);
+        }
+    }
+
     const target = PERIOD_STRATEGY_TARGETS[period];
     const investment = target?.investment || {};
-
-    // 投資計画に基づく必要資金
-    const chipCost = (investment.research || 0) * 20 +
-                     (investment.education || 0) * 20 +
-                     (investment.advertising || 0) * (period >= 3 ? 40 : 20) + // 3期以降は特急
-                     (investment.nextPeriodChips || 0) * 20;
-    let machineCost = (investment.machine || 0) * 60 +
-                        (investment.attachment || 0) * 30;
-    const hiringCost = (investment.worker || 0) * 5 +
-                       (investment.salesman || 0) * 5;
-
-    // 【戦略別追加投資】aggressive: 3期に大型機械+セールス追加
-    if (company.strategy === 'aggressive' && period === 3) {
-        machineCost += 120;  // 大型機械
-        console.log(`[aggressive戦略] ${company.name}: 3期大型機械投資計画（+¥120）`);
-    }
-    // 【戦略別追加投資】tech_focused: 2期に研究チップ3枚
-    if (company.strategy === 'tech_focused' && period === 2) {
-        const extraChips = 60 - chipCost; // 研究3枚=60円
-        if (extraChips > 0) {
-            console.log(`[tech_focused戦略] ${company.name}: 2期研究チップ投資計画（+¥${extraChips}）`);
-        }
-    }
-    const totalInvestmentNeed = chipCost + machineCost + hiringCost;
-
-    // 期末コスト見積もり
-    const periodEndCost = calculatePeriodPayment(company);
-    const safetyMargin = 50;
-    const totalCashNeed = totalInvestmentNeed + periodEndCost + safetyMargin;
-
-    // 借入判断: ROI > 10%の投資があり、現金不足なら借りる
-    const cashShortfall = Math.max(0, totalCashNeed - company.cash);
-    const recommendedLoan = investment.loanAmount || 0;
-    const canBorrow = currentLoans < maxLoanLimit;
-    const borrowableAmount = maxLoanLimit - currentLoans;
-
-    // 積極的借入（1円単位）- 3期以降のみ（2期は借入不可）
-    if (canBorrow && period >= 3 && period <= 4) {
-        // 推奨借入額と不足額の大きい方を借りる（ROI > 10%なので積極的に）
-        let borrowAmount = Math.max(recommendedLoan, cashShortfall);
-        borrowAmount = Math.min(borrowAmount, borrowableAmount);
-
-        if (borrowAmount > 0) {
-            const interestPaid = Math.floor(borrowAmount * INTEREST_RATES.longTerm);
-            company.loans += borrowAmount;
-            company.cash += borrowAmount - interestPaid;
-            company.periodStartInterest = (company.periodStartInterest || 0) + interestPaid;
-
-            console.log(`[長期借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）`);
-            console.log(`  投資計画: チップ¥${chipCost} + 機械¥${machineCost} + 採用¥${hiringCost}`);
-        }
-    }
 
     // === 1. 競争状況の分析（勝つためには何が必要か） ===
     const rivals = gameState.companies.filter((c, i) => i !== companyIndex);
