@@ -3854,6 +3854,98 @@ const AIBrain = {
                 return this.getFallbackDecision(company);
             }
 
+            // === 2期初手：戦略別に多様な行動を選択（究極AIでも尊重） ===
+            if (period === 2 && (company.currentRow || 1) <= 2) {
+                const strategy = company.strategy || 'balanced';
+                const salesCap = getSalesCapacity(company);
+                const mfgCap = getManufacturingCapacity(company);
+                const safeInvestment = company.cash - 80; // 安全マージン
+
+                console.log(`[2期戦略] ${company.name} (${strategy}): 材料=${company.materials}, 仕掛=${company.wip}, 製品=${company.products}`);
+
+                let strategyAction = null;
+                let strategyReason = '';
+
+                switch (strategy) {
+                    case 'tech_focused':
+                        // 技術重視：チップ購入最優先
+                        if ((company.chips.research || 0) < 2 && safeInvestment >= 20) {
+                            strategyAction = { type: 'BUY_CHIP', chipType: 'research', cost: 20 };
+                            strategyReason = 'tech_focused: 研究チップ優先';
+                        } else if ((company.chips.education || 0) < 1 && safeInvestment >= 20) {
+                            strategyAction = { type: 'BUY_CHIP', chipType: 'education', cost: 20 };
+                            strategyReason = 'tech_focused: 教育チップ';
+                        }
+                        break;
+
+                    case 'aggressive':
+                        // 攻撃的：販売優先（現金回収）
+                        if (company.products > 0 && salesCap > 0) {
+                            strategyAction = { type: 'SELL', quantity: Math.min(salesCap, company.products) };
+                            strategyReason = 'aggressive: 販売で現金回収';
+                        } else if ((company.chips.advertising || 0) < 1 && safeInvestment >= 20) {
+                            strategyAction = { type: 'BUY_CHIP', chipType: 'advertising', cost: 20 };
+                            strategyReason = 'aggressive: 広告チップ';
+                        }
+                        break;
+
+                    case 'price_focused':
+                        // 価格重視：材料仕入れ優先
+                        if (safeInvestment >= 30 && (company.materials + company.wip + company.products) < 15) {
+                            strategyAction = { type: 'BUY_MATERIALS', quantity: Math.min(mfgCap, 3) };
+                            strategyReason = 'price_focused: 材料仕入れ優先';
+                        }
+                        break;
+
+                    case 'conservative':
+                        // 保守的：保険・教育チップ優先
+                        if (!company.chips.insurance && safeInvestment >= 20) {
+                            strategyAction = { type: 'BUY_CHIP', chipType: 'insurance', cost: 20 };
+                            strategyReason = 'conservative: 保険チップ';
+                        } else if ((company.chips.education || 0) < 1 && safeInvestment >= 20) {
+                            strategyAction = { type: 'BUY_CHIP', chipType: 'education', cost: 20 };
+                            strategyReason = 'conservative: 教育チップ';
+                        }
+                        break;
+
+                    case 'unpredictable':
+                        // 予測不能：ランダム
+                        const rand = Math.random();
+                        if (rand < 0.25 && company.products > 0 && salesCap > 0) {
+                            strategyAction = { type: 'SELL', quantity: 1 };
+                            strategyReason = 'unpredictable: ランダム販売';
+                        } else if (rand < 0.50 && safeInvestment >= 20) {
+                            const chips = ['research', 'education', 'advertising'];
+                            strategyAction = { type: 'BUY_CHIP', chipType: chips[Math.floor(Math.random() * 3)], cost: 20 };
+                            strategyReason = 'unpredictable: ランダムチップ';
+                        } else if (rand < 0.75 && safeInvestment >= 20) {
+                            strategyAction = { type: 'BUY_MATERIALS', quantity: 2 };
+                            strategyReason = 'unpredictable: ランダム材料購入';
+                        }
+                        break;
+
+                    case 'balanced':
+                    default:
+                        // バランス型：MQサイクル（販売→生産→仕入れ）
+                        if (company.products > 0 && salesCap > 0) {
+                            strategyAction = { type: 'SELL', quantity: Math.min(salesCap, company.products) };
+                            strategyReason = 'balanced: 販売';
+                        }
+                        break;
+                }
+
+                if (strategyAction) {
+                    console.log(`[2期戦略採用] ${company.name}: ${strategyAction.type} - ${strategyReason}`);
+                    return {
+                        action: strategyAction,
+                        score: 100,
+                        confidence: 0.90,
+                        reasoning: { strategy: strategyReason },
+                        components: { base: 100, strategy: strategy }
+                    };
+                }
+            }
+
             // 1. 基本の統合意思決定
             const baseDecision = this.makeOptimalDecision(company, companyIndex);
 

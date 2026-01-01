@@ -3194,7 +3194,7 @@ function startAIBidding(aiCompany, market, aiQty, strategicPrice) {
                 <div style="font-size: 18px; font-weight: bold;">${market.name}市場</div>
                 <div style="font-size: 14px; opacity: 0.9;">基準価格: ¥${market.sellPrice}</div>
                 <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
-                    ${aiCompany.name}: 表示¥${aiDisplayPrice} → コール¥${aiCallPrice}
+                    ${aiCompany.name}が入札中（価格は非公開）
                 </div>
             </div>
             ${canPlayerBid ? `
