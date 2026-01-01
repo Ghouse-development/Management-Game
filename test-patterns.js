@@ -16,7 +16,7 @@ const GAME_RULES = {
     WAGE_BASE: { 2: 22, 3: 24, 4: 26, 5: 28 },
     RISK_PROBABILITY: 0.10,
     RISK_AVG_LOSS: 5,
-    SIMULATION_RUNS: 200,
+    SIMULATION_RUNS: 100,
     REALISTIC_MATERIAL_COST: { min: 11, max: 13, avg: 12 },
     SELL_PRICES_PERIOD2: {
         WITH_RESEARCH_2: { avg: 30, best: 32, worst: 28, winRate: 0.95 },
@@ -433,7 +433,8 @@ function runSimulation(strategy) {
         const carriedOverResearch = Math.max(0, (state.chips.research || 0) - newResearchChips);
         const nextPeriodResearch = state.nextPeriodChips?.research || 0;
 
-        const chipCost = newResearchChips * 30 + carriedOverResearch * GAME_RULES.CHIP_COST +
+        // 特急チップ: ¥40、翌期チップ: ¥20
+        const chipCost = newResearchChips * 40 + carriedOverResearch * GAME_RULES.CHIP_COST +
                         nextPeriodResearch * GAME_RULES.CHIP_COST +
                         (state.chips.computer || 0) * GAME_RULES.CHIP_COST +
                         (state.chips.insurance || 0) * GAME_RULES.INSURANCE_COST;

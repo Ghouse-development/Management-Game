@@ -229,7 +229,8 @@ function runDetailedSimulation(strategy, verbose = false) {
         const carriedOverResearch = Math.max(0, (state.chips.research || 0) - newResearchChips);
         const nextPeriodResearch = state.nextPeriodChips?.research || 0;
 
-        const chipCost = newResearchChips * 30 + carriedOverResearch * GAME_RULES.CHIP_COST +
+        // 特急チップ: ¥40、翌期チップ: ¥20
+        const chipCost = newResearchChips * 40 + carriedOverResearch * GAME_RULES.CHIP_COST +
                         nextPeriodResearch * GAME_RULES.CHIP_COST +
                         (state.chips.computer || 0) * GAME_RULES.CHIP_COST +
                         (state.chips.insurance || 0) * GAME_RULES.INSURANCE_COST;
@@ -239,8 +240,15 @@ function runDetailedSimulation(strategy, verbose = false) {
             : state.machinesSmall * 20 + (state.machinesLarge || 0) * 40;
 
         const fixedCost = salaryCost + chipCost + depreciation;
+
+        // 借入金利息（期末に支払い）
+        // 短期借入金: 借入時に20%差し引き済み → 期末の追加利息なし
+        // 長期借入金: 期末に10%利息支払い（初期状態では長期借入なし）
+        const longLoanInterest = Math.floor((state.longLoans || 0) * 0.10);
+        // 短期借入金は借入時に利息差し引き済みなので期末利息なし
+
         const grossProfit = periodSales - periodMaterialCost - periodProcessingCost;
-        const preTaxProfit = grossProfit - fixedCost;
+        const preTaxProfit = grossProfit - fixedCost - longLoanInterest;
 
         const newEquity = state.equity + preTaxProfit;
         let tax = 0;
