@@ -274,12 +274,14 @@ function calculateFixedCost(company) {
             education: company.chips.education || 0,
             advertising: company.chips.advertising || 0
         };
+        // 繰越ルール: 1枚を銀行に返却し、残りを繰越（最大3枚）
+        // willCarryOver = min(chips - 1, 3)
         const willCarryOver = {
-            research: Math.max(0, Math.min(chipsAtEnd.research, 3) - 1),
-            education: Math.max(0, Math.min(chipsAtEnd.education, 3) - 1),
-            advertising: Math.max(0, Math.min(chipsAtEnd.advertising, 3) - 1)
+            research: Math.min(Math.max(0, chipsAtEnd.research - 1), 3),
+            education: Math.min(Math.max(0, chipsAtEnd.education - 1), 3),
+            advertising: Math.min(Math.max(0, chipsAtEnd.advertising - 1), 3)
         };
-        // F = (購入枚数 - 繰越枚数) × 20円
+        // F = (購入枚数 - 繰越枚数) × 20円 = 消費枚数 × 20円
         cost += Math.max(0, (purchased.research || 0) - willCarryOver.research) * CHIP_COSTS.normal;
         cost += Math.max(0, (purchased.education || 0) - willCarryOver.education) * CHIP_COSTS.normal;
         cost += Math.max(0, (purchased.advertising || 0) - willCarryOver.advertising) * CHIP_COSTS.normal;

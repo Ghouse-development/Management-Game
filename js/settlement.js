@@ -175,9 +175,9 @@ function showVQBreakdown(companyIndex) {
     let content = '<div style="max-height: 60vh; overflow-y: auto; padding: 10px;">';
     content += '<div style="font-size: 14px; color: #d97706; font-weight: bold; margin-bottom: 10px;">変動費明細（VQ）</div>';
 
-    // 材料購入明細
+    // 材料購入明細（通常購入と2市場購入の両方を含む）
     const purchaseLogs = (gameState.actionLog || []).filter(log =>
-        log.companyIndex === companyIndex && log.action === '材料購入'
+        log.companyIndex === companyIndex && log.action.includes('材料購入')
     );
     content += '<div style="margin-bottom: 15px;">';
     content += '<div style="font-size: 12px; color: #666; font-weight: bold; margin-bottom: 5px;">材料購入</div>';
@@ -280,9 +280,13 @@ function showFBreakdown(companyIndex) {
     const pcCost = fb ? fb.pcCost : ((company.chips.computer || 0) * 20);
     const insuranceCost = fb ? fb.insuranceCost : ((company.chips.insurance || 0) * 5);
 
+    // 戦略チップ費用の詳細計算
     let chipCost = 0;
+    let chipDetails = { research: 0, education: 0, advertising: 0, researchExpress: 0, educationExpress: 0, advertisingExpress: 0 };
+
     if (fb) {
         chipCost = fb.chipCost;
+        chipDetails = fb.chipDetails || chipDetails;
     } else if (period === 2) {
         const purchased = company.chipsPurchasedThisPeriod || {research: 0, education: 0, advertising: 0};
         const chipsAtEnd = {
@@ -290,19 +294,30 @@ function showFBreakdown(companyIndex) {
             education: company.chips.education || 0,
             advertising: company.chips.advertising || 0
         };
+        // 繰越ルール: 1枚を銀行に返却し、残りを繰越（最大3枚）
         const willCarryOver = {
-            research: Math.max(0, Math.min(chipsAtEnd.research, 3) - 1),
-            education: Math.max(0, Math.min(chipsAtEnd.education, 3) - 1),
-            advertising: Math.max(0, Math.min(chipsAtEnd.advertising, 3) - 1)
+            research: Math.min(Math.max(0, chipsAtEnd.research - 1), 3),
+            education: Math.min(Math.max(0, chipsAtEnd.education - 1), 3),
+            advertising: Math.min(Math.max(0, chipsAtEnd.advertising - 1), 3)
         };
-        chipCost = (Math.max(0, (purchased.research || 0) - willCarryOver.research) +
-                    Math.max(0, (purchased.education || 0) - willCarryOver.education) +
-                    Math.max(0, (purchased.advertising || 0) - willCarryOver.advertising)) * 20;
+        // 消費枚数 = 購入枚数 - 繰越枚数
+        chipDetails.research = Math.max(0, (purchased.research || 0) - willCarryOver.research);
+        chipDetails.education = Math.max(0, (purchased.education || 0) - willCarryOver.education);
+        chipDetails.advertising = Math.max(0, (purchased.advertising || 0) - willCarryOver.advertising);
+        chipCost = (chipDetails.research + chipDetails.education + chipDetails.advertising) * 20;
     } else {
+        // 3期以降: 繰越チップ × 20円 + 特急チップ × 40円
         const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
         const express = company.expressChipsPurchased || {research: 0, education: 0, advertising: 0};
-        chipCost = ((carriedOver.research || 0) + (carriedOver.education || 0) + (carriedOver.advertising || 0)) * 20;
-        chipCost += ((express.research || 0) + (express.education || 0) + (express.advertising || 0)) * 40;
+        chipDetails.research = carriedOver.research || 0;
+        chipDetails.education = carriedOver.education || 0;
+        chipDetails.advertising = carriedOver.advertising || 0;
+        chipDetails.researchExpress = express.research || 0;
+        chipDetails.educationExpress = express.education || 0;
+        chipDetails.advertisingExpress = express.advertising || 0;
+        const normalCost = (chipDetails.research + chipDetails.education + chipDetails.advertising) * 20;
+        const expressCost = (chipDetails.researchExpress + chipDetails.educationExpress + chipDetails.advertisingExpress) * 40;
+        chipCost = normalCost + expressCost;
     }
 
     const extraLabor = fb ? fb.extraLabor : (company.extraLaborCost || 0);
@@ -360,7 +375,24 @@ function showFBreakdown(companyIndex) {
         content += '<div style="display: flex; justify-content: space-between;"><span>チップ費用</span><span></span></div>';
         if (pcCost > 0) content += `<div style="padding-left: 10px; color: #666;">　PC: ¥${pcCost}</div>`;
         if (insuranceCost > 0) content += `<div style="padding-left: 10px; color: #666;">　保険: ¥${insuranceCost}</div>`;
-        if (chipCost > 0) content += `<div style="padding-left: 10px; color: #666;">　戦略チップ: ¥${chipCost}</div>`;
+        if (chipCost > 0) {
+            content += `<div style="padding-left: 10px; color: #666; font-weight: bold;">　戦略チップ: ¥${chipCost}</div>`;
+            // 戦略チップ内訳
+            if (period === 2) {
+                // 2期: 消費枚数表示
+                if (chipDetails.research > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　研究 ${chipDetails.research}枚×¥20 = ¥${chipDetails.research * 20}</div>`;
+                if (chipDetails.education > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　教育 ${chipDetails.education}枚×¥20 = ¥${chipDetails.education * 20}</div>`;
+                if (chipDetails.advertising > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　広告 ${chipDetails.advertising}枚×¥20 = ¥${chipDetails.advertising * 20}</div>`;
+            } else {
+                // 3期以降: 繰越 + 特急
+                if (chipDetails.research > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　研究（繰越）${chipDetails.research}枚×¥20 = ¥${chipDetails.research * 20}</div>`;
+                if (chipDetails.education > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　教育（繰越）${chipDetails.education}枚×¥20 = ¥${chipDetails.education * 20}</div>`;
+                if (chipDetails.advertising > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　広告（繰越）${chipDetails.advertising}枚×¥20 = ¥${chipDetails.advertising * 20}</div>`;
+                if (chipDetails.researchExpress > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　研究（特急）${chipDetails.researchExpress}枚×¥40 = ¥${chipDetails.researchExpress * 40}</div>`;
+                if (chipDetails.educationExpress > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　教育（特急）${chipDetails.educationExpress}枚×¥40 = ¥${chipDetails.educationExpress * 40}</div>`;
+                if (chipDetails.advertisingExpress > 0) content += `<div style="padding-left: 20px; color: #888; font-size: 10px;">　　広告（特急）${chipDetails.advertisingExpress}枚×¥40 = ¥${chipDetails.advertisingExpress * 40}</div>`;
+            }
+        }
         content += '</div>';
     }
 
