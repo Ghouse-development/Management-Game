@@ -2262,6 +2262,556 @@ const AIBrain = {
         actions.push({ type: 'WAIT' });
 
         return actions;
+    },
+
+    // ========================================
+    // === 超強化AI: 学習機能強化 ===
+    // ========================================
+
+    /**
+     * ゲーム中の行動履歴を記録（学習用）
+     */
+    recordAction: function(companyIndex, action, result) {
+        const data = this.loadLearningData();
+        if (!data.actionHistory) {
+            data.actionHistory = [];
+        }
+
+        data.actionHistory.push({
+            period: gameState.currentPeriod,
+            row: gameState.companies[companyIndex]?.currentRow || 1,
+            company: companyIndex,
+            action: action,
+            result: result,
+            timestamp: Date.now()
+        });
+
+        // 直近100件のみ保持
+        if (data.actionHistory.length > 100) {
+            data.actionHistory = data.actionHistory.slice(-100);
+        }
+
+        this.saveLearningData();
+    },
+
+    /**
+     * 過去の成功パターンを分析
+     */
+    analyzeSuccessPatterns: function(companyIndex) {
+        const data = this.loadLearningData();
+        const history = data.actionHistory || [];
+        const company = gameState.companies[companyIndex];
+        const strategy = company.strategy || 'balanced';
+
+        // 戦略別の成功率を計算
+        const strategyStats = data.strategyWinRates[strategy] || { wins: 0, games: 0, avgEquity: 300 };
+        const winRate = strategyStats.games > 0 ? strategyStats.wins / strategyStats.games : 0.5;
+
+        // 期別の最適行動パターン
+        const periodPatterns = {
+            2: { chipPriority: 'research', productionTiming: 'early' },
+            3: { chipPriority: 'next_period', productionTiming: 'balanced' },
+            4: { chipPriority: 'next_period', productionTiming: 'aggressive' },
+            5: { chipPriority: 'clear_condition', productionTiming: 'inventory_focus' }
+        };
+
+        return {
+            winRate,
+            avgEquity: strategyStats.avgEquity,
+            recommendedPattern: periodPatterns[gameState.currentPeriod] || periodPatterns[3],
+            confidence: Math.min(0.9, 0.5 + strategyStats.games * 0.05)
+        };
+    },
+
+    /**
+     * 学習に基づく戦略パラメータ調整
+     */
+    getLearnedStrategyAdjustment: function(company, companyIndex) {
+        const data = this.loadLearningData();
+        const strategy = company.strategy || 'balanced';
+        const stats = data.strategyWinRates[strategy];
+
+        // 勝率が低い場合は戦略パラメータを調整
+        if (stats && stats.games >= 3) {
+            const winRate = stats.wins / stats.games;
+
+            if (winRate < 0.3) {
+                // 勝率低い：より積極的に
+                return {
+                    aggressivenessBonus: 0.2,
+                    riskToleranceBonus: 0.1,
+                    researchChipBonus: 1
+                };
+            } else if (winRate > 0.7) {
+                // 勝率高い：現状維持
+                return {
+                    aggressivenessBonus: 0,
+                    riskToleranceBonus: 0,
+                    researchChipBonus: 0
+                };
+            }
+        }
+
+        return {
+            aggressivenessBonus: 0,
+            riskToleranceBonus: 0,
+            researchChipBonus: 0
+        };
+    },
+
+    // ========================================
+    // === 超強化AI: 相手戦略タイプ推定 ===
+    // ========================================
+
+    /**
+     * 相手の行動パターンから戦略タイプを推定
+     */
+    estimateOpponentStrategy: function(opponentIndex) {
+        const opponent = gameState.companies[opponentIndex];
+        if (!opponent) return 'balanced';
+
+        // 行動パターンの分析
+        const indicators = {
+            aggressive: 0,
+            conservative: 0,
+            balanced: 0,
+            price_focused: 0,
+            tech_focused: 0
+        };
+
+        // 研究チップ数で判定
+        const researchChips = opponent.chips.research || 0;
+        if (researchChips >= 4) {
+            indicators.tech_focused += 3;
+            indicators.aggressive += 2;
+        } else if (researchChips >= 2) {
+            indicators.balanced += 2;
+        } else {
+            indicators.conservative += 2;
+        }
+
+        // 広告チップ数で判定
+        const adChips = opponent.chips.advertising || 0;
+        if (adChips >= 2) {
+            indicators.price_focused += 3;
+        }
+
+        // 現金保有量で判定
+        const periodPayment = calculatePeriodPayment(opponent);
+        const cashRatio = opponent.cash / Math.max(periodPayment, 1);
+        if (cashRatio > 2) {
+            indicators.conservative += 2;
+        } else if (cashRatio < 1.2) {
+            indicators.aggressive += 2;
+        }
+
+        // 在庫量で判定
+        const totalInventory = opponent.materials + opponent.wip + opponent.products;
+        if (totalInventory > 15) {
+            indicators.conservative += 1;
+        } else if (totalInventory < 5) {
+            indicators.aggressive += 2;
+        }
+
+        // 最も高いスコアの戦略を返す
+        let maxScore = 0;
+        let estimatedStrategy = 'balanced';
+        for (const [strategy, score] of Object.entries(indicators)) {
+            if (score > maxScore) {
+                maxScore = score;
+                estimatedStrategy = strategy;
+            }
+        }
+
+        return estimatedStrategy;
+    },
+
+    /**
+     * 相手の次の行動を高精度で予測
+     */
+    predictOpponentNextAction: function(opponentIndex) {
+        const opponent = gameState.companies[opponentIndex];
+        if (!opponent) return { action: 'UNKNOWN', probability: 0 };
+
+        const estimatedStrategy = this.estimateOpponentStrategy(opponentIndex);
+        const period = gameState.currentPeriod;
+        const mfgCapacity = getManufacturingCapacity(opponent);
+        const salesCapacity = getSalesCapacity(opponent);
+        const periodPayment = calculatePeriodPayment(opponent);
+
+        // 状況に基づく予測
+        const predictions = [];
+
+        // 緊急販売チェック
+        if (opponent.cash < periodPayment && opponent.products > 0) {
+            predictions.push({ action: 'EMERGENCY_SELL', probability: 0.95 });
+        }
+
+        // 5期クリア条件チェック
+        if (period === 5) {
+            const totalInv = opponent.materials + opponent.wip + opponent.products;
+            const nextChips = (opponent.nextPeriodChips?.research || 0) +
+                              (opponent.nextPeriodChips?.education || 0) +
+                              (opponent.nextPeriodChips?.advertising || 0);
+
+            if (nextChips < 3 && opponent.cash >= 60) {
+                predictions.push({ action: 'BUY_NEXT_CHIP', probability: 0.9 });
+            }
+            if (totalInv < 10) {
+                predictions.push({ action: 'BUILD_INVENTORY', probability: 0.85 });
+            }
+        }
+
+        // 戦略別の傾向
+        switch (estimatedStrategy) {
+            case 'aggressive':
+                if (opponent.products > 0 && salesCapacity > 0) {
+                    predictions.push({ action: 'SELL', probability: 0.8 });
+                }
+                break;
+            case 'conservative':
+                if (opponent.cash > periodPayment * 2) {
+                    predictions.push({ action: 'HOLD_CASH', probability: 0.7 });
+                }
+                break;
+            case 'tech_focused':
+                if (opponent.chips.research < 5 && opponent.cash > 50) {
+                    predictions.push({ action: 'BUY_RESEARCH', probability: 0.75 });
+                }
+                break;
+        }
+
+        // 基本行動
+        if (opponent.products > 0 && salesCapacity > 0) {
+            predictions.push({ action: 'SELL', probability: 0.6 });
+        }
+        if (opponent.wip > 0 && mfgCapacity > 0) {
+            predictions.push({ action: 'COMPLETE', probability: 0.5 });
+        }
+        if (opponent.materials > 0 && mfgCapacity > 0) {
+            predictions.push({ action: 'PRODUCE', probability: 0.4 });
+        }
+
+        // 最も確率が高い予測を返す
+        predictions.sort((a, b) => b.probability - a.probability);
+        return predictions[0] || { action: 'WAIT', probability: 0.3 };
+    },
+
+    // ========================================
+    // === 超強化AI: モンテカルロシミュレーション ===
+    // ========================================
+
+    /**
+     * モンテカルロ法による最適行動の決定
+     * @param {number} simulations シミュレーション回数
+     */
+    monteCarloDecision: function(company, companyIndex, simulations = 50) {
+        const possibleActions = this.enumeratePossibleActions(company, companyIndex);
+        const results = {};
+
+        // 各アクションについてシミュレーション
+        for (const action of possibleActions) {
+            results[action.type + '_' + (action.quantity || action.chipType || '')] = {
+                action,
+                totalValue: 0,
+                simCount: 0
+            };
+        }
+
+        // シミュレーション実行
+        for (let sim = 0; sim < simulations; sim++) {
+            for (const action of possibleActions) {
+                const key = action.type + '_' + (action.quantity || action.chipType || '');
+                const value = this.simulateActionOutcome(company, action, companyIndex);
+                results[key].totalValue += value;
+                results[key].simCount++;
+            }
+        }
+
+        // 平均値を計算し、最適アクションを選択
+        let bestAction = null;
+        let bestValue = -Infinity;
+
+        for (const key in results) {
+            const avgValue = results[key].totalValue / results[key].simCount;
+            if (avgValue > bestValue) {
+                bestValue = avgValue;
+                bestAction = results[key].action;
+            }
+        }
+
+        return {
+            recommendedAction: bestAction,
+            expectedValue: bestValue,
+            confidence: Math.min(0.95, 0.7 + simulations / 200),
+            simulationCount: simulations
+        };
+    },
+
+    /**
+     * 単一アクションの結果をシミュレート（ランダム要素含む）
+     */
+    simulateActionOutcome: function(company, action, companyIndex) {
+        const period = gameState.currentPeriod;
+        const remainingRows = gameState.maxRows - (company.currentRow || 1);
+
+        // ベース価値
+        let value = 0;
+
+        // ランダム要素（リスクカードの影響など）
+        const riskFactor = 0.9 + Math.random() * 0.2; // 0.9-1.1
+
+        switch (action.type) {
+            case 'SELL':
+                const basePrice = 40 + (company.chips.research || 0) * 2;
+                const sellValue = action.quantity * basePrice * riskFactor;
+                const variableCost = action.quantity * 15;
+                value = sellValue - variableCost;
+                break;
+
+            case 'COMPLETE':
+                // 完成による在庫価値増加
+                value = (action.quantity * 1 - action.quantity * 5) * riskFactor;
+                // 将来の販売機会の価値
+                value += action.quantity * 20 * (remainingRows / gameState.maxRows);
+                break;
+
+            case 'PRODUCE':
+                value = (action.quantity * 1 - action.quantity * 5) * riskFactor;
+                value += action.quantity * 15 * (remainingRows / gameState.maxRows);
+                break;
+
+            case 'BUY_CHIP':
+                const remainingPeriods = 5 - period + 1;
+                if (action.chipType === 'research') {
+                    // 研究チップ：価格競争力+2 × 予想販売数
+                    const expectedSales = (company.salesmen + 1) * 8 * remainingPeriods;
+                    value = (expectedSales * 2 - (period === 2 ? 20 : 30)) * riskFactor;
+                } else if (action.chipType === 'education') {
+                    if ((company.chips.education || 0) >= 1) {
+                        value = -50; // 2枚目以降は無駄
+                    } else {
+                        value = (remainingPeriods * 3 * 20 - (period === 2 ? 20 : 30)) * riskFactor;
+                    }
+                } else if (action.chipType === 'advertising') {
+                    if ((company.chips.advertising || 0) >= company.salesmen) {
+                        value = -30;
+                    } else {
+                        value = (remainingPeriods * 2 * 20 - (period === 2 ? 20 : 30)) * riskFactor;
+                    }
+                }
+                break;
+
+            case 'WAIT':
+                value = 0;
+                break;
+
+            default:
+                value = 0;
+        }
+
+        return value;
+    },
+
+    // ========================================
+    // === 超強化AI: ゲーム理論最適化 ===
+    // ========================================
+
+    /**
+     * ナッシュ均衡に近い戦略を計算
+     * 他プレイヤーの行動を考慮した最適応答を計算
+     */
+    calculateBestResponse: function(company, companyIndex) {
+        const competitors = this.analyzeCompetitors(company, companyIndex);
+        const myActions = this.enumeratePossibleActions(company, companyIndex);
+
+        // 各競合の予測行動を取得
+        const opponentPredictions = [];
+        for (let i = 0; i < gameState.companies.length; i++) {
+            if (i !== companyIndex) {
+                opponentPredictions.push({
+                    index: i,
+                    prediction: this.predictOpponentNextAction(i)
+                });
+            }
+        }
+
+        // 各自社アクションについて、競合の予測行動を考慮した期待利得を計算
+        const actionPayoffs = myActions.map(action => {
+            let expectedPayoff = 0;
+
+            // 基本的な期待値
+            const baseEV = this.calculateActionExpectedValue(company, action, companyIndex);
+            expectedPayoff += baseEV.expectedValue;
+
+            // 競合の行動による影響
+            for (const op of opponentPredictions) {
+                const opAction = op.prediction.action;
+                const opProb = op.prediction.probability;
+
+                // 競合が販売する場合、市場枠が減る
+                if (opAction === 'SELL' && action.type === 'SELL') {
+                    expectedPayoff -= opProb * action.quantity * 5; // 競合による市場圧迫
+                }
+
+                // 競合が研究チップを買う場合、将来の入札競争が激化
+                if (opAction === 'BUY_RESEARCH' && action.type === 'SELL') {
+                    expectedPayoff -= opProb * 3; // 将来の価格競争力低下
+                }
+
+                // 競合が在庫を積む場合、将来の販売圧力
+                if ((opAction === 'COMPLETE' || opAction === 'PRODUCE') && action.type === 'SELL') {
+                    expectedPayoff += opProb * 2; // 今売った方が有利
+                }
+            }
+
+            return {
+                action,
+                expectedPayoff,
+                baseEV: baseEV.expectedValue
+            };
+        });
+
+        // 最適応答を選択
+        actionPayoffs.sort((a, b) => b.expectedPayoff - a.expectedPayoff);
+
+        return {
+            bestResponse: actionPayoffs[0],
+            alternatives: actionPayoffs.slice(1, 3),
+            gameTheoreticAnalysis: true
+        };
+    },
+
+    /**
+     * 混合戦略の計算（確率的な行動選択）
+     */
+    calculateMixedStrategy: function(company, companyIndex) {
+        const bestResponse = this.calculateBestResponse(company, companyIndex);
+        const mcDecision = this.monteCarloDecision(company, companyIndex, 30);
+
+        // ゲーム理論とモンテカルロの結果を統合
+        const combined = [];
+
+        // ベストレスポンスの上位3アクションに確率を割り当て
+        if (bestResponse.bestResponse) {
+            combined.push({
+                action: bestResponse.bestResponse.action,
+                probability: 0.5,
+                source: 'game_theory'
+            });
+        }
+
+        if (mcDecision.recommendedAction) {
+            // モンテカルロ推奨が異なる場合は追加
+            const mcKey = mcDecision.recommendedAction.type;
+            const brKey = bestResponse.bestResponse?.action.type;
+
+            if (mcKey !== brKey) {
+                combined.push({
+                    action: mcDecision.recommendedAction,
+                    probability: 0.3,
+                    source: 'monte_carlo'
+                });
+            } else {
+                // 同じなら確率を上げる
+                combined[0].probability = 0.7;
+            }
+        }
+
+        // 探索的な行動（たまにランダムな選択）
+        combined.push({
+            action: { type: 'EXPLORE' },
+            probability: 0.1,
+            source: 'exploration'
+        });
+
+        return combined;
+    },
+
+    /**
+     * 統合的な最適意思決定（全手法を組み合わせ）
+     */
+    makeOptimalDecision: function(company, companyIndex) {
+        const period = gameState.currentPeriod;
+
+        // 1. 学習データからの調整を取得
+        const learnedAdj = this.getLearnedStrategyAdjustment(company, companyIndex);
+        const successPatterns = this.analyzeSuccessPatterns(companyIndex);
+
+        // 2. ゲーム理論による最適応答
+        const gameTheory = this.calculateBestResponse(company, companyIndex);
+
+        // 3. モンテカルロシミュレーション
+        const monteCarlo = this.monteCarloDecision(company, companyIndex, 30);
+
+        // 4. 期待値ベースの選択
+        const evBased = this.selectOptimalAction(company, companyIndex);
+
+        // 5. 動的調整
+        const dynamicAdj = this.dynamicStrategyAdjustment(company, companyIndex);
+
+        // 結果を統合（重み付け投票）
+        const votes = {};
+
+        // ゲーム理論（重み0.35）
+        if (gameTheory.bestResponse) {
+            const key = gameTheory.bestResponse.action.type;
+            votes[key] = (votes[key] || 0) + 0.35 * gameTheory.bestResponse.expectedPayoff;
+        }
+
+        // モンテカルロ（重み0.30）
+        if (monteCarlo.recommendedAction) {
+            const key = monteCarlo.recommendedAction.type;
+            votes[key] = (votes[key] || 0) + 0.30 * monteCarlo.expectedValue;
+        }
+
+        // 期待値ベース（重み0.25）
+        if (evBased.recommended) {
+            const key = evBased.recommended.action.type;
+            votes[key] = (votes[key] || 0) + 0.25 * evBased.recommended.ev.expectedValue;
+        }
+
+        // 学習パターン（重み0.10）
+        if (successPatterns.recommendedPattern) {
+            const pattern = successPatterns.recommendedPattern;
+            if (pattern.productionTiming === 'aggressive') {
+                votes['SELL'] = (votes['SELL'] || 0) + 0.10 * 50;
+            } else if (pattern.chipPriority === 'research') {
+                votes['BUY_CHIP'] = (votes['BUY_CHIP'] || 0) + 0.10 * 30;
+            }
+        }
+
+        // 最高投票のアクションを選択
+        let bestAction = null;
+        let bestScore = -Infinity;
+        for (const [actionType, score] of Object.entries(votes)) {
+            if (score > bestScore) {
+                bestScore = score;
+                bestAction = actionType;
+            }
+        }
+
+        // 詳細なアクションオブジェクトを取得
+        let finalAction = null;
+        if (bestAction === gameTheory.bestResponse?.action.type) {
+            finalAction = gameTheory.bestResponse.action;
+        } else if (bestAction === monteCarlo.recommendedAction?.type) {
+            finalAction = monteCarlo.recommendedAction;
+        } else if (bestAction === evBased.recommended?.action.type) {
+            finalAction = evBased.recommended.action;
+        }
+
+        return {
+            action: finalAction || { type: 'WAIT' },
+            score: bestScore,
+            confidence: Math.min(0.95, (successPatterns.confidence + monteCarlo.confidence) / 2),
+            reasoning: {
+                gameTheory: gameTheory.bestResponse?.expectedPayoff || 0,
+                monteCarlo: monteCarlo.expectedValue || 0,
+                evBased: evBased.recommended?.ev.expectedValue || 0,
+                dynamicMode: dynamicAdj.reasoning
+            }
+        };
     }
 };
 

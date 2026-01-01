@@ -802,40 +802,58 @@ function getFirstMoveByStrategy(company, mfgCapacity, salesCapacity) {
 }
 
 // ============================================
-// AI性格別の戦略実行（AIBrain統合版 + 強化AI機能）
+// AI性格別の戦略実行（超強化AI: 統合意思決定エンジン）
 // ============================================
 function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) {
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
 
-    // === 動的戦略調整: 現在のゲーム状況に応じてパラメータ調整 ===
+    // === 超強化AI: 統合最適意思決定 ===
+    // ゲーム理論 + モンテカルロ + 期待値 + 学習を統合
+    const optimalDecision = AIBrain.makeOptimalDecision(company, companyIndex);
+    console.log(`[統合AI] ${company.name}: ${optimalDecision.action.type} (信頼度${(optimalDecision.confidence * 100).toFixed(0)}%)`);
+    console.log(`  理由: GT=${optimalDecision.reasoning.gameTheory.toFixed(0)}, MC=${optimalDecision.reasoning.monteCarlo.toFixed(0)}, EV=${optimalDecision.reasoning.evBased.toFixed(0)}`);
+
+    // 相手戦略推定をログ
+    for (let i = 1; i < gameState.companies.length; i++) {
+        if (i !== companyIndex) {
+            const estimated = AIBrain.estimateOpponentStrategy(i);
+            const nextAction = AIBrain.predictOpponentNextAction(i);
+            console.log(`  [対${gameState.companies[i].name}] 推定戦略:${estimated}, 次の行動:${nextAction.action}(${(nextAction.probability * 100).toFixed(0)}%)`);
+        }
+    }
+
+    // === 動的戦略調整 ===
     const dynamicAdj = AIBrain.dynamicStrategyAdjustment(company, companyIndex);
     console.log(`[動的調整] ${company.name}: ${dynamicAdj.reasoning}`);
 
-    // === 複数ターン先読み: シナリオ比較で最適方針を決定 ===
+    // === 複数ターン先読み ===
     const futureSim = AIBrain.simulateFutureTurns(company, companyIndex, 3);
     console.log(`[先読み] ${company.name}: ${futureSim.reasoning}`);
 
-    // === 期待値ベース最適行動選択 ===
-    const evDecision = AIBrain.selectOptimalAction(company, companyIndex);
-    if (evDecision.recommended && evDecision.recommended.ev.expectedValue > 10) {
-        console.log(`[期待値] ${company.name}: ${evDecision.recommended.action.type} EV=${evDecision.recommended.ev.expectedValue.toFixed(0)}`);
-    }
-
-    // === G最大化マスター戦略を最優先で実行 ===
+    // === G最大化マスター戦略 ===
     const strategyParams = STRATEGY_PARAMS[company.strategy] || STRATEGY_PARAMS.balanced;
 
-    // 動的調整を反映
+    // 学習による調整を取得
+    const learnedAdj = AIBrain.getLearnedStrategyAdjustment(company, companyIndex);
+
+    // 動的調整 + 学習調整を反映
     const adjustedParams = {
         ...strategyParams,
-        aggressiveness: Math.min(1, strategyParams.aggressiveness + (dynamicAdj.aggressiveness - 0.5) * 0.5),
-        safetyMultiplier: strategyParams.safetyMultiplier * (1 + (0.5 - dynamicAdj.riskTolerance) * 0.3)
+        aggressiveness: Math.min(1, strategyParams.aggressiveness +
+            (dynamicAdj.aggressiveness - 0.5) * 0.5 +
+            learnedAdj.aggressivenessBonus),
+        safetyMultiplier: strategyParams.safetyMultiplier *
+            (1 + (0.5 - dynamicAdj.riskTolerance) * 0.3),
+        targetResearchChips: strategyParams.targetResearchChips + learnedAdj.researchChipBonus
     };
 
     const gMaxAction = getGMaximizingAction(company, companyIndex, adjustedParams);
 
     if (gMaxAction && gMaxAction.action !== 'WAIT') {
         console.log(`[G最大化] ${company.name}: ${gMaxAction.action} - ${gMaxAction.reason}`);
+        // 行動を記録（学習用）
+        AIBrain.recordAction(companyIndex, gMaxAction.action, 'pending');
         if (executeGMaximizingAction(company, companyIndex, gMaxAction)) {
             return;
         }
