@@ -269,18 +269,18 @@ function runSimulation(strategy) {
 
                 // 入札価格決定（研究チップで優位、高価格市場狙い）
                 // 仙台40、札幌36、福岡32、名古屋28が上限
-                // 研究チップ2枚で札幌¥34-36狙い（妥当な設定）
+                // 研究チップ2枚で仙台¥36-38狙い（強気設定）
                 let winRate, avgPrice;
                 if (period === 2) {
-                    // 2期: 競争少なく研究2枚で¥35-36狙い
-                    if (researchChips >= 2) { winRate = 0.92; avgPrice = 35; }
-                    else if (researchChips >= 1) { winRate = 0.85; avgPrice = 31; }
-                    else { winRate = 0.80; avgPrice = 27; }
+                    // 2期: 競争少なく研究2枚で¥36-38狙い
+                    if (researchChips >= 2) { winRate = 0.93; avgPrice = 36; }
+                    else if (researchChips >= 1) { winRate = 0.88; avgPrice = 32; }
+                    else { winRate = 0.82; avgPrice = 28; }
                 } else {
-                    // 3期以降: 研究2枚で¥33-35狙い
-                    if (researchChips >= 2) { winRate = 0.82; avgPrice = 34; }
-                    else if (researchChips >= 1) { winRate = 0.68; avgPrice = 29; }
-                    else { winRate = 0.42; avgPrice = 24; }
+                    // 3期以降: 研究2枚で¥35-36狙い
+                    if (researchChips >= 2) { winRate = 0.85; avgPrice = 35; }
+                    else if (researchChips >= 1) { winRate = 0.70; avgPrice = 30; }
+                    else { winRate = 0.45; avgPrice = 25; }
                 }
 
                 if (Math.random() < winRate) {
@@ -524,13 +524,13 @@ function runDetailedSimulation(strategy) {
                 // 高価格市場狙い（仙台40、札幌36、福岡32）
                 let winRate, avgPrice;
                 if (period === 2) {
-                    // 2期: 競争少なく研究2枚で¥35-36狙い
-                    winRate = researchChips >= 2 ? 0.92 : researchChips >= 1 ? 0.85 : 0.80;
-                    avgPrice = researchChips >= 2 ? 35 : researchChips >= 1 ? 31 : 27;
+                    // 2期: 競争少なく研究2枚で¥36-38狙い
+                    winRate = researchChips >= 2 ? 0.93 : researchChips >= 1 ? 0.88 : 0.82;
+                    avgPrice = researchChips >= 2 ? 36 : researchChips >= 1 ? 32 : 28;
                 } else {
-                    // 3期以降: 研究2枚で¥33-35狙い
-                    winRate = researchChips >= 2 ? 0.82 : researchChips >= 1 ? 0.68 : 0.42;
-                    avgPrice = researchChips >= 2 ? 34 : researchChips >= 1 ? 29 : 24;
+                    // 3期以降: 研究2枚で¥35-36狙い
+                    winRate = researchChips >= 2 ? 0.85 : researchChips >= 1 ? 0.70 : 0.45;
+                    avgPrice = researchChips >= 2 ? 35 : researchChips >= 1 ? 30 : 25;
                 }
 
                 if (Math.random() < winRate) {
