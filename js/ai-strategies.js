@@ -345,33 +345,101 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
         }
     }
 
-    // === 3. 2期：チップ投資最優先（MQ基盤構築） ===
+    // === 3. 2期：戦略別に初手を多様化 ===
     if (period === 2) {
-        // 教育チップ：製造+1、販売+1 → MQへの寄与最大
-        if (company.chips.education < params.targetEducationChips && safeInvestment >= 20) {
+        const strategy = company.strategy || 'balanced';
+        const chipFirstStrategies = ['tech_focused', 'aggressive'];  // チップ優先
+        const materialFirstStrategies = ['price_focused', 'balanced'];  // 材料優先
+        const isChipFirst = chipFirstStrategies.includes(strategy);
+
+        // 製品があれば販売を優先（共通）
+        if (company.products > 0 && salesCapacity > 0) {
+            const sellQty = Math.min(salesCapacity, company.products);
             return {
-                action: 'BUY_CHIP',
-                params: { chipType: 'education', cost: 20 },
-                reason: `教育チップ${company.chips.education + 1}枚目（MQ基盤）`
+                action: 'SELL',
+                params: { qty: sellQty, priceMultiplier: 0.80 },
+                reason: '2期：販売優先（現金確保）'
             };
         }
 
-        // 研究チップ：価格競争力+2 → 入札勝利確率UP
-        if (company.chips.research < params.targetResearchChips && safeInvestment >= 20) {
+        // 材料/仕掛品があれば生産を優先（共通）
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
             return {
-                action: 'BUY_CHIP',
-                params: { chipType: 'research', cost: 20 },
-                reason: `研究チップ${company.chips.research + 1}枚目（価格競争力）`
+                action: 'PRODUCE',
+                params: { qty: mfgCapacity },
+                reason: '2期：生産優先（在庫回転）'
             };
         }
 
-        // 広告チップ：販売能力+2/セールスマン
+        // 戦略別：チップ優先 or 材料優先
+        if (isChipFirst) {
+            // チップ優先戦略：先にチップ投資
+            if (company.chips.education < params.targetEducationChips && safeInvestment >= 20) {
+                return {
+                    action: 'BUY_CHIP',
+                    params: { chipType: 'education', cost: 20 },
+                    reason: `${strategy}戦略：教育チップ優先（MQ基盤）`
+                };
+            }
+            if (company.chips.research < params.targetResearchChips && safeInvestment >= 20) {
+                return {
+                    action: 'BUY_CHIP',
+                    params: { chipType: 'research', cost: 20 },
+                    reason: `${strategy}戦略：研究チップ優先（価格競争力）`
+                };
+            }
+            // その後材料
+            if (company.materials === 0 && company.cash > safetyMargin + 15) {
+                return {
+                    action: 'BUY_MATERIALS',
+                    params: { qty: mfgCapacity },
+                    reason: '2期：材料仕入れ（MQサイクル開始）'
+                };
+            }
+        } else {
+            // 材料優先戦略：先に材料仕入れ
+            if (company.materials === 0 && company.wip === 0 && company.products === 0) {
+                if (company.cash > safetyMargin + 15) {
+                    return {
+                        action: 'BUY_MATERIALS',
+                        params: { qty: mfgCapacity },
+                        reason: `${strategy}戦略：材料仕入れ優先（MQサイクル開始）`
+                    };
+                }
+            }
+            // MQサイクル後にチップ
+            if (company.chips.education < params.targetEducationChips && safeInvestment >= 20) {
+                return {
+                    action: 'BUY_CHIP',
+                    params: { chipType: 'education', cost: 20 },
+                    reason: `${strategy}戦略：教育チップ（MQ基盤）`
+                };
+            }
+            if (company.chips.research < params.targetResearchChips && safeInvestment >= 20) {
+                return {
+                    action: 'BUY_CHIP',
+                    params: { chipType: 'research', cost: 20 },
+                    reason: `${strategy}戦略：研究チップ（価格競争力）`
+                };
+            }
+        }
+
+        // 広告チップ（共通）
         if (company.chips.advertising < params.targetAdvertisingChips &&
             company.salesmen >= 1 && safeInvestment >= 20) {
             return {
                 action: 'BUY_CHIP',
                 params: { chipType: 'advertising', cost: 20 },
                 reason: `広告チップ${company.chips.advertising + 1}枚目（販売強化）`
+            };
+        }
+
+        // 材料補充（共通）
+        if (company.materials < mfgCapacity && company.cash > safetyMargin + 15) {
+            return {
+                action: 'BUY_MATERIALS',
+                params: { qty: mfgCapacity },
+                reason: '2期：材料補充（次サイクル準備）'
             };
         }
     }
@@ -457,6 +525,64 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
                 params: { cost: 15 },
                 reason: '製造能力不足：コンピュータチップ'
             };
+        }
+    }
+
+    // === 7. 3期以降：機械投資戦略 ===
+    if (period >= 3 && safeInvestment >= 30 && rowsRemaining > 8) {
+        const smallMachines = company.machines.filter(m => m.type === 'small');
+        const largeMachines = company.machines.filter(m => m.type === 'large');
+        const attachableMachines = smallMachines.filter(m => m.attachments === 0);
+        const machineCapacity = company.machines.reduce((sum, m) => {
+            if (m.type === 'large') return sum + 4;
+            return sum + (m.attachments > 0 ? 2 : 1);
+        }, 0);
+
+        // 目標：製造能力 >= 販売能力を目指す
+        const targetMfgCapacity = Math.max(salesCapacity, 3);
+        const needsMoreCapacity = mfgCapacity < targetMfgCapacity;
+
+        if (needsMoreCapacity) {
+            // オプション1：アタッチメント購入（30円、+1能力）
+            if (attachableMachines.length > 0 && safeInvestment >= 30) {
+                return {
+                    action: 'BUY_ATTACHMENT',
+                    params: { cost: 30 },
+                    reason: `製造能力向上：アタッチメント購入（${mfgCapacity}→${mfgCapacity + 1}）`
+                };
+            }
+
+            // オプション2：小型機械購入（50円、+1能力、要ワーカー）
+            if (safeInvestment >= 50 && company.workers > machineCapacity) {
+                return {
+                    action: 'BUY_SMALL_MACHINE',
+                    params: { cost: 50 },
+                    reason: `製造能力向上：小型機械購入（${mfgCapacity}→${mfgCapacity + 1}）`
+                };
+            }
+
+            // オプション3：大型機械へのアップグレード（売却+購入）
+            // 条件：小型機械あり、ワーカー3人以上、十分な資金
+            if (smallMachines.length > 0 && largeMachines.length === 0 &&
+                company.workers >= 3 && safeInvestment >= 70) {
+                const smallMachine = smallMachines[0];
+                const bookValue = smallMachine.attachments > 0 ? 40 : 30;
+                const salePrice = Math.floor(bookValue * 0.7);
+                const netCost = 100 - salePrice;
+
+                if (safeInvestment >= netCost) {
+                    return {
+                        action: 'UPGRADE_TO_LARGE',
+                        params: {
+                            sellMachineIndex: company.machines.indexOf(smallMachine),
+                            salePrice: salePrice,
+                            purchaseCost: 100,
+                            bookValue: bookValue
+                        },
+                        reason: `設備更新：小型→大型機械（製造+3、長期成長）`
+                    };
+                }
+            }
         }
     }
 
@@ -569,6 +695,61 @@ function executeGMaximizingAction(company, companyIndex, action) {
             incrementRow(companyIndex);
             showAIActionModal(company, 'チップ購入', '💻', action.reason);
             return true;
+
+        case 'BUY_ATTACHMENT':
+            // 小型機械にアタッチメントを追加
+            const attachableMachine = company.machines.find(m => m.type === 'small' && m.attachments === 0);
+            if (attachableMachine && company.cash >= action.params.cost) {
+                company.cash -= action.params.cost;
+                attachableMachine.attachments = 1;
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備投資', '🔧', action.reason, [
+                    { label: '投資額', value: `¥${action.params.cost}` },
+                    { label: '効果', value: '製造能力+1' }
+                ]);
+                return true;
+            }
+            return false;
+
+        case 'BUY_SMALL_MACHINE':
+            // 小型機械を購入
+            if (company.cash >= action.params.cost) {
+                company.cash -= action.params.cost;
+                company.machines.push({ type: 'small', attachments: 0 });
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備投資', '🏭', action.reason, [
+                    { label: '投資額', value: `¥${action.params.cost}` },
+                    { label: '効果', value: '製造能力+1（要ワーカー）' }
+                ]);
+                return true;
+            }
+            return false;
+
+        case 'UPGRADE_TO_LARGE':
+            // 小型機械を売却して大型機械を購入
+            const machineIndex = action.params.sellMachineIndex;
+            if (machineIndex >= 0 && machineIndex < company.machines.length) {
+                const soldMachine = company.machines[machineIndex];
+                const loss = action.params.bookValue - action.params.salePrice;
+
+                // 売却
+                company.cash += action.params.salePrice;
+                company.machines.splice(machineIndex, 1);
+                company.specialLoss = (company.specialLoss || 0) + loss;
+
+                // 購入
+                company.cash -= action.params.purchaseCost;
+                company.machines.push({ type: 'large', attachments: 0 });
+
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備更新', '🏗️', action.reason, [
+                    { label: '売却収入', value: `¥${action.params.salePrice}` },
+                    { label: '購入費用', value: `¥${action.params.purchaseCost}` },
+                    { label: '特別損失', value: `¥${loss}` }
+                ]);
+                return true;
+            }
+            return false;
 
         case 'WAIT':
             aiDoNothing(company, action.reason);
@@ -2676,15 +2857,16 @@ function executeDefaultMaterialPurchase(company, targetQty) {
     const canStore = Math.max(0, materialCapacity - company.materials);
     const maxBuyable = gameState.currentPeriod === 2 ? canStore : Math.min(mfgCapacity, canStore);
     const actualTargetQty = Math.min(targetQty, maxBuyable);
-    const companyRow = company.currentRow || 1;
-    const maxRow = Math.max(...gameState.companies.map(c => c.currentRow || 1));
-    const canDistribute = companyRow < maxRow;
 
     const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed)
         .sort((a, b) => a.buyPrice - b.buyPrice);
 
     if (availableMarkets.length > 0) {
-        if (canDistribute) {
+        // 常に2市場同時購入を試みる（複数市場から安い順に購入）
+        // 条件: 購入目標が2個以上、かつ複数市場が利用可能
+        const shouldDistribute = actualTargetQty >= 2 && availableMarkets.length >= 1;
+
+        if (shouldDistribute) {
             let simulatedTotal = 0;
             let simulatedCash = company.cash;
             let purchases = [];
@@ -2701,7 +2883,7 @@ function executeDefaultMaterialPurchase(company, targetQty) {
                 }
             }
 
-            if (simulatedTotal >= 2) {
+            if (simulatedTotal >= 1) {
                 let totalCost = 0;
                 let purchaseDetails = [];
 
@@ -2715,14 +2897,19 @@ function executeDefaultMaterialPurchase(company, targetQty) {
                 }
 
                 incrementRow(gameState.companies.indexOf(company));
-                showAIActionModal(company, '材料仕入', '📦', purchaseDetails.join('、'), [
+                const detailText = purchases.length > 1
+                    ? `${purchases.length}市場から購入: ${purchaseDetails.join('、')}`
+                    : purchaseDetails.join('、');
+                showAIActionModal(company, '材料仕入', '📦', detailText, [
                     { label: '購入数', value: `${simulatedTotal}個` },
                     { label: '支払', value: `¥${totalCost}` }
                 ]);
+                console.log(`[2市場購入] ${company.name}: ${purchaseDetails.join(', ')} 合計${simulatedTotal}個 ¥${totalCost}`);
                 return;
             }
         }
 
+        // フォールバック: 単一市場から購入
         const market = availableMarkets[0];
         const buyQty = Math.min(actualTargetQty, market.currentStock, Math.floor(company.cash / market.buyPrice));
 
