@@ -1262,6 +1262,19 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
 
+    // === 自己資本450目標戦略 ===
+    if (AIBrain.getEquityMaximizingAction) {
+        const equityAction = AIBrain.getEquityMaximizingAction(company, companyIndex);
+        if (equityAction.confidence >= 0.85) {
+            const convertedAction = convertUltimateToGMaxAction(equityAction, company, mfgCapacity, salesCapacity);
+            console.log(`[自己資本戦略採用] ${company.name}: ${convertedAction.action} - ${equityAction.reason}`);
+            AIBrain.recordAction(companyIndex, convertedAction.action, 'pending');
+            if (executeGMaximizingAction(company, companyIndex, convertedAction)) {
+                return;
+            }
+        }
+    }
+
     // === 究極AI: 全機能統合意思決定 ===
     // ゲーム理論 + モンテカルロ + 期待値 + 学習 + リスク + 長期最適化 + Q学習
     const ultimateDecision = AIBrain.makeUltimateDecision(company, companyIndex);

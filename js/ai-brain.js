@@ -3968,6 +3968,326 @@ const AIBrain = {
             reasoning: { fallback: reason },
             components: { base: 0, riskAdjusted: 0, longTerm: 0, rl: 0, bidUrgency: 0 }
         };
+    },
+
+    // ============================================
+    // 🎭 人間らしい行動パターン
+    // ============================================
+
+    /**
+     * 人間らしい「揺れ」を加える
+     * - 最適解でも100%選ばない
+     * - 性格による選好の違い
+     * - 時々「気まぐれ」な選択
+     */
+    addHumanLikeBehavior: function(action, company, alternatives) {
+        const strategy = company.strategy || 'balanced';
+        const randomFactor = Math.random();
+
+        // 性格別の「ブレ」確率
+        const deviationChance = {
+            aggressive: 0.05,    // 5%で違う選択
+            conservative: 0.08,  // 8%で違う選択（慎重に考え直す）
+            balanced: 0.03,      // 3%で違う選択
+            tech_focused: 0.04,  // 4%で違う選択
+            price_focused: 0.06, // 6%で違う選択
+            unpredictable: 0.25  // 25%で違う選択（読めない）
+        };
+
+        const chance = deviationChance[strategy] || 0.05;
+
+        // ブレが発生
+        if (randomFactor < chance && alternatives && alternatives.length > 0) {
+            const alternative = alternatives[Math.floor(Math.random() * alternatives.length)];
+            console.log(`[人間らしさ] ${company.name}: 気が変わった... ${action.type} → ${alternative.actionType}`);
+            return {
+                ...action,
+                type: alternative.actionType,
+                humanVariation: true
+            };
+        }
+
+        return action;
+    },
+
+    /**
+     * 思考時間を戦略別に計算（表示用）
+     */
+    getThinkingDuration: function(company, decision) {
+        const strategy = company.strategy || 'balanced';
+        const confidence = decision.confidence || 0.5;
+
+        // 基本思考時間（ms）
+        const baseTime = {
+            aggressive: 800,     // 速い決断
+            conservative: 1500,  // じっくり考える
+            balanced: 1000,      // 平均的
+            tech_focused: 1200,  // やや慎重
+            price_focused: 900,  // 早め
+            unpredictable: 600   // 直感的
+        };
+
+        const base = baseTime[strategy] || 1000;
+
+        // 信頼度が低いと長く考える
+        const confidenceMultiplier = 1 + (1 - confidence) * 0.5;
+
+        // ランダム要素
+        const randomVariation = 0.8 + Math.random() * 0.4;
+
+        return Math.floor(base * confidenceMultiplier * randomVariation);
+    },
+
+    /**
+     * 性格に応じた「癖」を反映した行動選択
+     */
+    applyPersonalityQuirks: function(action, company, context) {
+        const strategy = company.strategy || 'balanced';
+
+        switch (strategy) {
+            case 'aggressive':
+                // 攻撃的：販売を積極的に、価格を強気に
+                if (action.type === 'SELL' && action.priceMultiplier) {
+                    action.priceMultiplier = Math.min(0.95, action.priceMultiplier + 0.05);
+                }
+                break;
+
+            case 'conservative':
+                // 堅実：現金を多めに保持したがる
+                if (action.type === 'BUY_MATERIALS' && company.cash < 80) {
+                    action.reduced = true;
+                    action.reason += '（慎重に少量）';
+                }
+                break;
+
+            case 'price_focused':
+                // 価格重視：入札で粘る
+                if (action.type === 'SELL') {
+                    action.bidAggressive = true;
+                }
+                break;
+
+            case 'tech_focused':
+                // 技術重視：チップ購入を好む
+                if (action.type === 'WAIT' && company.cash >= 40 && company.chips.research < 5) {
+                    return {
+                        type: 'BUY_CHIP',
+                        chipType: 'research',
+                        reason: '技術重視の癖: 研究投資',
+                        quirk: true
+                    };
+                }
+                break;
+
+            case 'unpredictable':
+                // 予測不能：時々真逆のことをする
+                if (Math.random() < 0.1) {
+                    const opposites = {
+                        'SELL': 'BUY_MATERIALS',
+                        'BUY_MATERIALS': 'SELL',
+                        'PRODUCE': 'BUY_CHIP',
+                        'BUY_CHIP': 'PRODUCE'
+                    };
+                    if (opposites[action.type]) {
+                        console.log(`[予測不能] ${company.name}: 急に方向転換！`);
+                        return {
+                            ...action,
+                            type: opposites[action.type],
+                            quirk: true
+                        };
+                    }
+                }
+                break;
+        }
+
+        return action;
+    },
+
+    // ============================================
+    // 🏆 自己資本450目標戦略エンジン
+    // ============================================
+
+    /**
+     * 期別の目標自己資本を取得
+     * 初期300円 → 5期末450円以上を目指す
+     */
+    getEquityTarget: function(period) {
+        const targets = {
+            2: 310,   // 2期末: 微増（基盤構築期）
+            3: 350,   // 3期末: +40（成長開始）
+            4: 400,   // 4期末: +50（成長加速）
+            5: 450    // 5期末: +50（目標達成）
+        };
+        return targets[period] || 300;
+    },
+
+    /**
+     * 目標達成に必要なGを計算
+     */
+    getRequiredG: function(company, period) {
+        const currentEquity = company.equity;
+        const targetEquity = this.getEquityTarget(period);
+        const gap = targetEquity - currentEquity;
+
+        // 税金を考慮（G × 0.6 が純増）
+        const requiredG = Math.ceil(gap / 0.6);
+
+        return {
+            currentEquity,
+            targetEquity,
+            gap,
+            requiredG,
+            isOnTrack: currentEquity >= targetEquity * 0.9,
+            needsAggression: gap > 50
+        };
+    },
+
+    /**
+     * 行動シミュレーション：各行動の期待Gを計算
+     */
+    simulateAction: function(company, actionType, companyIndex) {
+        const period = gameState.currentPeriod;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+        const mfgCapacity = getManufacturingCapacity(company);
+        const salesCapacity = getSalesCapacity(company);
+
+        let expectedGImpact = 0;
+        let cashImpact = 0;
+        let cyclesGained = 0;
+        let confidence = 0.5;
+
+        switch (actionType) {
+            case 'SELL':
+                const sellQty = Math.min(company.products, salesCapacity);
+                const avgPrice = 28 + (company.chips.research || 0) * 2;
+                const avgVQ = 15; // 材料12 + 製造2 + 在庫評価1
+                expectedGImpact = sellQty * (avgPrice - avgVQ);
+                cashImpact = sellQty * avgPrice;
+                confidence = 0.9;
+                break;
+
+            case 'PRODUCE':
+                const produceQty = Math.min(company.materials + company.wip, mfgCapacity);
+                // 生産は直接Gに影響しないが、販売可能在庫を増やす
+                expectedGImpact = 0;
+                cashImpact = -produceQty; // 製造費
+                cyclesGained = 1; // 1サイクル進む
+                confidence = 0.8;
+                break;
+
+            case 'BUY_MATERIALS':
+                const buyQty = mfgCapacity;
+                const materialCost = 12 * buyQty;
+                expectedGImpact = 0; // 直接影響なし
+                cashImpact = -materialCost;
+                cyclesGained = 1;
+                confidence = 0.7;
+                break;
+
+            case 'BUY_CHIP':
+                const chipCost = period === 2 ? 20 : 40;
+                // チップの長期価値
+                expectedGImpact = Math.floor(rowsRemaining / 4) * 3; // 平均効果
+                cashImpact = -chipCost;
+                confidence = 0.6;
+                break;
+
+            case 'WAIT':
+                expectedGImpact = -5; // 機会損失
+                confidence = 0.3;
+                break;
+        }
+
+        // MQサイクル完了までの推定Gを加算
+        const futureCycles = Math.floor(rowsRemaining / 4);
+        const avgMQPerCycle = Math.min(mfgCapacity, salesCapacity) * 13;
+        const futureG = futureCycles * avgMQPerCycle;
+
+        return {
+            actionType,
+            expectedGImpact,
+            cashImpact,
+            cyclesGained,
+            futureG,
+            totalValue: expectedGImpact + futureG * 0.3, // 将来価値に割引
+            confidence
+        };
+    },
+
+    /**
+     * 全行動を比較して最適行動を選択
+     */
+    findOptimalAction: function(company, companyIndex) {
+        const possibleActions = ['SELL', 'PRODUCE', 'BUY_MATERIALS', 'BUY_CHIP', 'WAIT'];
+        const simulations = [];
+
+        for (const action of possibleActions) {
+            // 実行可能性チェック
+            if (action === 'SELL' && company.products <= 0) continue;
+            if (action === 'PRODUCE' && company.materials <= 0 && company.wip <= 0) continue;
+            if (action === 'BUY_MATERIALS' && company.cash < 10) continue;
+            if (action === 'BUY_CHIP' && company.cash < 20) continue;
+
+            const sim = this.simulateAction(company, action, companyIndex);
+            simulations.push(sim);
+        }
+
+        // スコアでソート
+        simulations.sort((a, b) => b.totalValue - a.totalValue);
+
+        const best = simulations[0] || { actionType: 'WAIT', totalValue: 0, confidence: 0.3 };
+
+        console.log(`[G最大化シミュ] ${company.name}: ${simulations.map(s => `${s.actionType}=${s.totalValue.toFixed(0)}`).join(', ')}`);
+
+        return {
+            action: best.actionType,
+            score: best.totalValue,
+            confidence: best.confidence,
+            alternatives: simulations.slice(1, 3)
+        };
+    },
+
+    /**
+     * 自己資本450達成のための戦略的行動決定
+     */
+    getEquityMaximizingAction: function(company, companyIndex) {
+        const period = gameState.currentPeriod;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+        const equityStatus = this.getRequiredG(company, period);
+
+        console.log(`[自己資本戦略] ${company.name}: 現在¥${equityStatus.currentEquity} → 目標¥${equityStatus.targetEquity} (必要G=¥${equityStatus.requiredG})`);
+
+        // 危機モード：目標から大幅に遅れている
+        if (equityStatus.needsAggression) {
+            console.log(`[危機モード] ${company.name}: 攻めの姿勢で挽回`);
+
+            // 製品があれば積極販売
+            if (company.products > 0) {
+                return {
+                    action: { type: 'SELL', quantity: Math.min(company.products, getSalesCapacity(company)) },
+                    reason: '自己資本挽回のため積極販売',
+                    confidence: 0.9
+                };
+            }
+
+            // 仕掛/材料があれば急いで生産
+            if (company.wip > 0 || company.materials > 0) {
+                return {
+                    action: { type: 'PRODUCE', quantity: getManufacturingCapacity(company) },
+                    reason: '自己資本挽回のため生産加速',
+                    confidence: 0.85
+                };
+            }
+        }
+
+        // 順調モード：最適化シミュレーションに従う
+        const optimal = this.findOptimalAction(company, companyIndex);
+
+        return {
+            action: { type: optimal.action },
+            reason: `G最大化シミュ: ${optimal.action} (スコア${optimal.score.toFixed(0)})`,
+            confidence: optimal.confidence
+        };
     }
 };
 
