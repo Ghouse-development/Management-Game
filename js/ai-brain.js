@@ -162,37 +162,31 @@ const AIBrain = {
     },
 
     // 感情に基づく入札価格調整
+    // 【v8修正】感情で入札価格を上げるのは愚策 → 冷静な判断を維持
     getEmotionalBidAdjustment: function(companyIndex, baseBidPrice, targetCompanyIndex) {
         const e = this.initEmotions(companyIndex);
         let adjustment = 0;
-
-        // 悔しさによる上乗せ（負けたくない！）
-        adjustment += Math.floor(e.frustration / 20);  // 最大+5
-
-        // 復讐対象への対抗心
-        if (targetCompanyIndex !== undefined && e.revengeTargets[targetCompanyIndex]) {
-            const revengeIntensity = e.revengeTargets[targetCompanyIndex];
-            adjustment += Math.floor(revengeIntensity / 25);  // 最大+4
-        }
-
-        // 勝利への渇望
-        if (e.victoryHunger > 70) {
-            adjustment += Math.floor((e.victoryHunger - 70) / 15);  // 最大+2
-        }
-
-        // 必死モードなら更に上乗せ
-        if (e.mood === 'desperate') {
-            adjustment += 2;
-        }
-
-        // 自信がある時は少し節約
-        if (e.mood === 'confident' && e.consecutiveLosses === 0) {
-            adjustment -= 1;
-        }
-
         const company = gameState.companies[companyIndex];
-        if (adjustment > 0) {
-            console.log(`[感情入札] ${company.name}: 基準${baseBidPrice} + 感情${adjustment} = ${baseBidPrice + adjustment}円 (悔${e.frustration} 渇${e.victoryHunger} ${e.mood})`);
+
+        // 【合理的感情システム】
+        // - 悔しさ → 入札価格を上げない（利益を守る）
+        // - 必死モード → むしろ安く売って在庫回転を優先
+        // - 自信 → 現状維持（冷静な判断）
+
+        // 必死モードでは安く売って回転を優先（在庫リスク回避）
+        if (e.mood === 'desperate' && e.consecutiveLosses >= 3) {
+            adjustment -= 1;  // 1円安くして勝率UP
+            console.log(`[冷静判断] ${company.name}: 連続負け${e.consecutiveLosses}回、1円引きで確実に落札`);
+        }
+
+        // 自信がある時も現状維持（無駄に高くしない）
+        if (e.mood === 'confident') {
+            adjustment = 0;
+        }
+
+        // 悔しさは記録するが、価格に反映しない（学習用データとして保持）
+        if (e.frustration > 50) {
+            console.log(`[感情抑制] ${company.name}: 悔しさ${e.frustration}だが冷静に判断（価格維持）`);
         }
 
         return adjustment;
@@ -417,7 +411,8 @@ const AIBrain = {
                 benefit: (1 + 1) * salesCycles * 13, // 製造+1、販売+1 × 販売回数 × MQ/個
                 longTermValue: periodsRemaining * 30,
                 // 2期は2枚以上購入しないと期末に没収されて無駄
-                priority: company.chips.education < (period === 2 ? 2 : 1) ? 'highest' : 'medium'
+                // 【v8修正】教育は1枚で十分（2枚目は効果なし）
+                priority: company.chips.education < 1 ? 'highest' : 'low'
             },
             advertising: {
                 cost: period === 2 ? 20 : 40,
@@ -1379,21 +1374,22 @@ const AIBrain = {
         const investmentBudget = Math.max(0, company.cash - periodEndCost - 50);  // 安全余裕50円
         const investments = [];
 
-        // 2期の投資優先順位
+        // 2期の投資優先順位【v8シミュレーション結果】
+        // 最強戦略: R2E1_NR_SM_DYN = 研究2 + 教育1 + 翌期研究1
         if (period === 2) {
-            // 教育チップ2枚（繰越のため）
-            if (company.chips.education < 2 && investmentBudget >= 40) {
-                investments.push({ type: 'education', qty: 2 - company.chips.education, cost: (2 - company.chips.education) * 20, priority: 1 });
+            // 研究チップ2枚（優先度1）- 名古屋¥28市場確保
+            if (company.chips.research < 2 && investmentBudget >= 40) {
+                const researchQty = Math.min(2 - company.chips.research, Math.floor(investmentBudget / 20));
+                investments.push({ type: 'research', qty: researchQty, cost: researchQty * 20, priority: 1 });
             }
-            // 研究チップ（4枚目標 = 繰越3枚）
-            const maxResearchInPeriod2 = 4;
-            if (company.chips.research < maxResearchInPeriod2 && investmentBudget >= 20) {
-                const researchQty = Math.min(maxResearchInPeriod2 - company.chips.research, Math.floor(investmentBudget / 20));
-                investments.push({ type: 'research', qty: researchQty, cost: researchQty * 20, priority: 2 });
+            // 教育チップ1枚（優先度2）- 製造+1、販売+1
+            // 【v8修正】2枚は不要（効果はワーカー数で上限）
+            if (company.chips.education < 1 && investmentBudget >= 20) {
+                investments.push({ type: 'education', qty: 1, cost: 20, priority: 2 });
             }
-            // セールスマン採用（販売能力強化）
-            if (salesCapacity < mfgCapacity && company.salesmen < 3 && investmentBudget >= 5) {
-                investments.push({ type: 'salesman', qty: 1, cost: 5, priority: 3 });
+            // 翌期チップ（優先度3）- 成功率+12%の効果
+            if (investmentBudget >= 20) {
+                investments.push({ type: 'nextPeriodChip_research', qty: 1, cost: 20, priority: 3 });
             }
         } else {
             // 3期以降の投資優先順位
