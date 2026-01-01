@@ -5,6 +5,7 @@ credentials.txt
 *.md
 !README.md
 !DEV_RULES.md
+!開発記録*.md
 
 # Reference materials
 sankoushiryou/
