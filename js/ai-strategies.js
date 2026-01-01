@@ -345,102 +345,136 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
         }
     }
 
-    // === 3. 2期：戦略別に初手を多様化 ===
+    // === 3. 2期：戦略別に初手を完全分離（多様性確保） ===
     if (period === 2) {
         const strategy = company.strategy || 'balanced';
-        const chipFirstStrategies = ['tech_focused', 'aggressive'];  // チップ優先
-        const materialFirstStrategies = ['price_focused', 'balanced'];  // 材料優先
-        const isChipFirst = chipFirstStrategies.includes(strategy);
+        console.log(`[2期初手] ${company.name} 戦略=${strategy} 材料=${company.materials} 仕掛=${company.wip} 製品=${company.products}`);
 
-        // 製品があれば販売を優先（共通）
-        if (company.products > 0 && salesCapacity > 0) {
-            const sellQty = Math.min(salesCapacity, company.products);
-            return {
-                action: 'SELL',
-                params: { qty: sellQty, priceMultiplier: 0.80 },
-                reason: '2期：販売優先（現金確保）'
-            };
-        }
-
-        // 材料/仕掛品があれば生産を優先（共通）
-        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-            return {
-                action: 'PRODUCE',
-                params: { qty: mfgCapacity },
-                reason: '2期：生産優先（在庫回転）'
-            };
-        }
-
-        // 戦略別：チップ優先 or 材料優先
-        if (isChipFirst) {
-            // チップ優先戦略：先にチップ投資
-            if (company.chips.education < params.targetEducationChips && safeInvestment >= 20) {
-                return {
-                    action: 'BUY_CHIP',
-                    params: { chipType: 'education', cost: 20 },
-                    reason: `${strategy}戦略：教育チップ優先（MQ基盤）`
-                };
-            }
-            if (company.chips.research < params.targetResearchChips && safeInvestment >= 20) {
-                return {
-                    action: 'BUY_CHIP',
-                    params: { chipType: 'research', cost: 20 },
-                    reason: `${strategy}戦略：研究チップ優先（価格競争力）`
-                };
-            }
-            // その後材料
-            if (company.materials === 0 && company.cash > safetyMargin + 15) {
-                return {
-                    action: 'BUY_MATERIALS',
-                    params: { qty: mfgCapacity },
-                    reason: '2期：材料仕入れ（MQサイクル開始）'
-                };
-            }
-        } else {
-            // 材料優先戦略：先に材料仕入れ
-            if (company.materials === 0 && company.wip === 0 && company.products === 0) {
-                if (company.cash > safetyMargin + 15) {
+        // 戦略別に完全に分岐（在庫状態に関係なく戦略優先）
+        switch (strategy) {
+            case 'tech_focused':
+                // 技術重視：チップ購入最優先
+                if (company.chips.research < 2 && safeInvestment >= 20) {
                     return {
-                        action: 'BUY_MATERIALS',
-                        params: { qty: mfgCapacity },
-                        reason: `${strategy}戦略：材料仕入れ優先（MQサイクル開始）`
+                        action: 'BUY_CHIP',
+                        params: { chipType: 'research', cost: 20 },
+                        reason: 'tech_focused：研究チップ最優先'
                     };
                 }
-            }
-            // MQサイクル後にチップ
-            if (company.chips.education < params.targetEducationChips && safeInvestment >= 20) {
-                return {
-                    action: 'BUY_CHIP',
-                    params: { chipType: 'education', cost: 20 },
-                    reason: `${strategy}戦略：教育チップ（MQ基盤）`
-                };
-            }
-            if (company.chips.research < params.targetResearchChips && safeInvestment >= 20) {
-                return {
-                    action: 'BUY_CHIP',
-                    params: { chipType: 'research', cost: 20 },
-                    reason: `${strategy}戦略：研究チップ（価格競争力）`
-                };
-            }
+                if (company.chips.education < 1 && safeInvestment >= 20) {
+                    return {
+                        action: 'BUY_CHIP',
+                        params: { chipType: 'education', cost: 20 },
+                        reason: 'tech_focused：教育チップ（能力向上）'
+                    };
+                }
+                // チップ済みなら生産
+                if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+                    return { action: 'PRODUCE', params: { qty: mfgCapacity }, reason: 'tech_focused：生産へ移行' };
+                }
+                break;
+
+            case 'aggressive':
+                // 攻撃的：販売優先（現金回収→攻めの投資）
+                if (company.products > 0 && salesCapacity > 0) {
+                    return {
+                        action: 'SELL',
+                        params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.75 },
+                        reason: 'aggressive：販売で現金回収'
+                    };
+                }
+                // 販売不可なら広告チップ
+                if (company.chips.advertising < 1 && safeInvestment >= 20) {
+                    return {
+                        action: 'BUY_CHIP',
+                        params: { chipType: 'advertising', cost: 20 },
+                        reason: 'aggressive：広告チップで販売力強化'
+                    };
+                }
+                break;
+
+            case 'price_focused':
+                // 価格重視：材料仕入れ優先（安価仕入れ→高利益）
+                if (company.cash > safetyMargin + 20 && totalInventory < 15) {
+                    return {
+                        action: 'BUY_MATERIALS',
+                        params: { qty: Math.min(mfgCapacity, 3) },
+                        reason: 'price_focused：材料仕入れ優先'
+                    };
+                }
+                // 材料あれば生産
+                if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+                    return { action: 'PRODUCE', params: { qty: mfgCapacity }, reason: 'price_focused：生産' };
+                }
+                break;
+
+            case 'conservative':
+                // 保守的：保険チップ→教育チップ優先
+                if (!company.chips.insurance && safeInvestment >= 20) {
+                    return {
+                        action: 'BUY_CHIP',
+                        params: { chipType: 'insurance', cost: 20 },
+                        reason: 'conservative：保険チップでリスク軽減'
+                    };
+                }
+                if (company.chips.education < 1 && safeInvestment >= 20) {
+                    return {
+                        action: 'BUY_CHIP',
+                        params: { chipType: 'education', cost: 20 },
+                        reason: 'conservative：教育チップで安定成長'
+                    };
+                }
+                // 生産で在庫確保
+                if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+                    return { action: 'PRODUCE', params: { qty: mfgCapacity }, reason: 'conservative：生産（在庫確保）' };
+                }
+                break;
+
+            case 'unpredictable':
+                // 予測不能：ランダム選択
+                const randomActions = ['SELL', 'PRODUCE', 'BUY_CHIP', 'BUY_MATERIALS'];
+                const randomChoice = randomActions[Math.floor(Math.random() * randomActions.length)];
+                if (randomChoice === 'SELL' && company.products > 0 && salesCapacity > 0) {
+                    return { action: 'SELL', params: { qty: 1, priceMultiplier: 0.80 }, reason: 'unpredictable：ランダム販売' };
+                }
+                if (randomChoice === 'PRODUCE' && (company.materials > 0 || company.wip > 0)) {
+                    return { action: 'PRODUCE', params: { qty: mfgCapacity }, reason: 'unpredictable：ランダム生産' };
+                }
+                if (randomChoice === 'BUY_CHIP' && safeInvestment >= 20) {
+                    const chips = ['research', 'education', 'advertising'];
+                    const chip = chips[Math.floor(Math.random() * chips.length)];
+                    return { action: 'BUY_CHIP', params: { chipType: chip, cost: 20 }, reason: `unpredictable：ランダム${chip}チップ` };
+                }
+                if (randomChoice === 'BUY_MATERIALS' && company.cash > safetyMargin + 20) {
+                    return { action: 'BUY_MATERIALS', params: { qty: 2 }, reason: 'unpredictable：ランダム材料購入' };
+                }
+                break;
+
+            case 'balanced':
+            default:
+                // バランス型：MQサイクル（販売→生産→仕入れ）
+                if (company.products > 0 && salesCapacity > 0) {
+                    return {
+                        action: 'SELL',
+                        params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.80 },
+                        reason: 'balanced：販売（MQサイクル開始）'
+                    };
+                }
+                if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+                    return { action: 'PRODUCE', params: { qty: mfgCapacity }, reason: 'balanced：生産' };
+                }
+                if (company.cash > safetyMargin + 20) {
+                    return { action: 'BUY_MATERIALS', params: { qty: mfgCapacity }, reason: 'balanced：材料仕入れ' };
+                }
+                break;
         }
 
-        // 広告チップ（共通）
-        if (company.chips.advertising < params.targetAdvertisingChips &&
-            company.salesmen >= 1 && safeInvestment >= 20) {
-            return {
-                action: 'BUY_CHIP',
-                params: { chipType: 'advertising', cost: 20 },
-                reason: `広告チップ${company.chips.advertising + 1}枚目（販売強化）`
-            };
+        // フォールバック：上記に該当しない場合
+        if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
+            return { action: 'PRODUCE', params: { qty: mfgCapacity }, reason: '2期フォールバック：生産' };
         }
-
-        // 材料補充（共通）
-        if (company.materials < mfgCapacity && company.cash > safetyMargin + 15) {
-            return {
-                action: 'BUY_MATERIALS',
-                params: { qty: mfgCapacity },
-                reason: '2期：材料補充（次サイクル準備）'
-            };
+        if (company.cash > safetyMargin + 20) {
+            return { action: 'BUY_MATERIALS', params: { qty: mfgCapacity }, reason: '2期フォールバック：材料仕入れ' };
         }
     }
 
