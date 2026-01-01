@@ -16,7 +16,7 @@ const GAME_RULES = {
     WAGE_BASE: { 2: 22, 3: 24, 4: 26, 5: 28 },
     RISK_PROBABILITY: 0.10,
     RISK_AVG_LOSS: 5,
-    SIMULATION_RUNS: 1000,
+    SIMULATION_RUNS: 200,
     REALISTIC_MATERIAL_COST: { min: 11, max: 13, avg: 12 },
     SELL_PRICES_PERIOD2: {
         WITH_RESEARCH_2: { avg: 30, best: 32, worst: 28, winRate: 0.95 },
