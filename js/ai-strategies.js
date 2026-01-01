@@ -6,164 +6,185 @@
  */
 
 // ============================================
-// 🎯 目標逆算型戦略エンジン（450達成計画）
+// 🎯 450達成のための正確な戦略計算
 // ============================================
 /**
- * 5期終了時自己資本450達成のための逆算計画
+ * 【正確な初期値・行数】
+ * - 初期自己資本: 283円
+ * - 目標自己資本: 450円
+ * - 必要増加額: 167円
+ * - 税率50%: 税引前G ≈ 320円必要（自己資本増加率50%）
  *
- * 【基本計算】
- * - 初期自己資本: 300
- * - 目標増加額: 150
- * - 法人税40%考慮: 税引前G ≈ 250以上必要
+ * 【正確な行数（MAX_ROWS_BY_PERIOD）】
+ * - 2期: 20行（期首処理で1行使用→実質19行）
+ * - 3期: 30行
+ * - 4期: 34行
+ * - 5期: 35行
  *
- * 【3ターンサイクル】
- * 利益創出には「材料購入→生産→販売」で3ターン必要
- * - 2期: 25行 → 8サイクル + 投資1行
- * - 3期: 22行 → 7サイクル + 投資1行
- * - 4期: 20行 → 6サイクル + 投資2行
- * - 5期: 17行 → 5サイクル + 投資2行
+ * 【初期在庫状態】
+ * - 材料: 1個、仕掛品: 2個、製品: 1個
+ * - 製造能力: 1（小型機械1台）
+ * - 販売能力: 2（セールスマン1人×2）
+ *
+ * 【3ターンサイクルの効率化】
+ * - 買う→生産→売るで3ターン（完成・投入同時実行で効率化）
+ * - パイプライン維持: 材料・仕掛品両方を保持すると1生産で2工程進む
  */
 
-/**
- * リスクカード考慮
- * - 75枚中15枚がリスクカード（確率20%）
- * - 意思決定カード60枚（確率80%）
- * - 1期あたり約5回リスクカードを引く計算（25行×20%=5回）
- * - リスクカードで行動できない場合があるため、有効行数は約80%
- */
-const RISK_CARD_PROBABILITY = 15 / 75;  // 20%
-const EFFECTIVE_ROW_MULTIPLIER = 1 - RISK_CARD_PROBABILITY;  // 80%
+// リスクカード確率（75枚中15枚 = 20%）
+const RISK_CARD_PROBABILITY = 15 / 75;
+const EFFECTIVE_ROW_MULTIPLIER = 1 - RISK_CARD_PROBABILITY;
 
+// 正確な期別戦略目標
 const PERIOD_STRATEGY_TARGETS = {
     2: {
-        rows: 25,
-        effectiveRows: Math.floor(25 * EFFECTIVE_ROW_MULTIPLIER),  // 20行
-        cycles: 6,         // 実効20行 ÷ 3 ≈ 6サイクル（リスク考慮）
-        investRows: 2,     // チップ・人員投資用（リスクカード分含む）
-        gTarget: 5,        // 損益分岐点がやっと（リスク考慮で下方修正）
-        fBudget: 65,       // 固定費予算
-        mqRequired: 70,    // G5 + F65 = MQ70
-        salesPerCycle: 1,  // 1サイクルあたり販売数
-        priceTarget: 12,   // 目標MQ単価（売価-原価）※研究チップ効果
-        investPriority: ['education', 'research', 'research'],
-        riskBuffer: 20,    // リスクカード用現金バッファ
-        description: '投資期：教育1枚+研究2枚、6サイクル確保',
-        // 詳細行動計画（25行の内訳）
+        rows: 20,                    // 正確な行数
+        effectiveRows: Math.floor(19 * EFFECTIVE_ROW_MULTIPLIER),  // 15行
+        cycles: 5,                   // 15行 ÷ 3 = 5サイクル
+        investRows: 3,               // チップ投資用
+        gTarget: 20,                 // 投資期でも+20目標（300超過を狙う）
+        fBudget: 70,                 // 固定費予算
+        mqRequired: 90,              // G20 + F70 = MQ90
+        salesPerCycle: 1,
+        priceTarget: 14,             // 東京20円 - 原価(13+1)6 = MQ14
+        investPriority: ['research', 'education'],
+        riskBuffer: 25,
+        description: '投資期：研究2枚+教育1枚、5サイクル',
         actionPlan: {
-            buyMaterials: 6,     // 材料購入6回
-            produce: 6,          // 完成投入6回
-            sell: 6,             // 商品販売6回（6個×MQ12=MQ72）
-            riskCards: 5,        // リスクカード5回（20%想定）
-            invest: 2,           // 投資2回（教育1+研究1）
-            total: 25
+            buyMaterials: 5,
+            produce: 5,
+            sell: 5,
+            riskCards: 4,
+            invest: 3,
+            total: 20
         },
-        // 投資詳細
         investmentPlan: {
-            education: 1,        // 教育チップ1枚（製造+1、販売+1）
-            research: 1,         // 研究チップ1枚（価格+2）→次期に追加
+            education: 1,
+            research: 2,
             advertising: 0,
             worker: 0,
             machine: 0
         }
     },
     3: {
-        rows: 22,
-        effectiveRows: Math.floor(22 * EFFECTIVE_ROW_MULTIPLIER),  // 17行
-        cycles: 5,         // 実効17行 ÷ 3 ≈ 5サイクル
-        investRows: 2,
-        gTarget: 20,       // 賃金上昇・市場閉鎖で厳しい
-        fBudget: 85,       // 固定費増加（賃金上昇）
-        mqRequired: 105,   // G20 + F85 = MQ105
-        salesPerCycle: 2,  // 製造能力・販売能力向上
-        priceTarget: 10,   // 競争激化で価格下落
-        investPriority: ['research', 'advertising', 'worker'],
-        riskBuffer: 25,
-        description: '能力拡張期：研究追加、広告、5サイクル',
+        rows: 30,                    // 正確な行数
+        effectiveRows: Math.floor(30 * EFFECTIVE_ROW_MULTIPLIER),  // 24行
+        cycles: 8,                   // 24行 ÷ 3 = 8サイクル
+        investRows: 3,
+        gTarget: 50,                 // 成長期目標
+        fBudget: 90,
+        mqRequired: 140,             // G50 + F90 = MQ140（自己資本+25）
+        salesPerCycle: 2,
+        priceTarget: 12,
+        investPriority: ['research', 'advertising'],
+        riskBuffer: 30,
+        description: '成長期：研究追加、広告、8サイクル',
         actionPlan: {
-            buyMaterials: 5,     // 材料購入5回
-            produce: 5,          // 完成投入5回
-            sell: 5,             // 商品販売5回（10個×MQ10=MQ100）
-            riskCards: 5,        // リスクカード5回
-            invest: 2,           // 投資2回
-            total: 22
+            buyMaterials: 8,
+            produce: 8,
+            sell: 8,
+            riskCards: 6,
+            invest: 2,
+            total: 30
         },
         investmentPlan: {
-            education: 0,        // 既に保有
-            research: 1,         // 研究チップ追加（計2枚、価格+4）
-            advertising: 1,      // 広告チップ（販売+2）
-            worker: 0,           // 採用は期首処理で
+            education: 0,
+            research: 1,
+            advertising: 1,
+            worker: 0,
             machine: 0
         }
     },
     4: {
-        rows: 20,
-        effectiveRows: Math.floor(20 * EFFECTIVE_ROW_MULTIPLIER),  // 16行
-        cycles: 5,         // 実効16行 ÷ 3 ≈ 5サイクル
-        investRows: 1,
-        gTarget: 70,       // 投資回収開始
+        rows: 34,                    // 正確な行数
+        effectiveRows: Math.floor(34 * EFFECTIVE_ROW_MULTIPLIER),  // 27行
+        cycles: 9,                   // 27行 ÷ 3 = 9サイクル
+        investRows: 2,
+        gTarget: 100,                // 回収期目標
         fBudget: 100,
-        mqRequired: 170,   // G70 + F100 = MQ170
-        salesPerCycle: 3,
-        priceTarget: 12,
-        investPriority: ['research', 'machine', 'salesman'],
-        riskBuffer: 30,
-        description: '回収期：研究チップ最大化、5サイクル集中',
+        mqRequired: 200,             // G100 + F100 = MQ200（自己資本+50）
+        salesPerCycle: 2,
+        priceTarget: 10,
+        investPriority: ['research', 'nextPeriodChips'],
+        riskBuffer: 35,
+        description: '回収期：9サイクル、次期チップ購入',
         actionPlan: {
-            buyMaterials: 5,     // 材料購入5回
-            produce: 5,          // 完成投入5回
-            sell: 5,             // 商品販売5回（15個×MQ12=MQ180）
-            riskCards: 4,        // リスクカード4回
-            invest: 1,           // 投資1回（研究チップ次期繰越）
-            total: 20
+            buyMaterials: 9,
+            produce: 9,
+            sell: 9,
+            riskCards: 7,
+            invest: 2,
+            total: 34
         },
         investmentPlan: {
             education: 0,
-            research: 1,         // 研究チップ繰越（5期用）
+            research: 0,
             advertising: 0,
+            nextPeriodChips: 2,      // 5期用チップ予約
             worker: 0,
-            machine: 1           // 期首でアタッチメントor大型
+            machine: 0
         }
     },
     5: {
-        rows: 17,
-        effectiveRows: Math.floor(17 * EFFECTIVE_ROW_MULTIPLIER),  // 13行
-        cycles: 4,         // 実効13行 ÷ 3 ≈ 4サイクル
+        rows: 35,                    // 正確な行数
+        effectiveRows: Math.floor(35 * EFFECTIVE_ROW_MULTIPLIER),  // 28行
+        cycles: 9,                   // 28行 ÷ 3 ≈ 9サイクル
         investRows: 1,
-        gTarget: 160,      // 最大利益創出（税引後96→累計G ≈ 255）
-        fBudget: 105,
-        mqRequired: 265,   // G160 + F105 = MQ265
-        salesPerCycle: 4,  // 最大販売能力活用
-        priceTarget: 16,   // 研究チップ効果で高価格維持
-        investPriority: ['sellAll'],
-        riskBuffer: 20,
-        description: '利益最大化期：4サイクルで全力販売',
+        gTarget: 160,                // 最大利益期目標
+        fBudget: 110,
+        mqRequired: 270,             // G160 + F110 = MQ270（自己資本+80）
+        salesPerCycle: 3,
+        priceTarget: 10,
+        investPriority: ['sellAll', 'inventory10'],
+        riskBuffer: 25,
+        description: '最大利益期：9サイクル、在庫10個確保',
         actionPlan: {
-            buyMaterials: 4,     // 材料購入4回（期首在庫+16個）
-            produce: 4,          // 完成投入4回
-            sell: 5,             // 商品販売5回（20個×MQ16=MQ320目標）
-            riskCards: 3,        // リスクカード3回
-            invest: 1,           // 投資1回（次期繰越チップ使用）
-            total: 17
+            buyMaterials: 9,
+            produce: 9,
+            sell: 9,
+            riskCards: 7,
+            invest: 1,               // 次期チップ使用
+            total: 35
         },
         investmentPlan: {
             education: 0,
-            research: 0,         // 4期からの繰越を使用
+            research: 0,
             advertising: 0,
+            keepInventory: 10,       // 期末在庫10個以上
+            nextPeriodChips: 3,      // 次期チップ3枚以上
             worker: 0,
-            machine: 0           // 投資なし、利益最大化
+            machine: 0
         }
     }
 };
 
 /**
  * 累積G目標（450達成のための期別目標）
- * 税率40%想定：税引前G合計255 → 税引後153 → 自己資本453達成
+ *
+ * 【正確な税制】
+ * - 自己資本300以下: 税・配当なし（G = 自己資本増加）
+ * - 300超過時（初回）: 超過分×50%税 → 自己資本 = G - 超過分×50%
+ * - 300超過後: 利益×50%税 → 自己資本 = G × 50%
+ * ※配当は現金支払いであり、自己資本からは控除されない
+ *
+ * 【正確な計算】
+ * - 初期自己資本: 283円
+ * - 目標自己資本: 450円
+ * - 300到達に必要: 17円（非課税）
+ * - 300超過後は50%保持（税金のみ控除）
+ *
+ * 期別G目標:
+ * - 2期: G = 20（300超過し、301.5に）
+ * - 3期: G = 50（+25で326.5に）
+ * - 4期: G = 100（+50で376.5に）
+ * - 5期: G = 160（+80で456.5に）
+ * 合計: 330円
  */
 const CUMULATIVE_G_TARGETS = {
-    2: { periodG: 5, cumulativeG: 5, equityTarget: 305 },
-    3: { periodG: 20, cumulativeG: 25, equityTarget: 315 },
-    4: { periodG: 70, cumulativeG: 95, equityTarget: 357 },
-    5: { periodG: 160, cumulativeG: 255, equityTarget: 453 }
+    2: { periodG: 20, cumulativeG: 20, equityTarget: 302 },   // 300超過、税1.5
+    3: { periodG: 50, cumulativeG: 70, equityTarget: 327 },   // 50%保持
+    4: { periodG: 100, cumulativeG: 170, equityTarget: 377 }, // 50%保持
+    5: { periodG: 160, cumulativeG: 330, equityTarget: 457 }  // 50%保持
 };
 
 /**
