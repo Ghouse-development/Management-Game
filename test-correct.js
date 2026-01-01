@@ -113,6 +113,14 @@ function calcSalesCapacity(state) {
 // 戦略定義
 // ============================================
 const STRATEGIES = {
+    // ユーザー戦略: 研究4枚+教育2枚+大型機械+セールス拡大
+    // 2期は特急の概念なし → チップ購入は即時適用（¥20/枚）
+    'USER': {
+        period2: { research: 4, education: 2 },  // 2期: 研究4枚、教育2枚（即時適用、各¥20）
+        period3: { salesman: 2, sellSmallMachine: 1, largeMachine: 1, nextResearch: 2 },  // S+2、小型売却、大型購入、次期研究2枚
+        period4: { nextResearch: 5, nextEducation: 1 },  // 次期研究5枚、次期教育1枚
+        period5: {}  // 全力販売
+    },
     // 2期翌期チップ2枚（F2b）- 最強候補
     'F2b': {
         period2: { nextResearch: 2 },
@@ -198,24 +206,72 @@ function runSimulation(strategy) {
             state.chips.research += state.nextPeriodChips.research;
             state.nextPeriodChips.research = 0;
         }
-
-        // 特急チップ購入
-        let newExpressChips = 0;
-        if (strat.expressResearch) {
-            newExpressChips = strat.expressResearch;
-            state.chips.research += newExpressChips;
-            row += newExpressChips;
+        if (state.nextPeriodChips.education > 0) {
+            state.chips.education += state.nextPeriodChips.education;
+            state.nextPeriodChips.education = 0;
         }
 
-        // 翌期チップ購入
+        // 2期のチップ購入（即時適用、¥20/枚）- 特急の概念なし
+        let newPeriod2Chips = 0;
+        let newPeriod2EducationChips = 0;
+        if (period === 2) {
+            if (strat.research) {
+                newPeriod2Chips = strat.research;
+                state.chips.research += newPeriod2Chips;
+                row += newPeriod2Chips;
+            }
+            if (strat.education) {
+                newPeriod2EducationChips = strat.education;
+                state.chips.education += newPeriod2EducationChips;
+                row += newPeriod2EducationChips;
+            }
+        }
+
+        // 3期以降: 特急チップ購入（¥40/枚、即時適用）
+        let newExpressChips = 0;
+        let newExpressEducationChips = 0;
+        if (period >= 3) {
+            if (strat.expressResearch) {
+                newExpressChips = strat.expressResearch;
+                state.chips.research += newExpressChips;
+                row += newExpressChips;
+            }
+            if (strat.expressEducation) {
+                newExpressEducationChips = strat.expressEducation;
+                state.chips.education += newExpressEducationChips;
+                row += newExpressEducationChips;
+            }
+        }
+
+        // 翌期チップ購入（¥20/枚、次期適用）
         let newNextChips = 0;
+        let newNextEducationChips = 0;
         if (strat.nextResearch) {
             newNextChips = strat.nextResearch;
-            state.nextPeriodChips.research = newNextChips;
+            state.nextPeriodChips.research = (state.nextPeriodChips.research || 0) + newNextChips;
             row += newNextChips;
         }
+        if (strat.nextEducation) {
+            newNextEducationChips = strat.nextEducation;
+            state.nextPeriodChips.education = (state.nextPeriodChips.education || 0) + newNextEducationChips;
+            row += newNextEducationChips;
+        }
 
-        // セールスマン追加
+        // 小型機械売却（¥56）
+        if (strat.sellSmallMachine && state.machinesSmall > 0) {
+            state.machinesSmall -= strat.sellSmallMachine;
+            state.cash += strat.sellSmallMachine * 56;
+            row += strat.sellSmallMachine;
+        }
+
+        // 大型機械購入（¥200）
+        if (strat.largeMachine) {
+            state.machinesLarge += strat.largeMachine;
+            state.cash -= strat.largeMachine * 200;
+            row += strat.largeMachine;
+        }
+
+        // セールスマン追加（¥5/人）
         if (strat.salesman) {
             state.salesmen += strat.salesman;
             state.cash -= strat.salesman * 5;

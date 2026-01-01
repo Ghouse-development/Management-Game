@@ -14,10 +14,10 @@
  * | 安価¥11 | 楽観¥30 | ¥430 | ¥513 | 28% |
  * | 安価¥11 | 超楽¥31 | ¥448 | ¥535 | 47% ★最強★ |
  *
- * === 採用戦略: F2b (2期翌期チップ2枚) + 価格最適化 ===
+ * === 採用戦略: 2期研究チップ2枚 + 価格最適化 ===
  *
  * 【投資戦略】
- * 2期: 翌期用研究チップ2枚購入（¥20×2=¥40）
+ * 2期: 研究チップ2枚購入（即時適用、¥20×2=¥40）
  * 3期: 何もしない（研究2枚で高勝率販売）
  * 4期: 何もしない（F最小化）
  * 5期: 何もしない（安定利益）
@@ -32,7 +32,9 @@
  * - 高価格市場（仙台、札幌）を優先
  *
  * ★重要発見★
- * - 翌期チップ（¥20）が特急（¥30）より¥10/枚安い
+ * - 2期: チップは即時適用（翌期/特急の区別なし、¥20/枚）
+ * - 3期以降: 翌期チップ（¥20、次期適用）、特急チップ（¥40、即時適用）
+ * - 翌期チップは使用時期を選べる（3期購入→4期or5期使用可能）
  * - セールスマン/機械追加は F増加 > G増加 で逆効果
  * - 仕入れ価格を¥1下げると利益+60個×¥1=¥60増加
  * - 販売価格を¥1上げると利益+60個×¥1=¥60増加
@@ -121,16 +123,19 @@ const GAME_RULES = {
     // ¥26販売 → G = ¥11/個
     // 2期の売価（競争が緩い）
     SELL_PRICES_PERIOD2: {
-        WITH_RESEARCH_2: { avg: 30, best: 32, worst: 28, winRate: 0.95 },
-        WITH_RESEARCH_1: { avg: 28, best: 30, worst: 26, winRate: 0.90 },
-        NO_RESEARCH: { avg: 27, best: 28, worst: 25, winRate: 0.85 }  // 2期は競争少ない
+        WITH_RESEARCH_5: { avg: 32, best: 33, worst: 31, winRate: 0.98 },  // 研究5枚
+        WITH_RESEARCH_2: { avg: 29, best: 30, worst: 28, winRate: 0.95 },
+        WITH_RESEARCH_1: { avg: 27, best: 28, worst: 26, winRate: 0.90 },
+        NO_RESEARCH: { avg: 25, best: 26, worst: 24, winRate: 0.85 }  // 2期は競争少ない
     },
     // 3期以降の売価（競争激化）
+    // ユーザー指摘: 研究2枚で¥27-28、研究0枚で¥23-24、研究5枚で¥31-33
     SELL_PRICES_PERIOD3PLUS: {
-        WITH_RESEARCH_2: { avg: 29, best: 30, worst: 28, winRate: 0.95 },  // 研究2枚で有利
-        WITH_RESEARCH_1: { avg: 27, best: 28, worst: 26, winRate: 0.75 },
+        WITH_RESEARCH_5: { avg: 32, best: 33, worst: 31, winRate: 0.98 },  // 研究5枚
+        WITH_RESEARCH_2: { avg: 28, best: 29, worst: 27, winRate: 0.92 },  // 研究2枚: ¥27-28
+        WITH_RESEARCH_1: { avg: 26, best: 27, worst: 25, winRate: 0.70 },
         // 研究なし: 3期以降は¥24以下でしか売れない
-        NO_RESEARCH: { avg: 24, best: 24, worst: 22, winRate: 0.45 }
+        NO_RESEARCH: { avg: 24, best: 24, worst: 23, winRate: 0.45 }  // ¥23-24
     }
 };
 
@@ -161,15 +166,16 @@ class OptimalStrategyEngine {
     }
 
     normalize(input) {
+        // 2期開始時の正しい初期状態（INITIAL_COMPANY_STATEに準拠）
         return {
             period: input.period || 2,
-            cash: input.cash ?? 300,
-            equity: input.equity ?? 300,
+            cash: input.cash ?? 112,      // 2期開始: ¥112
+            equity: input.equity ?? 283,  // 2期開始: ¥283
             loans: input.loans ?? 0,
             shortLoans: input.shortLoans ?? 0,
-            workers: input.workers ?? 4,
-            salesmen: input.salesmen ?? 4,
-            machinesSmall: input.machinesSmall ?? 4,
+            workers: input.workers ?? 1,       // 2期開始: 1人
+            salesmen: input.salesmen ?? 1,     // 2期開始: 1人
+            machinesSmall: input.machinesSmall ?? 1,  // 2期開始: 1台
             machinesLarge: input.machinesLarge ?? 0,
             materials: input.materials ?? 1,
             wip: input.wip ?? 2,
@@ -181,6 +187,12 @@ class OptimalStrategyEngine {
                 advertising: input.chips?.advertising ?? 0,
                 computer: input.chips?.computer ?? 1,
                 insurance: input.chips?.insurance ?? 1
+            },
+            // 翌期繰り越しチップ（3期以降に購入可能、使用時期は選択可）
+            nextPeriodChips: {
+                research: input.nextPeriodChips?.research ?? 0,
+                education: input.nextPeriodChips?.education ?? 0,
+                advertising: input.nextPeriodChips?.advertising ?? 0
             }
         };
     }
@@ -287,35 +299,54 @@ class OptimalStrategyEngine {
         const wage = Math.round(GAME_RULES.WAGE_BASE[period] * wageMultiplier);
 
         // ========================================
-        // Phase 0: 最適戦略F2b（1000回シミュレーション検証済み）
-        // 平均¥369、最高¥456達成
+        // Phase 0: 期首処理（1行目）
         // ========================================
 
+        // 1行目: 期首処理（コンピュータ¥20 + 保険¥5 = ¥25）
+        // 2期: 自動購入（必須）
+        // 3期以降: 選択可能だが基本購入
+        const pcCost = GAME_RULES.CHIP_COST;  // ¥20
+        const insCost = GAME_RULES.INSURANCE_COST;  // ¥5
+        state.chips.computer = 1;
+        state.chips.insurance = 1;
+        state.cash -= (pcCost + insCost);
+        actions.push({ row: row++, type: 'period_start', action: '期首処理', detail: `PC+保険（¥${pcCost + insCost}）`, cash: -(pcCost + insCost) });
+
         // 翌期チップの適用（前期に購入したものを適用）
+        // ※翌期チップは使用時期を選べる（繰り越し可能）
         if (state.nextPeriodChips?.research > 0) {
+            // ここでは自動適用（最適戦略として）
             state.chips.research = (state.chips.research || 0) + state.nextPeriodChips.research;
+            const applied = state.nextPeriodChips.research;
             state.nextPeriodChips.research = 0;
-            actions.push({ row: row, type: 'strategy', action: '翌期チップ適用', detail: `研究チップ+${state.chips.research}枚`, cash: 0 });
+            actions.push({ row: row, type: 'strategy', action: '翌期チップ適用', detail: `研究チップ+${applied}枚`, cash: 0 });
         }
 
-        // 2期: 翌期用研究チップ2枚購入（¥20×2=¥40）
-        // 特急¥30より¥10/枚安い！
+        // ========================================
+        // Phase 1: 戦略チップ購入
+        // ========================================
+
+        // 2期: チップ購入は即時適用（翌期/特急の区別なし）
+        // ※2期には「翌期チップ」「特急チップ」の概念がない
+        // 購入したチップは即座に会社盤に置かれる（¥20/枚）
         if (period === 2) {
-            state.nextPeriodChips = state.nextPeriodChips || {};
-            state.nextPeriodChips.research = 2;
-            actions.push({ row: row++, type: 'invest', action: '翌期チップ購入', detail: '研究チップ2枚（3期適用、¥20×2）', cash: 0 });
-            row++;  // 2枚目で1行追加
+            // 研究チップ購入（即時適用）
+            const researchToBuy = 2;  // 研究2枚で入札競争に勝ちやすくなる
+            state.chips.research = (state.chips.research || 0) + researchToBuy;
+            state.cash -= researchToBuy * GAME_RULES.CHIP_COST;
+            actions.push({ row: row++, type: 'invest', action: 'チップ購入', detail: `研究チップ1枚（即時、¥${GAME_RULES.CHIP_COST}）`, cash: -GAME_RULES.CHIP_COST });
+            actions.push({ row: row++, type: 'invest', action: 'チップ購入', detail: `研究チップ2枚目（即時、¥${GAME_RULES.CHIP_COST}）`, cash: -GAME_RULES.CHIP_COST });
         }
 
         // 3期以降: 研究チップがあれば維持、なければ何もしない
         // セールスマン/機械追加は逆効果（F増加>G増加）
 
-        // 4期: 何もしない（F最小¥189）
+        // 4期: 何もしない（F最小化）
         if (period === 4) {
             actions.push({ row: row, type: 'strategy', action: '維持', detail: '投資なし（利益確保）', cash: 0 });
         }
 
-        // 5期: 何もしない（F最小¥197）
+        // 5期: 何もしない（F最小化）
         if (period === 5) {
             actions.push({ row: row, type: 'strategy', action: '維持', detail: '投資なし（安定利益）', cash: 0 });
         }
@@ -361,11 +392,13 @@ class OptimalStrategyEngine {
                 //
                 const researchChips = state.chips.research || 0;
                 const priceTable = period === 2 ? GAME_RULES.SELL_PRICES_PERIOD2 : GAME_RULES.SELL_PRICES_PERIOD3PLUS;
-                const priceConfig = researchChips >= 2
-                    ? priceTable.WITH_RESEARCH_2
-                    : researchChips === 1
-                        ? priceTable.WITH_RESEARCH_1
-                        : priceTable.NO_RESEARCH;
+                const priceConfig = researchChips >= 5
+                    ? priceTable.WITH_RESEARCH_5
+                    : researchChips >= 2
+                        ? priceTable.WITH_RESEARCH_2
+                        : researchChips === 1
+                            ? priceTable.WITH_RESEARCH_1
+                            : priceTable.NO_RESEARCH;
 
                 // 入札に勝つかどうか
                 const bidWon = Math.random() < priceConfig.winRate;
@@ -497,9 +530,9 @@ class OptimalStrategyEngine {
         const personnelCost = personnelCount * wage;
 
         // チップコスト計算
-        // - 翌期チップ: ¥20（前期に購入済み）
-        // - 新規特急チップ: ¥30（当期購入）
-        // ※F2b戦略では2期に翌期チップを購入するため、すべて¥20で計算
+        // - 2期: 購入チップ × ¥20（即時適用）
+        // - 3期以降: 繰越チップ × ¥20、特急チップ × ¥40
+        // - PC × ¥20、保険 × ¥5
         const nextPeriodChipCost = (state.nextPeriodChips?.research || 0) * GAME_RULES.CHIP_COST;
         const currentChipCost = ((state.chips.research || 0) + (state.chips.education || 0) +
                          (state.chips.advertising || 0) + (state.chips.computer || 0)) * GAME_RULES.CHIP_COST +
