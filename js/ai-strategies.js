@@ -2289,40 +2289,42 @@ function analyzeCompetitors(company, companyIndex) {
 
 /**
  * 行別の推奨行動を計算（何行目に何をすべきか）
+ * PERIOD_STRATEGY_TARGETSのrowPlanを使用
  */
 function getRowBasedActionPlan(company, period) {
     const target = PERIOD_STRATEGY_TARGETS[period];
     if (!target) return [];
 
+    // rowPlanが定義されていればそれを使用
+    if (target.rowPlan && target.rowPlan.length > 0) {
+        return target.rowPlan;
+    }
+
+    // rowPlanがない場合は動的に生成
     const currentRow = company.currentRow || 1;
     const maxRows = gameState.maxRows;
-    const rowsRemaining = maxRows - currentRow;
-
-    // 行動計画を生成
     const actionPlan = [];
-    const plan = target.actionPlan;
+    const investment = target.investment || {};
+    const cycles = target.cycles || 5;
 
-    // サイクル数からスケジュールを逆算
-    // 期末から逆算して行動を配置
     let row = currentRow;
 
     // フェーズ1: 序盤（投資フェーズ）- 最初の1-3行
     if (row <= 3) {
-        if (plan.invest > 0 && target.investmentPlan.education > 0 && !company.chips.education) {
+        if (investment.education > 0 && !company.chips.education) {
             actionPlan.push({ row, action: 'BUY_CHIP', type: 'education', reason: '序盤投資：教育チップ' });
             row++;
         }
-        if (row <= 3 && plan.invest > 0 && target.investmentPlan.research > 0 && company.chips.research < 3) {
+        if (row <= 3 && investment.research > 0 && company.chips.research < 3) {
             actionPlan.push({ row, action: 'BUY_CHIP', type: 'research', reason: '序盤投資：研究チップ' });
             row++;
         }
     }
 
     // フェーズ2: 中盤（サイクル実行）
-    const cycleStartRow = row;
     const cycleEndRow = maxRows - 5;  // 期末5行前まで
 
-    for (let cycle = 0; cycle < plan.sell && row < cycleEndRow; cycle++) {
+    for (let cycle = 0; cycle < cycles && row < cycleEndRow; cycle++) {
         // 材料購入 → 生産 → 販売の3行1セット
         actionPlan.push({ row: row++, action: 'BUY_MATERIALS', reason: `サイクル${cycle + 1}: 材料購入` });
         if (row < cycleEndRow) {
@@ -2334,7 +2336,6 @@ function getRowBasedActionPlan(company, period) {
     }
 
     // フェーズ3: 終盤（次期に繋げる）- 期末5行
-    // ※2-4期は次期に繋げるため生産継続、5期のみ10個超過分を売却
     const isFinalPeriod = period === 5;
     for (let i = 0; i < 5 && row <= maxRows; i++) {
         if (company.products > 0 || company.wip > 0 || company.materials > 0) {
