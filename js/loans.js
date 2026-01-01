@@ -110,6 +110,29 @@ function processPeriodStartWarehousePurchase() {
 }
 
 // ============================================
+// 特別ルール: 期首処理後に現金がマイナスなら100円強制借入
+// ============================================
+function checkEmergencyLoan() {
+    gameState.companies.forEach((company, index) => {
+        if (company.cash < 0) {
+            // 強制100円借入（借入上限に左右されない特別ルール）
+            const emergencyLoan = 100;
+            const netAmount = Math.floor(emergencyLoan * 0.9);  // 90円入金（10円金利控除）
+
+            company.loans += emergencyLoan;
+            company.cash += netAmount;
+
+            console.log(`[特別ルール] ${company.name}の現金がマイナス → 強制100円借入（入金¥${netAmount}）`);
+
+            if (index === 0) {
+                // プレイヤーに通知
+                showToast(`⚠️ 現金不足のため100円を強制借入しました（入金¥${netAmount}）\n※期末返済が必要です`, 'warning', 5000);
+            }
+        }
+    });
+}
+
+// ============================================
 // 期首金利支払い
 // ============================================
 function processInterestPayments() {
@@ -296,6 +319,9 @@ function startPeriodWithBorrowing() {
     // プレイヤーの期首倉庫購入処理
     processPeriodStartWarehousePurchase();
 
+    // 特別ルール: 期首処理後に現金がマイナスなら強制100円借入
+    checkEmergencyLoan();
+
     // AI会社の長期借入処理（プレイヤーの借入モーダル表示前に処理）
     processAILongTermBorrowing();
 
@@ -358,6 +384,9 @@ function startPeriodWithoutBorrowing() {
     // プレイヤーの期首倉庫購入処理
     processPeriodStartWarehousePurchase();
 
+    // 特別ルール: 期首処理後に現金がマイナスなら強制100円借入
+    checkEmergencyLoan();
+
     // AI会社の長期借入処理
     processAILongTermBorrowing();
 
@@ -391,16 +420,16 @@ function showBorrowModal() {
 
     window.loanSelection = { amount: 0, max: availableLoan };
 
-    // 利用可能な借入額オプション
-    const loanOptions = [0, 50, 100, 150, 200, 250, 300].filter(v => v <= availableLoan);
+    // クイック選択オプション（よく使う金額）
+    const quickOptions = [0, 50, 100, 150, 200].filter(v => v <= availableLoan);
 
-    const loanCards = loanOptions.map((amount, i) => {
+    const quickCards = quickOptions.map((amount) => {
         const isSelected = amount === 0;
         const netAmount = Math.floor(amount * 0.9);
         return `
-            <div onclick="selectLoanAmount(${amount})" id="loan-${amount}" style="background: ${isSelected ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#374151'}; color: white; padding: 10px 8px; border-radius: 8px; text-align: center; cursor: pointer; border: 2px solid ${isSelected ? '#60a5fa' : 'transparent'};">
-                <div style="font-size: 16px; font-weight: bold;">${amount === 0 ? '借りない' : '¥' + amount}</div>
-                ${amount > 0 ? `<div style="font-size: 10px; opacity: 0.8;">入金¥${netAmount}</div>` : ''}
+            <div onclick="selectLoanAmount(${amount})" id="loan-${amount}" style="background: ${isSelected ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#374151'}; color: white; padding: 8px 6px; border-radius: 8px; text-align: center; cursor: pointer; border: 2px solid ${isSelected ? '#60a5fa' : 'transparent'}; font-size: 12px;">
+                <div style="font-weight: bold;">${amount === 0 ? '借りない' : '¥' + amount}</div>
+                ${amount > 0 ? `<div style="font-size: 9px; opacity: 0.8;">→¥${netAmount}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -413,15 +442,28 @@ function showBorrowModal() {
             </div>
 
             <div style="font-size: 11px; color: #666; text-align: center; margin-bottom: 8px;">
-                ${loanRuleText}（上限¥${maxLoanTotal}）・利息10%
+                ${loanRuleText}（上限¥${maxLoanTotal}）・利息10%・<strong>1円単位</strong>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(${Math.min(loanOptions.length, 4)}, 1fr); gap: 6px; margin-bottom: 10px;">
-                ${loanCards}
+            <!-- クイック選択 -->
+            <div style="display: grid; grid-template-columns: repeat(${quickOptions.length}, 1fr); gap: 4px; margin-bottom: 8px;">
+                ${quickCards}
             </div>
 
-            <div id="loanResultDisplay" style="background: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; display: none;">
-                <span style="color: #374151;">借入額: <strong id="loanAmountText">¥0</strong> → 入金: <strong id="loanNetText">¥0</strong></span>
+            <!-- 1円単位入力 -->
+            <div style="background: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                <div style="font-size: 11px; color: #666; margin-bottom: 6px; text-align: center;">または金額を直接入力（1円単位）</div>
+                <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                    <span style="font-size: 14px;">¥</span>
+                    <input type="number" id="loanAmountInput" value="0" min="0" max="${availableLoan}"
+                           onchange="updateLoanAmount()" oninput="updateLoanAmount()"
+                           style="width: 80px; padding: 8px; font-size: 16px; text-align: center; border: 2px solid #3b82f6; border-radius: 6px;">
+                    <span style="font-size: 11px; color: #666;">/ 上限¥${availableLoan}</span>
+                </div>
+            </div>
+
+            <div id="loanResultDisplay" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; display: none;">
+                <span style="color: #1e40af;">借入額: <strong id="loanAmountText">¥0</strong> → 入金: <strong id="loanNetText">¥0</strong></span>
             </div>
 
             <button class="submit-btn" onclick="processBorrowing()" style="width: 100%; padding: 12px;">💳 借入実行</button>
@@ -432,19 +474,50 @@ function showBorrowModal() {
 }
 
 // ============================================
-// 借入額選択
+// 借入額選択（クイックボタン）
 // ============================================
 function selectLoanAmount(amount) {
     window.loanSelection.amount = amount;
-    const options = [0, 50, 100, 150, 200, 250, 300].filter(v => v <= window.loanSelection.max);
-    options.forEach(opt => {
+    document.getElementById('loanAmountInput').value = amount;
+    updateLoanDisplay(amount);
+
+    // ボタンのハイライト更新
+    const quickOptions = [0, 50, 100, 150, 200].filter(v => v <= window.loanSelection.max);
+    quickOptions.forEach(opt => {
         const el = document.getElementById(`loan-${opt}`);
         if (el) {
             el.style.background = opt === amount ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#374151';
             el.style.borderColor = opt === amount ? '#60a5fa' : 'transparent';
         }
     });
+}
 
+// ============================================
+// 借入額入力更新（1円単位入力）
+// ============================================
+function updateLoanAmount() {
+    const input = document.getElementById('loanAmountInput');
+    let amount = parseInt(input.value) || 0;
+    amount = Math.max(0, Math.min(amount, window.loanSelection.max));
+    input.value = amount;
+    window.loanSelection.amount = amount;
+    updateLoanDisplay(amount);
+
+    // クイックボタンのハイライトをリセット
+    const quickOptions = [0, 50, 100, 150, 200].filter(v => v <= window.loanSelection.max);
+    quickOptions.forEach(opt => {
+        const el = document.getElementById(`loan-${opt}`);
+        if (el) {
+            el.style.background = opt === amount ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#374151';
+            el.style.borderColor = opt === amount ? '#60a5fa' : 'transparent';
+        }
+    });
+}
+
+// ============================================
+// 借入表示更新
+// ============================================
+function updateLoanDisplay(amount) {
     const resultDisplay = document.getElementById('loanResultDisplay');
     if (amount > 0) {
         resultDisplay.style.display = 'block';
@@ -551,8 +624,8 @@ function processAILongTermBorrowing() {
 
         // 借入実行
         if (borrowRatio > 0) {
-            const loanAmount = Math.floor(availableLoan * borrowRatio / 50) * 50;  // 50円単位
-            if (loanAmount >= 50) {
+            const loanAmount = Math.floor(availableLoan * borrowRatio);  // 1円単位
+            if (loanAmount >= 1) {
                 company.loans += loanAmount;
                 const netAmount = Math.floor(loanAmount * 0.9);  // 10%金利控除
                 company.cash += netAmount;
