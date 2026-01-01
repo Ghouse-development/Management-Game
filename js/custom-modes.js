@@ -90,9 +90,37 @@ const GAME_RULES = {
     // 行数
     MAX_ROWS: { 2: 20, 3: 30, 4: 34, 5: 35 },
 
-    // リスクカード（効果なし/軽微なものも多い）
-    RISK_PROBABILITY: 0.10,
-    RISK_AVG_LOSS: 5,
+    // リスクカード（実際のゲームルールに基づく64種類）
+    // 意思決定カード60枚 + リスクカード15枚 = 75枚デッキ
+    RISK_PROBABILITY: 0.20,  // 75枚中15枚 = 20%
+    // 実際のリスクカード（constants.js RISK_CARDS準拠）
+    RISK_CARDS: [
+        // コスト系
+        { name: 'クレーム発生', fCost: 5, type: 'fCost' },
+        { name: '得意先倒産', cashLoss: 30, type: 'cashLoss', period2Exempt: true },
+        { name: '研究開発失敗', returnChip: 'research', type: 'returnChip' },
+        { name: '広告政策失敗', returnChip: 'advertising', type: 'returnChip' },
+        { name: 'コンピュータートラブル', fCost: 10, type: 'fCost' },
+        { name: '製造ミス発生', loseWip: 1, type: 'loseWip' },
+        { name: '倉庫火災', loseMaterials: true, type: 'loseMaterials' },
+        { name: '盗難発見', loseProducts: 2, type: 'loseProducts' },
+        { name: 'ワーカー退職', workerRetires: true, fCost: 5, type: 'workerRetires' },
+        { name: '設計トラブル発生', fCost: 10, type: 'fCost' },
+        { name: 'ストライキ発生', skipTurns: 1, type: 'skipTurns' },
+        { name: '長期労務紛争', skipTurns: 2, type: 'skipTurns' },
+        // ベネフィット系（シミュレーションではプラス効果として処理）
+        { name: '教育成功', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
+        { name: '研究開発成功', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
+        { name: '広告成功', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
+        { name: '商品の独占販売', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
+        { name: '特別サービス', benefit: true, materialPrice: 10, maxQty: 5, type: 'benefit' },
+        // 特殊系
+        { name: '消費者運動発生', noSales: true, type: 'noSales' },
+        { name: '労災発生', noProduction: true, type: 'noProduction' },
+        { name: '返品発生', returnProduct: 1, cashLoss: 20, type: 'returnProduct', period2Exempt: true },
+        { name: '景気変動', reverseTurn: true, type: 'special' },
+        { name: '各社共通', commonPurchase: true, materialPrice: 12, maxQty: 3, type: 'special' }
+    ],
 
     // 目標（シミュレーションでは¥300程度が現実的上限）
     TARGET_EQUITY: 450,
@@ -121,21 +149,25 @@ const GAME_RULES = {
     // ¥28販売 → G = ¥13/個
     // ¥27販売 → G = ¥12/個
     // ¥26販売 → G = ¥11/個
-    // 2期の売価（競争が緩い）
+    // ===================================================
+    // 市場別販売価格上限（実際のゲームルール）
+    // 仙台¥40、札幌¥36、福岡¥32、名古屋¥28、大阪¥24、東京¥20、海外¥16
+    // 研究チップで勝ちやすくなるが、市場の上限価格を超えることはない
+    // ===================================================
+    // 2期の売価（競争が緩い）- 名古屋¥28が現実的上限
     SELL_PRICES_PERIOD2: {
-        WITH_RESEARCH_5: { avg: 32, best: 33, worst: 31, winRate: 0.98 },  // 研究5枚
-        WITH_RESEARCH_2: { avg: 29, best: 30, worst: 28, winRate: 0.95 },
-        WITH_RESEARCH_1: { avg: 27, best: 28, worst: 26, winRate: 0.90 },
-        NO_RESEARCH: { avg: 25, best: 26, worst: 24, winRate: 0.85 }  // 2期は競争少ない
+        WITH_RESEARCH_5: { avg: 28, best: 28, worst: 27, winRate: 0.98, market: '名古屋' },  // 名古屋上限¥28
+        WITH_RESEARCH_2: { avg: 28, best: 28, worst: 27, winRate: 0.95, market: '名古屋' },  // 名古屋上限¥28
+        WITH_RESEARCH_1: { avg: 27, best: 28, worst: 26, winRate: 0.90, market: '名古屋' },
+        NO_RESEARCH: { avg: 24, best: 24, worst: 23, winRate: 0.85, market: '大阪' }  // 大阪上限¥24
     },
-    // 3期以降の売価（競争激化）
-    // ユーザー指摘: 研究2枚で¥27-28、研究0枚で¥23-24、研究5枚で¥31-33
+    // 3期以降の売価（競争激化）- 研究チップで勝つが価格は市場上限内
     SELL_PRICES_PERIOD3PLUS: {
-        WITH_RESEARCH_5: { avg: 32, best: 33, worst: 31, winRate: 0.98 },  // 研究5枚
-        WITH_RESEARCH_2: { avg: 28, best: 29, worst: 27, winRate: 0.92 },  // 研究2枚: ¥27-28
-        WITH_RESEARCH_1: { avg: 26, best: 27, worst: 25, winRate: 0.70 },
-        // 研究なし: 3期以降は¥24以下でしか売れない
-        NO_RESEARCH: { avg: 24, best: 24, worst: 23, winRate: 0.45 }  // ¥23-24
+        WITH_RESEARCH_5: { avg: 28, best: 28, worst: 27, winRate: 0.98, market: '名古屋' },  // 名古屋上限¥28
+        WITH_RESEARCH_2: { avg: 28, best: 28, worst: 27, winRate: 0.92, market: '名古屋' },  // 研究2枚で名古屋確保
+        WITH_RESEARCH_1: { avg: 26, best: 27, worst: 25, winRate: 0.70, market: '名古屋' },
+        // 研究なし: 3期以降は大阪¥24以下でしか売れない
+        NO_RESEARCH: { avg: 24, best: 24, worst: 23, winRate: 0.45, market: '大阪' }  // 大阪上限¥24
     }
 };
 
@@ -302,7 +334,26 @@ class OptimalStrategyEngine {
         // Phase 0: 期首処理（1行目）
         // ========================================
 
-        // 1行目: 期首処理（コンピュータ¥20 + 保険¥5 = ¥25）
+        // ========================================
+        // 3期以降: 期首に長期借入可能（10%金利）
+        // ========================================
+        if (period >= 3) {
+            // 現金が少ない場合、投資資金を確保するために借入
+            const currentLoans = state.loans || 0;
+            const maxLoan = 300;  // 借入上限
+            const availableLoan = maxLoan - currentLoans;
+
+            // 投資判断: 現金が50未満なら50借入
+            if (state.cash < 50 && availableLoan >= 50) {
+                const loanAmount = 50;
+                const interestPaid = Math.floor(loanAmount * 0.10);  // 金利10%
+                state.loans = currentLoans + loanAmount;
+                state.cash += loanAmount - interestPaid;  // 金利差引
+                actions.push({ row: row++, type: 'period_start', action: '長期借入', detail: `¥${loanAmount}借入（金利¥${interestPaid}）`, cash: loanAmount - interestPaid });
+            }
+        }
+
+        // 期首処理（コンピュータ¥20 + 保険¥5 = ¥25）
         // 2期: 自動購入（必須）
         // 3期以降: 選択可能だが基本購入
         const pcCost = GAME_RULES.CHIP_COST;  // ¥20
@@ -366,11 +417,137 @@ class OptimalStrategyEngine {
             const mc = mfgCap();
             const sc = salesCap();
 
-            // リスクカード判定（意思決定カードの20%がリスク）
+            // リスクカード判定（75枚中15枚 = 20%）
             if (Math.random() < GAME_RULES.RISK_PROBABILITY) {
-                const loss = Math.floor(Math.random() * 20) + 5;
-                state.cash = Math.max(0, state.cash - loss);
-                actions.push({ row: row++, type: 'risk', action: 'リスクカード', detail: `損失 ¥${loss}`, cash: -loss });
+                // 実際のリスクカードをランダムに選択
+                const riskCards = GAME_RULES.RISK_CARDS;
+                const card = riskCards[Math.floor(Math.random() * riskCards.length)];
+                let cashChange = 0;
+                let detail = card.name;
+
+                // 2期免除チェック
+                if (card.period2Exempt && period === 2) {
+                    detail += '（2期免除）';
+                    actions.push({ row: row++, type: 'risk', action: 'リスクカード', detail: detail, cash: 0 });
+                    continue;
+                }
+
+                switch(card.type) {
+                    case 'fCost':
+                        // 固定費追加はF計算時に反映
+                        state.additionalF = (state.additionalF || 0) + card.fCost;
+                        detail += ` - 本社経費▲${card.fCost}`;
+                        break;
+                    case 'cashLoss':
+                        cashChange = -card.cashLoss;
+                        state.cash = Math.max(0, state.cash + cashChange);
+                        detail += ` - 現金▲${card.cashLoss}`;
+                        break;
+                    case 'returnChip':
+                        if (state.chips[card.returnChip] > 0) {
+                            state.chips[card.returnChip]--;
+                            detail += ` - ${card.returnChip}チップ返却`;
+                        } else {
+                            detail += '（チップなし）';
+                        }
+                        break;
+                    case 'loseWip':
+                        const wipLoss = Math.min(card.loseWip, state.wip);
+                        state.wip -= wipLoss;
+                        detail += ` - 仕掛品${wipLoss}個損失`;
+                        break;
+                    case 'loseProducts':
+                        const prodLoss = Math.min(card.loseProducts, state.products);
+                        state.products -= prodLoss;
+                        // 保険金（保険チップがあれば1個10円）
+                        if (state.chips.insurance > 0 && prodLoss > 0) {
+                            cashChange = prodLoss * 10;
+                            state.cash += cashChange;
+                            detail += ` - 製品${prodLoss}個損失（保険金¥${cashChange}）`;
+                        } else {
+                            detail += ` - 製品${prodLoss}個損失`;
+                        }
+                        break;
+                    case 'loseMaterials':
+                        const matLoss = state.materials;
+                        state.materials = 0;
+                        // 保険金（保険チップがあれば1個8円）
+                        if (state.chips.insurance > 0 && matLoss > 0) {
+                            cashChange = matLoss * 8;
+                            state.cash += cashChange;
+                            detail += ` - 材料${matLoss}個全損（保険金¥${cashChange}）`;
+                        } else {
+                            detail += ` - 材料${matLoss}個全損`;
+                        }
+                        break;
+                    case 'workerRetires':
+                        if (state.workers > 0) {
+                            state.workers--;
+                            detail += ' - ワーカー退職';
+                        }
+                        if (card.fCost) {
+                            state.additionalF = (state.additionalF || 0) + card.fCost;
+                            detail += ` 労務費▲${card.fCost}`;
+                        }
+                        break;
+                    case 'skipTurns':
+                        // シミュレーションでは行を消費として表現
+                        detail += ` - ${card.skipTurns}回休み`;
+                        break;
+                    case 'returnProduct':
+                        if (state.products > 0) {
+                            state.products--;
+                            cashChange = -card.cashLoss;
+                            state.cash = Math.max(0, state.cash + cashChange);
+                            detail += ` - 返品1個、売上▲${card.cashLoss}`;
+                        }
+                        break;
+                    case 'noSales':
+                    case 'noProduction':
+                        detail += '（今回は効果なし）';
+                        break;
+                    case 'benefit':
+                        // ベネフィットカード：¥32で最大5個販売可能
+                        if (card.sellPrice && state.products > 0) {
+                            const sellQty = Math.min(card.maxQty, state.products, salesCap());
+                            if (sellQty > 0) {
+                                cashChange = sellQty * card.sellPrice;
+                                state.products -= sellQty;
+                                state.cash += cashChange;
+                                totalSales += cashChange;
+                                productsSold += sellQty;
+                                detail += ` - ¥${card.sellPrice}×${sellQty}個販売`;
+                            }
+                        } else if (card.materialPrice) {
+                            // 特別サービス：材料購入
+                            const buyQty = Math.min(card.maxQty, matCap() - state.materials, Math.floor(state.cash / card.materialPrice));
+                            if (buyQty > 0) {
+                                cashChange = -buyQty * card.materialPrice;
+                                state.materials += buyQty;
+                                state.cash += cashChange;
+                                totalMaterialCost += -cashChange;
+                                detail += ` - 材料¥${card.materialPrice}×${buyQty}個購入`;
+                            }
+                        }
+                        break;
+                    case 'special':
+                        // 景気変動、各社共通など
+                        if (card.commonPurchase) {
+                            const buyQty = Math.min(card.maxQty, matCap() - state.materials, Math.floor(state.cash / card.materialPrice));
+                            if (buyQty > 0) {
+                                cashChange = -buyQty * card.materialPrice;
+                                state.materials += buyQty;
+                                state.cash += cashChange;
+                                totalMaterialCost += -cashChange;
+                                detail += ` - 材料¥${card.materialPrice}×${buyQty}個購入`;
+                            }
+                        } else {
+                            detail += '（効果なし）';
+                        }
+                        break;
+                }
+
+                actions.push({ row: row++, type: 'risk', action: 'リスクカード', detail: detail, cash: cashChange });
                 continue;
             }
 
@@ -426,8 +603,14 @@ class OptimalStrategyEngine {
                     totalSales += revenue;
                     productsSold += actualSoldQty;
 
-                    // 市場名マッピング（価格ベース）
-                    const marketName = sellPrice >= 30 ? '名古屋' : sellPrice >= 28 ? '大阪' : '海外';
+                    // 市場名マッピング（価格に対応する市場を正確に表示）
+                    // 仙台¥40、札幌¥36、福岡¥32、名古屋¥28、大阪¥24、東京¥20、海外¥16
+                    const marketName = priceConfig.market || (
+                        sellPrice >= 32 ? '福岡' :
+                        sellPrice >= 28 ? '名古屋' :
+                        sellPrice >= 24 ? '大阪' :
+                        sellPrice >= 20 ? '東京' : '海外'
+                    );
                     actions.push({ row: row++, type: 'sell', action: '商品販売', detail: `${marketName}¥${sellPrice}×${actualSoldQty}個`, cash: revenue });
                 } else {
                     // 入札に負けた - 1行消費するが売れない
@@ -514,14 +697,14 @@ class OptimalStrategyEngine {
                 }
             }
 
-            // 何もできない場合（現金不足など）
-            actions.push({ row: row++, type: 'wait', action: 'DO NOTHING', detail: '行動なし', cash: 0 });
+            // 何もできない場合（現金不足など）- DO NOTHINGは行を消費しない
+            // ※ DO NOTHINGを選択しても行カウンターは進めない
+            break;  // ループを終了して期末処理へ
         }
 
         // ========================================
-        // Phase 2: 期末処理
+        // Phase 2: 期末処理（行を使わない - 決算は全員一斉処理）
         // ========================================
-        actions.push({ row: maxRows - 1, type: 'end', action: '期末処理', detail: '決算準備', cash: 0 });
 
         // 固定費計算
         const machineCount = (state.machinesSmall || 0) + (state.machinesLarge || 0);
@@ -540,7 +723,9 @@ class OptimalStrategyEngine {
         const chipCost = currentChipCost + nextPeriodChipCost;
 
         const warehouseCost = (state.warehouses || 0) * GAME_RULES.WAREHOUSE_COST;
-        const fixedCost = machineCost + personnelCost + chipCost + warehouseCost;
+        // リスクカードからの追加固定費
+        const additionalF = state.additionalF || 0;
+        const fixedCost = machineCost + personnelCost + chipCost + warehouseCost + additionalF;
 
         // 財務計算
         // G = 売上 - 材料費 - 加工費
@@ -597,7 +782,8 @@ class OptimalStrategyEngine {
         // 期末：倉庫リセット
         state.warehouses = 0;
 
-        actions.push({ row: maxRows, type: 'end', action: '期末完了', detail: `純利益 ¥${netProfit}`, cash: netProfit });
+        // 期末完了アクションは表示しない（行を使わないため）
+        // ※ 決算は全員一斉処理であり、行数には含まれない
 
         return {
             period,
