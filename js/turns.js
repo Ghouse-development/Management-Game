@@ -324,3 +324,23 @@ function initGame() {
         alert("エラーが発生しました: " + e.message);
     }
 }
+
+// グローバル公開
+if (typeof window !== 'undefined') {
+    window.startPeriod = startPeriod;
+    window.showDiceRollModal = showDiceRollModal;
+    window.rollPeriodDice = rollPeriodDice;
+    window.proceedAfterDice = proceedAfterDice;
+    window.updateLoanSelection = updateLoanSelection;
+    window.selectPeriodStart = selectPeriodStart;
+    window.drawCard = drawCard;
+    window.selectDecisionCard = selectDecisionCard;
+    window.incrementRow = incrementRow;
+    window.closePeriodEndAnnouncementAndStartSettlement = closePeriodEndAnnouncementAndStartSettlement;
+    window.endTurn = endTurn;
+    window.nextTurn = nextTurn;
+    window.resumeGame = resumeGame;
+    window.startNewGame = startNewGame;
+    window.confirmDeleteSave = confirmDeleteSave;
+    window.initGame = initGame;
+}

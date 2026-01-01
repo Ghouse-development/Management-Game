@@ -34,6 +34,7 @@ function saveGame() {
         previousPQTopName: gameState.previousPQTopName,
         previousPQTopAmount: gameState.previousPQTopAmount,
         diceRoll: gameState.diceRoll,
+        diceRolled: gameState.diceRolled,
         wageMultiplier: gameState.wageMultiplier,
         osakaMaxPrice: gameState.osakaMaxPrice,
         periodStartPlayerIndex: gameState.periodStartPlayerIndex
@@ -83,6 +84,7 @@ function restoreGame(saveData) {
     gameState.previousPQTopName = saveData.previousPQTopName;
     gameState.previousPQTopAmount = saveData.previousPQTopAmount;
     gameState.diceRoll = saveData.diceRoll;
+    gameState.diceRolled = saveData.diceRolled || false;
     gameState.wageMultiplier = saveData.wageMultiplier || 1.0;
     gameState.osakaMaxPrice = saveData.osakaMaxPrice;
     gameState.periodStartPlayerIndex = saveData.periodStartPlayerIndex;

@@ -657,6 +657,9 @@ function processAIBidWithPlayer() {
         winCompany.totalSales += salePrice * actualQty;
         winCompany.totalSoldQuantity = (winCompany.totalSoldQuantity || 0) + actualQty;
         bid.market.currentStock += actualQty;
+
+        // 行動ログに記録（AI入札への参加結果）
+        logAction(winner.company, '商品販売', `${bid.market.name}に¥${salePrice}×${actualQty}個`, salePrice * actualQty, true);
     }
 
     const resultSalePrice = winner.displayPrice || winner.price;

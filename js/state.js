@@ -38,6 +38,7 @@ const gameState = {
 
     // 3期以降のサイコロ結果
     diceRoll: null,  // 1-6の値
+    diceRolled: false,  // サイコロを振ったかどうか
     wageMultiplier: 1.0,  // 人件費倍率（1.1または1.2）
     osakaMaxPrice: 24,  // 大阪上限価格（21-26）
 

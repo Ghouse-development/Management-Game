@@ -174,7 +174,12 @@ function showTurnStartOptions() {
                 <button class="action-btn main card-choice-btn" onclick="drawCard()" style="flex: 2;">カードを引く</button>
                 <button class="action-btn secondary" onclick="viewGameState()" style="flex: 1; font-size: 12px;">全体を見る</button>
             </div>
-            <div style="margin-top: 20px;">
+            <div style="margin-top: 15px; margin-bottom: 15px;">
+                <button class="action-btn warning" onclick="showCurrentGameAIAdvice()" style="width: 100%; padding: 10px;">
+                    🤖 AIアドバイスを見る
+                </button>
+            </div>
+            <div style="margin-top: 15px;">
                 <p>その他のアクション（Bルール）</p>
                 <button class="action-btn secondary" onclick="showInsurancePurchaseModal()">保険チップ購入</button>
                 <button class="action-btn secondary" onclick="showWarehouseModal()">無災害倉庫を購入</button>
@@ -416,21 +421,33 @@ function showStartMenu() {
 
     const menuHtml = `
         <div class="modal active" style="z-index: 2000;">
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <h2 style="margin-bottom: 20px; color: #1e40af;">🎮 MG（マネジメントゲーム）</h2>
-                <p style="margin-bottom: 20px; color: #666;">自主練モード - 6人対戦</p>
+            <div class="modal-content" style="max-width: 450px; text-align: center;">
+                <h2 style="margin-bottom: 15px; color: #1e40af;">🎮 MG（マネジメントゲーム）</h2>
+                <p style="margin-bottom: 15px; color: #666;">自主練モード - 6人対戦</p>
 
-                <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
                     ${hasSave ? `
-                        <button onclick="resumeGame()" class="action-btn primary" style="padding: 15px; font-size: 16px;">
+                        <button onclick="resumeGame()" class="action-btn primary" style="padding: 12px; font-size: 15px;">
                             ▶ 続きから始める${saveInfo}
                         </button>
                     ` : ''}
-                    <button onclick="startNewGame()" class="action-btn success" style="padding: 15px; font-size: 16px;">
+                    <button onclick="startNewGame()" class="action-btn success" style="padding: 12px; font-size: 15px;">
                         🆕 2期から新しく始める
                     </button>
+
+                    <div style="border-top: 1px solid #e5e7eb; margin: 8px 0;"></div>
+                    <p style="font-size: 12px; color: #999; margin: 5px 0;">カスタムモード</p>
+
+                    <button onclick="showCustomGameSetupModal()" class="action-btn warning" style="padding: 12px; font-size: 14px;">
+                        ⚙️ カスタム条件でゲーム開始
+                    </button>
+                    <button onclick="showAIActionPlanModal()" class="action-btn secondary" style="padding: 12px; font-size: 14px;">
+                        🤖 AI行動提案を見る
+                    </button>
+
                     ${hasSave ? `
-                        <button onclick="confirmDeleteSave()" class="action-btn secondary" style="padding: 10px; font-size: 14px;">
+                        <div style="border-top: 1px solid #e5e7eb; margin: 8px 0;"></div>
+                        <button onclick="confirmDeleteSave()" class="action-btn secondary" style="padding: 8px; font-size: 12px; color: #999;">
                             🗑 セーブデータを削除
                         </button>
                     ` : ''}
