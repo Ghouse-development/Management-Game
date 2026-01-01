@@ -2,6 +2,24 @@
 // modals.js - モーダル表示モジュール
 // ==============================================
 
+// AIアドバイス表示（ゲーム中）
+function showCurrentGameAIAdvice() {
+    if (typeof showAIAdviceForCurrentState === 'function') {
+        showAIAdviceForCurrentState();
+    } else {
+        showToast('AI機能を読み込み中...', 'error');
+    }
+}
+
+// AI行動提案モーダル（メニュー画面）
+function showAIActionPlanModal() {
+    if (typeof runOptimalSimulation === 'function') {
+        runOptimalSimulation();
+    } else {
+        showToast('AI機能を読み込み中...', 'error');
+    }
+}
+
 // 行動ログを表示するモーダル
 function showActionLogModal() {
     const companies = gameState.companies;
