@@ -438,6 +438,41 @@ function generateAIActionPlan() {
         `;
     }
 
+    // 達成可能性サマリー
+    const finalEquity = periodPlans[periodPlans.length - 1].endEquity;
+    const achievable = finalEquity >= 450;
+    const progressPercent = Math.min(100, Math.round((finalEquity / 450) * 100));
+
+    planHtml += `
+        <div style="background: ${achievable ? '#dcfce7' : '#fef2f2'}; border: 2px solid ${achievable ? '#22c55e' : '#dc2626'}; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <div style="font-size: 32px;">${achievable ? '🎉' : '⚠️'}</div>
+                <div style="font-size: 16px; font-weight: bold; color: ${achievable ? '#166534' : '#991b1b'};">
+                    ${achievable ? '目標達成可能！' : '目標達成には追加努力が必要'}
+                </div>
+            </div>
+            <div style="background: #e5e7eb; border-radius: 8px; height: 20px; margin: 10px 0; overflow: hidden;">
+                <div style="background: ${achievable ? '#22c55e' : '#f59e0b'}; height: 100%; width: ${progressPercent}%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666;">
+                <span>開始: ¥${currentEquity}</span>
+                <span style="font-weight: bold; color: ${achievable ? '#166534' : '#991b1b'};">予想: ¥${finalEquity}</span>
+                <span>目標: ¥450</span>
+            </div>
+            ${!achievable ? `
+            <div style="margin-top: 10px; padding: 8px; background: #fef3c7; border-radius: 6px; font-size: 11px; color: #92400e;">
+                <strong>改善案:</strong>
+                <ul style="margin: 4px 0 0 15px; padding: 0;">
+                    <li>高単価市場（東京¥40）での販売を増やす</li>
+                    <li>製造・販売能力を早めに強化（W6/S6/機6）</li>
+                    <li>研究チップで入札勝率UP</li>
+                    <li>固定費削減（不要な人員・機械を避ける）</li>
+                </ul>
+            </div>
+            ` : ''}
+        </div>
+    `;
+
     // 戦略チップの推奨
     planHtml += `
         <div style="background: #fae8ff; border-radius: 10px; padding: 12px; margin-bottom: 10px;">
