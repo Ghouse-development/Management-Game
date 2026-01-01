@@ -128,17 +128,13 @@ function startSeparateTwoMarketSale() {
 }
 
 // ============================================
-// 材料購入モーダル（複数市場対応）
+// 材料購入モーダル（カード選択式）
 // ============================================
+let selectedMarketPurchases = {};
+
 function showMaterialPurchaseModal() {
     const company = gameState.companies[0];
     const remainingRows = gameState.maxRows - company.currentRow + 1;
-
-    // 最も行数を使っている会社を取得
-    const maxRowCompany = gameState.companies.reduce((max, c) =>
-        (c.currentRow || 1) > (max.currentRow || 1) ? c : max
-    );
-    const isHighestRow = company === maxRowCompany;
 
     // 購入可能な市場を取得（閉鎖されていない市場のみ）
     const availableMarkets = gameState.markets.filter(m => !m.closed && m.currentStock > 0);
@@ -146,127 +142,169 @@ function showMaterialPurchaseModal() {
     // 3期以降は1市場からの購入上限 = 製造能力
     const mfgCapacity = getManufacturingCapacity(company);
     const isPeriod2 = gameState.currentPeriod === 2;
+    const spaceAvailable = 10 - company.materials;
 
-    // 市場カードを生成
-    let marketCards = '';
-    availableMarkets.forEach((market, i) => {
+    // 選択状態をリセット
+    selectedMarketPurchases = {};
+
+    // 市場カードを生成（タップで選択）
+    const marketColors = {
+        '仙台': { bg: '#10b981', border: '#047857', light: '#d1fae5' },
+        '札幌': { bg: '#3b82f6', border: '#1d4ed8', light: '#dbeafe' },
+        '東京': { bg: '#ef4444', border: '#b91c1c', light: '#fee2e2' },
+        '名古屋': { bg: '#f59e0b', border: '#b45309', light: '#fef3c7' },
+        '大阪': { bg: '#8b5cf6', border: '#6d28d9', light: '#ede9fe' },
+        '福岡': { bg: '#ec4899', border: '#be185d', light: '#fce7f3' }
+    };
+
+    let marketCards = availableMarkets.map((market, i) => {
         const marketIndex = gameState.markets.indexOf(market);
-        // 2期: 制限なし、3期以降: 製造能力が上限
         const maxPerMarket = isPeriod2 ? 99 : mfgCapacity;
-        const maxBuy = Math.min(market.currentStock, 10 - company.materials, maxPerMarket);
+        const maxBuy = Math.min(market.currentStock, spaceAvailable, maxPerMarket);
+        const colors = marketColors[market.name] || { bg: '#6b7280', border: '#374151', light: '#f3f4f6' };
 
-        // 市場の色を決定
-        const marketColors = {
-            '仙台': { bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: '#047857' },
-            '札幌': { bg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', border: '#1d4ed8' },
-            '東京': { bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', border: '#b91c1c' },
-            '名古屋': { bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: '#b45309' },
-            '大阪': { bg: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', border: '#6d28d9' },
-            '福岡': { bg: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)', border: '#be185d' }
-        };
-        const colors = marketColors[market.name] || { bg: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)', border: '#374151' };
+        // 数量オプション（0, 1, 2, max）
+        const qtyOptions = [0, 1, 2];
+        if (maxBuy > 2) qtyOptions.push(maxBuy);
 
-        marketCards += `
-            <div style="
-                background: ${colors.bg};
+        return `
+            <div class="market-purchase-card" id="market-card-${marketIndex}" style="
+                background: white;
                 border: 3px solid ${colors.border};
-                border-radius: 12px;
+                border-radius: 16px;
                 padding: 12px;
-                color: white;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             ">
-                <div style="text-align: center; margin-bottom: 8px;">
-                    <div style="font-weight: bold; font-size: 16px;">${market.name}</div>
-                    <div style="font-size: 12px; opacity: 0.9;">在庫: ${market.currentStock}個</div>
+                <div style="
+                    background: ${colors.bg};
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 10px;
+                    margin-bottom: 10px;
+                    text-align: center;
+                ">
+                    <div style="font-weight: bold; font-size: 18px;">${market.name}</div>
+                    <div style="font-size: 13px; opacity: 0.9;">¥${market.buyPrice}/個 ・ 在庫${market.currentStock}</div>
                 </div>
-                <div style="background: rgba(255,255,255,0.2); border-radius: 8px; padding: 8px; text-align: center; margin-bottom: 8px;">
-                    <div style="font-size: 11px; opacity: 0.8;">仕入価格</div>
-                    <div style="font-size: 20px; font-weight: bold;">¥${market.buyPrice}</div>
+                <div style="display: grid; grid-template-columns: repeat(${qtyOptions.length}, 1fr); gap: 6px;">
+                    ${qtyOptions.map(qty => {
+                        const isDisabled = qty > maxBuy || qty * market.buyPrice > company.cash;
+                        const label = qty === maxBuy && qty > 2 ? `${qty}(MAX)` : `${qty}個`;
+                        return `
+                            <div onclick="${!isDisabled ? `selectMarketQty(${marketIndex}, ${qty}, ${market.buyPrice})` : ''}"
+                                id="qty-btn-${marketIndex}-${qty}"
+                                class="qty-select-card"
+                                style="
+                                    background: ${isDisabled ? '#e5e7eb' : colors.light};
+                                    border: 2px solid ${isDisabled ? '#d1d5db' : colors.border};
+                                    border-radius: 10px;
+                                    padding: 10px 4px;
+                                    text-align: center;
+                                    cursor: ${isDisabled ? 'not-allowed' : 'pointer'};
+                                    opacity: ${isDisabled ? '0.5' : '1'};
+                                    transition: all 0.2s;
+                                ">
+                                <div style="font-size: 16px; font-weight: bold; color: ${colors.border};">${label}</div>
+                                <div style="font-size: 11px; color: #666;">¥${qty * market.buyPrice}</div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
-                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <button onclick="adjustMaterialQty(${marketIndex}, -1)" style="
-                        width: 36px; height: 36px;
-                        border: none; border-radius: 50%;
-                        background: rgba(255,255,255,0.3);
-                        color: white; font-size: 20px; font-weight: bold;
-                        cursor: pointer;
-                    ">−</button>
-                    <div style="
-                        min-width: 50px; text-align: center;
-                        background: rgba(255,255,255,0.9); color: #1e293b;
-                        padding: 6px 12px; border-radius: 8px;
-                        font-size: 18px; font-weight: bold;
-                    ">
-                        <span id="qty_${marketIndex}">0</span>個
-                    </div>
-                    <button onclick="adjustMaterialQty(${marketIndex}, 1)" style="
-                        width: 36px; height: 36px;
-                        border: none; border-radius: 50%;
-                        background: rgba(255,255,255,0.3);
-                        color: white; font-size: 20px; font-weight: bold;
-                        cursor: pointer;
-                    ">+</button>
-                </div>
-                <div style="text-align: center; margin-top: 6px; font-size: 12px;">
-                    <span id="cost_${marketIndex}">¥0</span>
-                    <input type="hidden" id="market_${marketIndex}" value="0" data-price="${market.buyPrice}" data-max="${maxBuy}">
-                </div>
+                <input type="hidden" id="market_${marketIndex}" value="0" data-price="${market.buyPrice}" data-max="${maxBuy}">
             </div>
         `;
-    });
+    }).join('');
 
     const content = `
         <div style="padding: 10px;">
-            <!-- 会社盤（ミニ表示） -->
-            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 12px; margin-bottom: 15px;">
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; font-size: 11px;">
-                    <div style="background: rgba(255,255,255,0.7); padding: 6px; border-radius: 6px;">
-                        <div style="color: #6b7280;">材料</div>
-                        <div style="font-weight: bold; font-size: 14px;" id="materialDisplay">${company.materials}</div>
-                    </div>
-                    <div style="background: rgba(255,255,255,0.7); padding: 6px; border-radius: 6px;">
-                        <div style="color: #6b7280;">仕掛</div>
-                        <div style="font-weight: bold; font-size: 14px;">${company.wip}</div>
-                    </div>
-                    <div style="background: rgba(255,255,255,0.7); padding: 6px; border-radius: 6px;">
-                        <div style="color: #6b7280;">製品</div>
-                        <div style="font-weight: bold; font-size: 14px;">${company.products}</div>
-                    </div>
-                    <div style="background: rgba(255,255,255,0.7); padding: 6px; border-radius: 6px;">
-                        <div style="color: #6b7280;">現金</div>
-                        <div style="font-weight: bold; font-size: 14px; color: #166534;" id="cashDisplay">¥${company.cash}</div>
-                    </div>
+            <!-- ステータスバー -->
+            <div style="
+                background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+                color: white;
+                padding: 12px;
+                border-radius: 12px;
+                margin-bottom: 12px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <div>
+                    <div style="font-size: 12px; opacity: 0.8;">現金</div>
+                    <div style="font-size: 20px; font-weight: bold;" id="cashDisplay">¥${company.cash}</div>
                 </div>
-                <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px; font-size: 10px;">
-                    <span style="color: #3b82f6;">🔬${company.chips.research || 0}</span>
-                    <span style="color: #eab308;">📚${company.chips.education || 0}</span>
-                    <span style="color: #ef4444;">📢${company.chips.advertising || 0}</span>
-                    <span style="color: #666;">| W${company.workers} 機${company.machines.length} S${company.salesmen}</span>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; opacity: 0.8;">材料</div>
+                    <div style="font-size: 20px; font-weight: bold;" id="materialDisplay">${company.materials}/10</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 12px; opacity: 0.8;">残り行</div>
+                    <div style="font-size: 20px; font-weight: bold;">${remainingRows}</div>
                 </div>
             </div>
 
-            <div style="background: #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 15px;">
-                <div style="font-size: 12px; color: #78350f;">残り行数: ${remainingRows}行 / 材料上限: 10個</div>
-                ${!isPeriod2 ? `<div style="font-size: 12px; color: #0369a1;">製造能力: ${mfgCapacity} (1市場あたり${mfgCapacity}個まで)</div>` : ''}
-                ${isHighestRow ? `<div style="font-size: 12px; color: #dc2626; margin-top: 5px;">⚠️ あなたは行数トップです。2市場購入は慎重に。</div>` : ''}
-                <div style="font-size: 11px; color: #666; margin-top: 5px;">※複数市場から購入 = 市場数×1行使用</div>
-            </div>
+            ${!isPeriod2 ? `
+                <div style="background: #dbeafe; border-radius: 8px; padding: 8px; margin-bottom: 12px; text-align: center; font-size: 12px; color: #1e40af;">
+                    製造能力: ${mfgCapacity} → 1市場あたり${mfgCapacity}個まで
+                </div>
+            ` : ''}
 
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px;">
+            <!-- 市場カード -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 15px;">
                 ${marketCards}
             </div>
 
-            <div style="background: #e0f2fe; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center;">
-                <div style="font-size: 12px; color: #0369a1;">合計</div>
-                <div style="font-size: 24px; font-weight: bold; color: #1e40af;" id="totalCost">¥0</div>
-                <div style="font-size: 12px; color: #666;" id="totalQty">0個 / 使用行数: 0行</div>
+            <!-- 合計表示 -->
+            <div style="
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                border-radius: 12px;
+                padding: 15px;
+                margin-bottom: 15px;
+                text-align: center;
+            ">
+                <div style="font-size: 14px; opacity: 0.9;">購入合計</div>
+                <div style="font-size: 28px; font-weight: bold;" id="totalCost">¥0</div>
+                <div style="font-size: 13px; opacity: 0.9;" id="totalQty">0個 / 0市場（0行使用）</div>
             </div>
 
-            <button class="submit-btn" onclick="buyMaterialsFromMultiple()">購入実行</button>
+            <button class="submit-btn" onclick="buyMaterialsFromMultiple()" style="
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                width: 100%;
+                padding: 16px;
+                font-size: 18px;
+                border-radius: 12px;
+            ">購入実行</button>
         </div>
     `;
 
-    showModal('📦 材料購入', content);
+    showModal('📦 材料仕入れ', content);
+}
+
+// 市場の数量を選択
+function selectMarketQty(marketIndex, qty, price) {
+    const prevQty = selectedMarketPurchases[marketIndex] || 0;
+
+    // 前の選択をリセット
+    const prevBtn = document.getElementById(`qty-btn-${marketIndex}-${prevQty}`);
+    if (prevBtn) {
+        prevBtn.style.transform = 'scale(1)';
+        prevBtn.style.boxShadow = 'none';
+    }
+
+    // 新しい選択を適用
+    selectedMarketPurchases[marketIndex] = qty;
+
+    const newBtn = document.getElementById(`qty-btn-${marketIndex}-${qty}`);
+    if (newBtn && qty > 0) {
+        newBtn.style.transform = 'scale(1.05)';
+        newBtn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+    }
+
+    // hidden inputを更新
+    const input = document.getElementById(`market_${marketIndex}`);
+    if (input) input.value = qty;
+
+    updateMaterialPurchaseTotal();
 }
 
 // 材料購入数量を調整

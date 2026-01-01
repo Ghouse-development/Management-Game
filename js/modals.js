@@ -198,12 +198,20 @@ function showTurnStartOptions() {
                 </button>
             </div>
             <div style="margin-top: 15px;">
-                <p>その他のアクション（Bルール）</p>
-                <button class="action-btn secondary" onclick="showInsurancePurchaseModal()">保険チップ購入</button>
-                <button class="action-btn secondary" onclick="showWarehouseModal()">無災害倉庫を購入</button>
-                ${company.warehouses === 1 ? '<button class="action-btn secondary" onclick="showWarehouseMoveModal()">倉庫の移動</button>' : ''}
-                <button class="action-btn secondary" onclick="showReassignModal()">配置転換</button>
-                <button class="action-btn secondary" onclick="showSellMachineModal()">機械売却</button>
+                <p>投資アクション</p>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px;">
+                    <button class="action-btn secondary" onclick="showMachineModal()">🏭 機械購入</button>
+                    <button class="action-btn secondary" onclick="showChipPurchaseModal()">🎰 チップ購入</button>
+                    <button class="action-btn secondary" onclick="showHireModal()">👤 人員採用</button>
+                    <button class="action-btn secondary" onclick="showWarehouseModal()">🏠 倉庫購入</button>
+                </div>
+                <p>その他のアクション</p>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                    <button class="action-btn secondary" onclick="showReassignModal()">🔄 配置転換</button>
+                    <button class="action-btn secondary" onclick="showSellMachineModal()">💰 機械売却</button>
+                    ${company.warehouses === 1 ? '<button class="action-btn secondary" onclick="showWarehouseMoveModal()">📦 倉庫移動</button>' : ''}
+                    <button class="action-btn secondary" onclick="showInsurancePurchaseModal()">🛡 保険購入</button>
+                </div>
             </div>
         </div>
     `;

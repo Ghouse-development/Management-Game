@@ -618,11 +618,11 @@ function showCustomGameSetupModal() {
                         </div>
                         <div>
                             <label style="font-size: 11px; color: #666;">現金</label>
-                            <input type="number" id="custom-cash" value="300" min="0" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
+                            <input type="number" id="custom-cash" value="112" min="0" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
                         </div>
                         <div>
                             <label style="font-size: 11px; color: #666;">自己資本</label>
-                            <input type="number" id="custom-equity" value="300" min="0" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
+                            <input type="number" id="custom-equity" value="283" min="0" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
                         </div>
                     </div>
                 </div>
@@ -648,15 +648,15 @@ function showCustomGameSetupModal() {
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
                         <div>
                             <label style="font-size: 11px; color: #666;">ワーカー</label>
-                            <input type="number" id="custom-workers" value="4" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
+                            <input type="number" id="custom-workers" value="1" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
                         </div>
                         <div>
                             <label style="font-size: 11px; color: #666;">セールス</label>
-                            <input type="number" id="custom-salesmen" value="4" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
+                            <input type="number" id="custom-salesmen" value="1" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
                         </div>
                         <div>
                             <label style="font-size: 11px; color: #666;">小型機械(¥100, 能力1)</label>
-                            <input type="number" id="custom-machines-small" value="4" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
+                            <input type="number" id="custom-machines-small" value="1" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
                         </div>
                         <div>
                             <label style="font-size: 11px; color: #666;">大型機械(¥200, 能力4)</label>
@@ -739,15 +739,16 @@ function showCustomGameSetupModal() {
 }
 
 function getCustomSettings() {
+    // 2期開始時の正しい初期状態（constants.jsのINITIAL_COMPANY_STATEに準拠）
     return {
         period: parseInt(document.getElementById('custom-period')?.value || '2'),
-        cash: parseInt(document.getElementById('custom-cash')?.value || '300'),
-        equity: parseInt(document.getElementById('custom-equity')?.value || '300'),
+        cash: parseInt(document.getElementById('custom-cash')?.value || '112'),      // 2期開始時: ¥112
+        equity: parseInt(document.getElementById('custom-equity')?.value || '283'),  // 2期開始時: ¥283
         loans: parseInt(document.getElementById('custom-loans')?.value || '0'),
         shortLoans: parseInt(document.getElementById('custom-short-loans')?.value || '0'),
-        workers: parseInt(document.getElementById('custom-workers')?.value || '4'),
-        salesmen: parseInt(document.getElementById('custom-salesmen')?.value || '4'),
-        machinesSmall: parseInt(document.getElementById('custom-machines-small')?.value || '4'),
+        workers: parseInt(document.getElementById('custom-workers')?.value || '1'),  // 2期開始時: 1人
+        salesmen: parseInt(document.getElementById('custom-salesmen')?.value || '1'), // 2期開始時: 1人
+        machinesSmall: parseInt(document.getElementById('custom-machines-small')?.value || '1'), // 2期開始時: 1台
         machinesLarge: parseInt(document.getElementById('custom-machines-large')?.value || '0'),
         materials: parseInt(document.getElementById('custom-materials')?.value || '1'),
         wip: parseInt(document.getElementById('custom-wip')?.value || '2'),
