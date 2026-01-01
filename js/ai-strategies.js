@@ -943,6 +943,169 @@ const STRATEGY_ROW_PLANS = {
 };
 
 // ============================================
+// 🏭 市場盤分析・購入戦略決定システム
+// ============================================
+/**
+ * 市場盤を分析し、最適な購入戦略を決定
+ * @param {Object} company - 会社オブジェクト
+ * @param {number} targetQty - 購入目標数量
+ * @returns {Object} 購入戦略 { strategy: '1MARKET'|'2MARKET', markets: [], totalQty, totalCost, rowsUsed }
+ */
+function analyzeMaterialMarkets(company, targetQty) {
+    const availableMarkets = gameState.markets
+        .filter(m => m.currentStock > 0 && !m.closed)
+        .sort((a, b) => a.buyPrice - b.buyPrice);  // 安い順にソート
+
+    if (availableMarkets.length === 0) {
+        return { strategy: 'NONE', markets: [], totalQty: 0, totalCost: 0, rowsUsed: 0 };
+    }
+
+    const materialCapacity = getMaterialCapacity(company);
+    const canStore = Math.max(0, materialCapacity - company.materials);
+    const actualTarget = Math.min(targetQty, canStore);
+
+    if (actualTarget <= 0) {
+        return { strategy: 'NONE', markets: [], totalQty: 0, totalCost: 0, rowsUsed: 0, reason: '在庫容量不足' };
+    }
+
+    // === 1市場購入プラン ===
+    const plan1Market = calculate1MarketPlan(availableMarkets, actualTarget, company.cash);
+
+    // === 2市場購入プラン ===
+    const plan2Market = calculate2MarketPlan(availableMarkets, actualTarget, company.cash);
+
+    // === 比較・判断 ===
+    // 2市場購入の条件:
+    // 1. 2市場から購入可能
+    // 2. 2市場使う価値がある（1市場では足りない or コスト差が小さい）
+    // 3. 残り行数が2行以上
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+
+    if (plan2Market.totalQty > 0 && rowsRemaining >= 2) {
+        // 2市場の方が多く買える場合
+        if (plan2Market.totalQty > plan1Market.totalQty) {
+            console.log(`[市場分析] ${company.name}: 2市場購入推奨（${plan2Market.totalQty}個 > ${plan1Market.totalQty}個）`);
+            return {
+                strategy: '2MARKET',
+                ...plan2Market,
+                rowsUsed: 2,
+                reason: `2市場で${plan2Market.totalQty}個購入可能（1市場では${plan1Market.totalQty}個）`
+            };
+        }
+
+        // 在庫が複数市場に分散している場合（1市場で足りない）
+        const cheapestMarket = availableMarkets[0];
+        if (cheapestMarket.currentStock < actualTarget && plan2Market.totalQty >= actualTarget) {
+            console.log(`[市場分析] ${company.name}: 2市場購入推奨（最安市場の在庫${cheapestMarket.currentStock}個 < 目標${actualTarget}個）`);
+            return {
+                strategy: '2MARKET',
+                ...plan2Market,
+                rowsUsed: 2,
+                reason: `${cheapestMarket.name}在庫不足、2市場で補完`
+            };
+        }
+    }
+
+    // 1市場で十分な場合
+    if (plan1Market.totalQty > 0) {
+        console.log(`[市場分析] ${company.name}: 1市場購入（${plan1Market.markets[0].name}から${plan1Market.totalQty}個）`);
+        return {
+            strategy: '1MARKET',
+            ...plan1Market,
+            rowsUsed: 1,
+            reason: `${plan1Market.markets[0].name}から${plan1Market.totalQty}個`
+        };
+    }
+
+    return { strategy: 'NONE', markets: [], totalQty: 0, totalCost: 0, rowsUsed: 0, reason: '購入不可' };
+}
+
+/**
+ * 1市場購入プランを計算
+ */
+function calculate1MarketPlan(availableMarkets, targetQty, cash) {
+    if (availableMarkets.length === 0) {
+        return { markets: [], totalQty: 0, totalCost: 0 };
+    }
+
+    const market = availableMarkets[0];  // 最安市場
+    const maxAffordable = Math.floor(cash / market.buyPrice);
+    const buyQty = Math.min(targetQty, market.currentStock, maxAffordable);
+    const cost = buyQty * market.buyPrice;
+
+    return {
+        markets: [{ market, qty: buyQty, cost }],
+        totalQty: buyQty,
+        totalCost: cost
+    };
+}
+
+/**
+ * 2市場購入プランを計算
+ */
+function calculate2MarketPlan(availableMarkets, targetQty, cash) {
+    if (availableMarkets.length < 2) {
+        return { markets: [], totalQty: 0, totalCost: 0 };
+    }
+
+    let remaining = targetQty;
+    let remainingCash = cash;
+    const purchases = [];
+
+    for (let i = 0; i < Math.min(2, availableMarkets.length) && remaining > 0; i++) {
+        const market = availableMarkets[i];
+        const maxAffordable = Math.floor(remainingCash / market.buyPrice);
+        const buyQty = Math.min(remaining, market.currentStock, maxAffordable);
+
+        if (buyQty > 0) {
+            const cost = buyQty * market.buyPrice;
+            purchases.push({ market, qty: buyQty, cost });
+            remaining -= buyQty;
+            remainingCash -= cost;
+        }
+    }
+
+    return {
+        markets: purchases,
+        totalQty: purchases.reduce((sum, p) => sum + p.qty, 0),
+        totalCost: purchases.reduce((sum, p) => sum + p.cost, 0)
+    };
+}
+
+/**
+ * 製造が2個以上可能かチェック（1個のみの完成・投入は行わない）
+ * @returns {boolean} 製造を実行すべきか
+ */
+function shouldExecuteProduction(company) {
+    const mfgCapacity = getManufacturingCapacity(company);
+    const availableMaterials = company.materials;
+    const availableWip = company.wip;
+
+    // 投入可能数 = min(製造能力, 材料数)
+    const canInput = Math.min(mfgCapacity, availableMaterials);
+    // 完成可能数 = min(製造能力, 仕掛品数)
+    const canComplete = Math.min(mfgCapacity, availableWip);
+
+    // 投入+完成の合計が2以上なら実行
+    // ただし、期末の在庫準備では1個でもOK
+    const totalProduction = canInput + canComplete;
+
+    if (totalProduction >= 2) {
+        return true;
+    }
+
+    // 期末（残り3行以内）は1個でも許容
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+    if (rowsRemaining <= 3 && totalProduction >= 1) {
+        console.log(`[製造判断] ${company.name}: 期末のため1個でも製造実行`);
+        return true;
+    }
+
+    console.log(`[製造判断] ${company.name}: 製造スキップ（投入${canInput}+完成${canComplete}=${totalProduction}個 < 2個）`);
+    return false;
+}
+
+// ============================================
 // 📊 行別進捗追跡・動的調整システム
 // ============================================
 
@@ -1277,13 +1440,13 @@ function getStrategicPlan(company, period) {
             recommendedAction = 'PRODUCE_CARRY';
             actionReason = '期末：次期に繋げるため生産継続';
         }
-    } else if (needsMoreCapacity && target.investPriority.includes('machine')) {
+    } else if (needsMoreCapacity && (target.investment?.machine > 0 || target.investment?.attachment > 0)) {
         recommendedAction = 'INVEST_MACHINE';
-        actionReason = `製造能力不足（${mfgCapacity}→目標${target.salesPerCycle}）`;
-    } else if (needsMorePriceComp && company.chips.research < 4) {
+        actionReason = `製造能力不足（${mfgCapacity}→目標${target.salesTarget || 2}）`;
+    } else if (needsMorePriceComp && company.chips.research < 4 && (target.investment?.research > 0)) {
         recommendedAction = 'INVEST_RESEARCH';
-        actionReason = `価格競争力不足（MQ${estimatedMQPerUnit}→目標${target.priceTarget}）`;
-    } else if (mfgCapacity < salesCapacity && !company.chips.education) {
+        actionReason = `価格競争力不足（MQ${estimatedMQPerUnit}→目標${target.avgMQPerUnit || 14}）`;
+    } else if (mfgCapacity < salesCapacity && !company.chips.education && (target.investment?.education > 0)) {
         recommendedAction = 'INVEST_EDUCATION';
         actionReason = '製造能力が販売能力より低い';
     }
@@ -2446,10 +2609,13 @@ function aiDoNothing(company, originalReason = '') {
             executeDefaultMaterialPurchase(company, mfgCapacity);
             return;
         }
-        // 材料購入できない場合のみ仕掛品完成
-        console.log(`[AI強制行動] ${company.name}: 材料購入不可 → 仕掛品${company.wip}を完成`);
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        // 材料購入できない場合のみ仕掛品完成（2個以上制限あり）
+        console.log(`[AI強制行動] ${company.name}: 材料購入不可 → 仕掛品${company.wip}を完成試行`);
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;  // 成功時のみリターン
+        }
+        // 失敗時は次の行動へ続行
+        console.log(`[AI強制行動] ${company.name}: 製造2個未満でスキップ → 次の行動へ`);
     }
 
     // 材料あり（+仕掛品あれば同時処理）→ 生産
@@ -2457,9 +2623,12 @@ function aiDoNothing(company, originalReason = '') {
         const canProduce = Math.min(mfgCapacity, company.materials + company.wip);
         if (canProduce > 0) {
             const produceType = company.wip > 0 ? '完成＋投入' : '投入のみ';
-            console.log(`[AI強制行動] ${company.name}: 材料${company.materials}/仕掛${company.wip} → ${produceType}`);
-            executeDefaultProduction(company, mfgCapacity);
-            return;
+            console.log(`[AI強制行動] ${company.name}: 材料${company.materials}/仕掛${company.wip} → ${produceType}試行`);
+            if (executeDefaultProduction(company, mfgCapacity)) {
+                return;  // 成功時のみリターン
+            }
+            // 失敗時は次の行動へ続行
+            console.log(`[AI強制行動] ${company.name}: 製造2個未満でスキップ → 次の行動へ`);
         }
     }
 
@@ -3136,8 +3305,8 @@ function executeGMaximizingAction(company, companyIndex, action) {
             return true;
 
         case 'PRODUCE':
-            executeDefaultProduction(company, mfgCapacity);
-            return true;
+            // executeDefaultProductionは成功時true、失敗時falseを返す
+            return executeDefaultProduction(company, mfgCapacity);
 
         case 'BUY_MATERIALS':
             executeDefaultMaterialPurchase(company, action.params.qty || mfgCapacity);
@@ -3961,8 +4130,10 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
             case 'PRIORITIZE_PRODUCE':
             case 'ACCELERATE_CYCLE':
                 if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
-                    executeDefaultProduction(company, mfgCapacity);
-                    adjusted = true;
+                    // 戻り値をチェック: 2個未満で失敗する場合がある
+                    if (executeDefaultProduction(company, mfgCapacity)) {
+                        adjusted = true;
+                    }
                 }
                 break;
             case 'CONSIDER_INVESTMENT':
@@ -3991,8 +4162,10 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
                 break;
             case 'PRODUCE':
                 if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
-                    executeDefaultProduction(company, mfgCapacity);
-                    executed = true;
+                    // 戻り値をチェック
+                    if (executeDefaultProduction(company, mfgCapacity)) {
+                        executed = true;
+                    }
                 }
                 break;
             case 'BUY_CHIP':
@@ -4037,8 +4210,10 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
             // 在庫10個未満なら生産して積み上げ
             if (totalInventory < 10 && (company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
                 console.log(`[5期最終] ${company.name}: 在庫${totalInventory}個→10個目標で生産`);
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
+                // 失敗時は次の行動へ
             }
         } else {
             // 2-4期：在庫を次期に繋げる（売らない！生産して製品を増やす）
@@ -4057,8 +4232,10 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
                 // 材料あり → 投入実行
                 const action = company.wip > 0 ? '完成＋投入' : '投入のみ';
                 console.log(`[期末継続] ${company.name}: ${action}で次期に繋げる（在庫${totalInventory}個）`);
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
+                // 失敗時は次の行動へ
             }
             // 製品しかない場合も基本的に売らない（次期初手で売れる）
             // ただし現金が極端に少ない場合のみ売却
@@ -4083,8 +4260,10 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
                 break;
             case 'PRODUCE':
                 if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
-                    executeDefaultProduction(company, mfgCapacity);
-                    executed = true;
+                    // 戻り値をチェック
+                    if (executeDefaultProduction(company, mfgCapacity)) {
+                        executed = true;
+                    }
                 }
                 break;
             case 'BUY':
@@ -4314,8 +4493,9 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
             return;
         }
         if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-            executeDefaultProduction(company, mfgCapacity);
-            return;
+            if (executeDefaultProduction(company, mfgCapacity)) {
+                return;
+            }
         }
         if (company.cash >= 20 && mfgCapacity > 0) {
             executeDefaultMaterialPurchase(company, mfgCapacity);
@@ -4483,8 +4663,9 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         }
 
         if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-            executeDefaultProduction(company, mfgCapacity);
-            return;
+            if (executeDefaultProduction(company, mfgCapacity)) {
+                return;
+            }
         }
 
         if (company.materials < mfgCapacity && company.cash > 50) {
@@ -4573,8 +4754,9 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
                 return;
             }
             if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
         }
 
@@ -4621,8 +4803,9 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
 
     // 生産最大化（材料/仕掛品があれば生産）
     if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;
+        }
     }
 
     // 材料購入（在庫ゼロ時は緊急仕入れ）
@@ -4750,8 +4933,9 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
                 return;
             }
             if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
         }
 
@@ -4810,8 +4994,9 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
     }
 
     if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;
+        }
     }
 
     // 材料購入（在庫ゼロ時は緊急仕入れ）
@@ -4907,8 +5092,9 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
                 return;
             }
             if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
         }
 
@@ -4952,8 +5138,9 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
     }
 
     if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;
+        }
     }
 
     // 材料購入（在庫ゼロ時は緊急仕入れ）
@@ -5064,8 +5251,9 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
                 return;
             }
             if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
         }
 
@@ -5108,8 +5296,9 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
     }
 
     if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;
+        }
     }
 
     // 材料購入（在庫ゼロ時は緊急仕入れ）
@@ -5244,8 +5433,9 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
                 return;
             }
             if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
         }
 
@@ -5296,8 +5486,9 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
     }
 
     if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;
+        }
     }
 
     // 材料購入（在庫ゼロ時は緊急仕入れ）
@@ -5447,8 +5638,9 @@ function executeUnpredictableStrategy(company, mfgCapacity, salesCapacity, analy
                 break;
             case 3:
                 if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                    executeDefaultProduction(company, mfgCapacity);
-                    return;
+                    if (executeDefaultProduction(company, mfgCapacity)) {
+                        return;
+                    }
                 }
                 break;
             case 4:
@@ -5487,8 +5679,9 @@ function executeUnpredictableStrategy(company, mfgCapacity, salesCapacity, analy
                 return;
             }
             if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
         }
 
@@ -5515,8 +5708,9 @@ function executeUnpredictableStrategy(company, mfgCapacity, salesCapacity, analy
                 break;
             case 'produce':
                 if ((company.materials > 0 || company.wip > 0) && mfgCapacity > 0) {
-                    executeDefaultProduction(company, mfgCapacity);
-                    return;
+                    if (executeDefaultProduction(company, mfgCapacity)) {
+                        return;
+                    }
                 }
                 break;
             case 'buy':
@@ -5607,8 +5801,9 @@ function executeDefaultSale(company, salesCapacity, priceBase) {
         if (availableMarkets.length === 0) {
             if (company.materials > 0 || company.wip > 0) {
                 const mfgCapacity = getManufacturingCapacity(company);
-                executeDefaultProduction(company, mfgCapacity);
-                return;
+                if (executeDefaultProduction(company, mfgCapacity)) {
+                    return;
+                }
             }
             const mfgCapacity = getManufacturingCapacity(company);
             executeDefaultMaterialPurchase(company, mfgCapacity);
@@ -5696,8 +5891,9 @@ function executeDefaultSale(company, salesCapacity, priceBase) {
 
     if (company.materials > 0 || company.wip > 0) {
         const mfgCapacity = getManufacturingCapacity(company);
-        executeDefaultProduction(company, mfgCapacity);
-        return;
+        if (executeDefaultProduction(company, mfgCapacity)) {
+            return;
+        }
     }
 
     const mfgCapacity = getManufacturingCapacity(company);
@@ -5705,97 +5901,71 @@ function executeDefaultSale(company, salesCapacity, priceBase) {
 }
 
 // ============================================
-// 共通関数：材料購入
+// 共通関数：材料購入（市場盤分析使用）
 // ============================================
 function executeDefaultMaterialPurchase(company, targetQty) {
-    const mfgCapacity = getManufacturingCapacity(company);
-    const materialCapacity = getMaterialCapacity(company);
-    const canStore = Math.max(0, materialCapacity - company.materials);
-    const maxBuyable = gameState.currentPeriod === 2 ? canStore : Math.min(mfgCapacity, canStore);
-    const actualTargetQty = Math.min(targetQty, maxBuyable);
     const companyIndex = gameState.companies.indexOf(company);
+    const mfgCapacity = getManufacturingCapacity(company);
 
-    const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed)
-        .sort((a, b) => a.buyPrice - b.buyPrice);
+    // 市場盤を分析して最適な購入戦略を決定
+    const purchasePlan = analyzeMaterialMarkets(company, targetQty);
 
-    if (availableMarkets.length > 0) {
-        // 2市場同時購入を検討（購入目標が2個以上、複数市場が利用可能、行数に余裕）
-        // 重要: 2市場から購入する場合は2行使用する
-        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
-        const shouldDistribute = actualTargetQty >= 2 && availableMarkets.length >= 2 && rowsRemaining >= 2;
+    if (purchasePlan.strategy === '2MARKET' && purchasePlan.markets.length >= 2) {
+        // === 2市場購入（2行使用）===
+        let purchaseDetails = [];
 
-        if (shouldDistribute) {
-            let simulatedTotal = 0;
-            let simulatedCash = company.cash;
-            let purchases = [];
-
-            for (const market of availableMarkets) {
-                if (simulatedTotal >= actualTargetQty) break;
-                if (purchases.length >= 2) break; // 最大2市場まで
-                const maxAffordable = Math.floor(simulatedCash / market.buyPrice);
-                const buyQty = Math.min(actualTargetQty - simulatedTotal, market.currentStock, maxAffordable);
-
-                if (buyQty > 0) {
-                    simulatedCash -= market.buyPrice * buyQty;
-                    simulatedTotal += buyQty;
-                    purchases.push({ market, qty: buyQty, cost: market.buyPrice * buyQty });
-                }
-            }
-
-            // 2市場から購入する場合は2行使用
-            if (purchases.length >= 2 && simulatedTotal >= 2) {
-                let totalCost = 0;
-                let purchaseDetails = [];
-
-                for (const p of purchases) {
-                    company.cash -= p.cost;
-                    company.materials += p.qty;
-                    company.totalMaterialCost += p.cost;
-                    p.market.currentStock -= p.qty;
-                    totalCost += p.cost;
-                    purchaseDetails.push(`${p.market.name}:${p.qty}個`);
-                }
-
-                // 2市場購入 = 2行使用
-                incrementRow(companyIndex);
-                incrementRow(companyIndex);
-
-                const detailText = `2市場購入（2行使用）: ${purchaseDetails.join('、')}`;
-                showAIActionModal(company, '材料仕入（2行）', '📦📦', detailText, [
-                    { label: '購入数', value: `${simulatedTotal}個` },
-                    { label: '支払', value: `¥${totalCost}` },
-                    { label: '使用行数', value: '2行', highlight: true }
-                ]);
-                console.log(`[2市場購入-2行] ${company.name}: ${purchaseDetails.join(', ')} 合計${simulatedTotal}個 ¥${totalCost}`);
-                return;
-            }
+        for (const p of purchasePlan.markets) {
+            company.cash -= p.cost;
+            company.materials += p.qty;
+            company.totalMaterialCost += p.cost;
+            p.market.currentStock -= p.qty;
+            purchaseDetails.push(`${p.market.name}:${p.qty}個@¥${p.market.buyPrice}`);
         }
 
-        // 1市場から購入（1行使用）
-        const market = availableMarkets[0];
-        const buyQty = Math.min(actualTargetQty, market.currentStock, Math.floor(company.cash / market.buyPrice));
+        // 2市場購入 = 2行使用
+        incrementRow(companyIndex);
+        incrementRow(companyIndex);
 
-        if (buyQty >= 1) {
-            const cost = market.buyPrice * buyQty;
-            company.cash -= cost;
-            company.materials += buyQty;
-            company.totalMaterialCost += cost;
-            market.currentStock -= buyQty;
-
-            incrementRow(companyIndex);
-            showAIActionModal(company, '材料仕入', '📦', `${market.name}から${buyQty}個購入`, [
-                { label: '仕入価格', value: `¥${market.buyPrice}/個` },
-                { label: '支払', value: `¥${cost}` }
-            ]);
-            return;
-        }
-    }
-
-    if (company.materials > 0 || company.wip > 0) {
-        executeDefaultProduction(company, mfgCapacity);
+        const detailText = `2市場購入（2行使用）: ${purchaseDetails.join('、')}`;
+        showAIActionModal(company, '材料仕入（2行）', '📦📦', detailText, [
+            { label: '購入数', value: `${purchasePlan.totalQty}個` },
+            { label: '支払', value: `¥${purchasePlan.totalCost}` },
+            { label: '使用行数', value: '2行', highlight: true },
+            { label: '理由', value: purchasePlan.reason }
+        ]);
+        console.log(`[2市場購入-2行] ${company.name}: ${purchaseDetails.join(', ')} - ${purchasePlan.reason}`);
         return;
     }
 
+    if (purchasePlan.strategy === '1MARKET' && purchasePlan.markets.length >= 1) {
+        // === 1市場購入（1行使用）===
+        const p = purchasePlan.markets[0];
+        company.cash -= p.cost;
+        company.materials += p.qty;
+        company.totalMaterialCost += p.cost;
+        p.market.currentStock -= p.qty;
+
+        incrementRow(companyIndex);
+        showAIActionModal(company, '材料仕入', '📦', `${p.market.name}から${p.qty}個購入`, [
+            { label: '仕入価格', value: `¥${p.market.buyPrice}/個` },
+            { label: '支払', value: `¥${p.cost}` }
+        ]);
+        console.log(`[1市場購入] ${company.name}: ${p.market.name}から${p.qty}個 ¥${p.cost}`);
+        return;
+    }
+
+    // 購入できない場合のフォールバック（循環呼び出し防止）
+    if (company.materials > 0 || company.wip > 0) {
+        if (shouldExecuteProduction(company)) {
+            if (executeDefaultProduction(company, mfgCapacity)) {
+                return;  // 成功時のみリターン
+            }
+        }
+        // 製造失敗 or 2個未満 → チップ購入へフォールスルー
+        console.log(`[材料購入失敗] ${company.name}: 購入不可、製造も不可 → チップ購入試行`);
+    }
+
+    // フォールバック: チップ購入
     const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
     const maxResearchChips = gameState.currentPeriod === 2 ? 4 : 5;
     if (company.cash >= chipCost && company.chips.research < maxResearchChips) {
@@ -5806,7 +5976,12 @@ function executeDefaultMaterialPurchase(company, targetQty) {
         return;
     }
 
-    aiDoNothing(company, '材料・資金不足');
+    // 最終フォールバック: 戦略的待機（行を消費して終了）
+    const statusReport = `現金¥${company.cash}, 材料${company.materials}, 仕掛${company.wip}, 製品${company.products}`;
+    console.log(`[材料購入最終] ${company.name}: 何もできず → 待機 (${statusReport})`);
+    incrementRow(companyIndex);
+    logAction(companyIndex, '待機', '材料購入不可＆製造不可', 0, true);
+    showAIActionModal(company, '待機', '⏳', '市場/資金不足のため待機');
 }
 
 // ============================================
@@ -5838,16 +6013,14 @@ function executeProductionWithPipelineCheck(company, mfgCapacity) {
 
         // 材料購入できない場合は仕方なく生産（パイプライン切れる）
         console.log(`[パイプライン注意] ${company.name}: 材料購入不可 → 仕掛品完成のみ`);
-        executeDefaultProduction(company, mfgCapacity);
-        return true;
+        return executeDefaultProduction(company, mfgCapacity);
     }
 
     // 材料あり（+仕掛品もあれば同時処理）→ 通常生産
     if (company.materials > 0) {
         const action = company.wip > 0 ? '完成＋投入同時' : '投入のみ';
         console.log(`[最適生産] ${company.name}: ${action}`);
-        executeDefaultProduction(company, mfgCapacity);
-        return true;
+        return executeDefaultProduction(company, mfgCapacity);
     }
 
     // 材料も仕掛品もない
@@ -5857,12 +6030,41 @@ function executeProductionWithPipelineCheck(company, mfgCapacity) {
 // ============================================
 // 共通関数：生産実行
 // ============================================
+/**
+ * 生産実行（完成・投入）
+ * @returns {boolean} true=成功（行を消費）, false=失敗（行未消費、呼び出し元が代替行動必要）
+ */
 function executeDefaultProduction(company, maxQty) {
-    const produceQty = Math.min(maxQty, company.materials);
-    const wipToProduct = Math.min(maxQty, company.wip);
-    const cost = produceQty + wipToProduct;
+    const produceQty = Math.min(maxQty, company.materials);    // 投入: 材料→仕掛品
+    const wipToProduct = Math.min(maxQty, company.wip);        // 完成: 仕掛品→製品
+    const totalProduction = produceQty + wipToProduct;
+    const cost = totalProduction;
 
-    if (company.cash >= cost && (produceQty > 0 || wipToProduct > 0)) {
+    // 「完成だけ」「投入だけ」は基本的に行わない
+    // 合計2個以上、または期末（残り3行以内）で1個以上の場合のみ実行
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+    const isPeriodEnd = rowsRemaining <= 3;
+
+    // 判定: 合計2個以上 OR 期末で1個以上
+    const shouldProduce = totalProduction >= 2 || (isPeriodEnd && totalProduction >= 1);
+
+    // 完成だけ・投入だけの判定（警告ログ用）
+    const isCompletionOnly = wipToProduct > 0 && produceQty === 0;
+    const isInputOnly = produceQty > 0 && wipToProduct === 0;
+
+    if (!shouldProduce) {
+        console.log(`[製造スキップ] ${company.name}: 投入${produceQty}+完成${wipToProduct}=${totalProduction}個 < 2個（期末=${isPeriodEnd}）`);
+        // 製造しない → false返却（呼び出し元が別の行動を判断）
+        return false;
+    }
+
+    // 完成だけ・投入だけの場合は警告ログ（期末以外）
+    if (!isPeriodEnd && (isCompletionOnly || isInputOnly)) {
+        const actionType = isCompletionOnly ? '完成のみ' : '投入のみ';
+        console.log(`[製造注意] ${company.name}: ${actionType}（合計${totalProduction}個で実行）`);
+    }
+
+    if (company.cash >= cost && totalProduction > 0) {
         company.cash -= cost;
         company.materials -= produceQty;
         company.wip += produceQty - wipToProduct;
@@ -5877,11 +6079,12 @@ function executeDefaultProduction(company, maxQty) {
         showAIActionModal(company, '完成・投入', '🏭', detail, [
             { label: '加工費', value: `¥${cost}` }
         ]);
-        return;
+        return true;  // 成功
     }
 
-    const mfgCapacity = getManufacturingCapacity(company);
-    executeDefaultMaterialPurchase(company, mfgCapacity);
+    // 資金不足の場合
+    console.log(`[製造失敗] ${company.name}: 資金不足（必要¥${cost}、所持¥${company.cash}）`);
+    return false;  // 失敗
 }
 
 // ============================================
