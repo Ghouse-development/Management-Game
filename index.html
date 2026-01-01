@@ -1001,13 +1001,11 @@ function applyRiskCard(cardId) {
                 alert(`倉庫火災！\n材料${lostMaterials}個をストッカーへ（特別損失¥${materialValue}）`);
             }
             break;
-        case 33: // 縁故採用
+        case 33: // 縁故採用（5円支払い、1行使用、セールスまたはワーカー1人採用）
         case 34:
-            company.cash = Math.max(0, company.cash - 5);
-            company.extraLaborCost = (company.extraLaborCost || 0) + 5;  // 人件費
+            // 5円の支払いとF計上はexecuteHiringで行う
             showHiringChoiceModal();
-            rowUsed = false;
-            break;
+            return;  // モーダルで選択後にexecuteHiringがendTurnを呼ぶ
         case 35: // 研究開発成功
         case 36:
         case 37:

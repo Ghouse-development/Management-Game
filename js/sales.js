@@ -323,16 +323,65 @@ function updateMaterialPurchaseTotal() {
 // 購入モード
 // ============================================
 
-// 購入モードを開始
+// 購入モードを開始（方式選択モーダルを表示）
 function enterBuyMode() {
+    showBuyTypeModal();
+}
+
+// 購入方式選択モーダル
+function showBuyTypeModal() {
+    const company = gameState.companies[0];
+    const maxMaterialCapacity = getMaterialCapacity(company);
+    const spaceAvailable = maxMaterialCapacity - company.materials;
+    const availableMarkets = gameState.markets.filter(m => !m.closed && m.currentStock > 0);
+    const canTwoMarkets = availableMarkets.length >= 2 && spaceAvailable >= 2 && company.cash >= 20;
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1) + 1;
+
+    const content = `
+        <div style="padding: 10px;">
+            <div style="background: #dcfce7; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #166534;">現金: ¥${company.cash} / 材料置場: ${company.materials}/${maxMaterialCapacity}個</div>
+            </div>
+
+            <div style="display: grid; gap: 12px;">
+                <button onclick="startSingleMarketBuy()" class="submit-btn" style="padding: 15px; font-size: 16px; background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);">
+                    <div style="font-weight: bold;">📦 1市場から購入</div>
+                    <div style="font-size: 12px; opacity: 0.8;">1行使用</div>
+                </button>
+
+                ${canTwoMarkets && rowsRemaining >= 2 ? `
+                <button onclick="startTwoMarketBuy()" class="submit-btn" style="padding: 15px; font-size: 16px; background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);">
+                    <div style="font-weight: bold;">📦📦 2市場から購入</div>
+                    <div style="font-size: 12px; opacity: 0.8;">2行使用（各市場から別々に購入）</div>
+                </button>
+                ` : `
+                <div style="background: #f3f4f6; border-radius: 8px; padding: 12px; text-align: center; color: #6b7280; font-size: 13px;">
+                    ${rowsRemaining < 2 ? '2市場購入には2行必要です' :
+                      spaceAvailable < 2 ? '材料置場の空きが不足' :
+                      company.cash < 20 ? '現金が不足しています' :
+                      '在庫のある市場が2つ以上必要です'}
+                </div>
+                `}
+            </div>
+
+            <button onclick="closeModal(); showTurnStartOptions();" class="submit-btn" style="margin-top: 15px; background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);">
+                ← 戻る
+            </button>
+        </div>
+    `;
+
+    showModal('📦 購入方式を選択', content);
+}
+
+// 1市場購入モード開始
+function startSingleMarketBuy() {
+    const company = gameState.companies[0];
     gameState.buyMode = true;
     gameState.salesMode = false;
+    gameState.twoMarketBuyMode = false;
     closeModal();
     renderMarketsBoard();
 
-    const company = gameState.companies[0];
-
-    // インストラクションを表示
     const instruction = document.createElement('div');
     instruction.className = 'market-instruction buy-mode';
     instruction.id = 'marketInstruction';
@@ -343,11 +392,204 @@ function enterBuyMode() {
     document.body.appendChild(instruction);
 }
 
+// 2市場購入モード開始
+function startTwoMarketBuy() {
+    const company = gameState.companies[0];
+    gameState.buyMode = true;
+    gameState.salesMode = false;
+    gameState.twoMarketBuyMode = true;
+    gameState.selectedMarkets = [];
+    closeModal();
+    renderMarketsBoard();
+
+    const instruction = document.createElement('div');
+    instruction.className = 'market-instruction buy-mode';
+    instruction.id = 'marketInstruction';
+    instruction.innerHTML = `
+        <span>📦📦 2つの市場を選択 (0/2)（現金: ¥${company.cash}）</span>
+        <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
+    `;
+    document.body.appendChild(instruction);
+}
+
+// 2市場購入の選択インストラクション更新
+function updateTwoMarketBuyInstruction() {
+    const instruction = document.getElementById('marketInstruction');
+    if (instruction) {
+        const selected = gameState.selectedMarkets || [];
+        const marketNames = selected.map(i => gameState.markets[i].name).join('、');
+        const company = gameState.companies[0];
+        instruction.innerHTML = `
+            <span>📦📦 2つの市場を選択 (${selected.length}/2) ${marketNames ? '- ' + marketNames : ''}（現金: ¥${company.cash}）</span>
+            <button class="cancel-mode-btn" onclick="cancelMarketMode()">キャンセル</button>
+        `;
+    }
+}
+
+// 2市場購入モーダル表示
+function showTwoMarketBuyModal() {
+    const company = gameState.companies[0];
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+    const maxMaterialCapacity = getMaterialCapacity(company);
+    const spaceAvailable = maxMaterialCapacity - company.materials;
+
+    // 各市場からの最大購入数
+    const maxFromMarket1 = Math.min(market1.currentStock, Math.floor(company.cash / market1.buyPrice), spaceAvailable);
+    const maxFromMarket2 = Math.min(market2.currentStock, Math.floor(company.cash / market2.buyPrice), spaceAvailable);
+
+    // 初期値をグローバルに保存
+    window.twoMarketBuyData = {
+        qty1: 0, qty2: 0,
+        max1: maxFromMarket1, max2: maxFromMarket2,
+        price1: market1.buyPrice, price2: market2.buyPrice,
+        spaceAvailable: spaceAvailable
+    };
+
+    const content = `
+        <div style="padding: 8px;">
+            <div style="background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white; text-align: center;">
+                <div style="font-weight: bold; font-size: 15px;">2市場から購入</div>
+                <div style="font-size: 11px;">各市場から別々に購入（2行使用）</div>
+            </div>
+
+            <div style="background: #f1f5f9; border-radius: 6px; padding: 8px; margin-bottom: 8px; text-align: center;">
+                <span style="font-weight: bold; color: #1e293b;">💰 ¥${company.cash} / 📦 空き${spaceAvailable}個</span>
+            </div>
+
+            <!-- 1つ目の市場 -->
+            <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 10px; padding: 10px; margin-bottom: 8px;">
+                <div style="font-weight: bold; margin-bottom: 6px; font-size: 13px;">🟢 ${market1.name}（¥${market1.buyPrice}/個・在庫${market1.currentStock}個）</div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button onclick="adjustTwoMarketBuyQty(1, -1)" style="width: 36px; height: 36px; border-radius: 8px; border: none; background: #22c55e; color: white; font-size: 18px; cursor: pointer;">−</button>
+                    <div id="twoMarketBuyQty1" style="min-width: 50px; padding: 8px; background: white; border-radius: 8px; text-align: center; font-weight: bold; font-size: 18px;">0</div>
+                    <button onclick="adjustTwoMarketBuyQty(1, 1)" style="width: 36px; height: 36px; border-radius: 8px; border: none; background: #22c55e; color: white; font-size: 18px; cursor: pointer;">+</button>
+                    <span id="twoMarketBuyCost1" style="font-weight: bold; color: #166534;">¥0</span>
+                </div>
+            </div>
+
+            <!-- 2つ目の市場 -->
+            <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 10px; padding: 10px; margin-bottom: 8px;">
+                <div style="font-weight: bold; margin-bottom: 6px; font-size: 13px;">🔵 ${market2.name}（¥${market2.buyPrice}/個・在庫${market2.currentStock}個）</div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <button onclick="adjustTwoMarketBuyQty(2, -1)" style="width: 36px; height: 36px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-size: 18px; cursor: pointer;">−</button>
+                    <div id="twoMarketBuyQty2" style="min-width: 50px; padding: 8px; background: white; border-radius: 8px; text-align: center; font-weight: bold; font-size: 18px;">0</div>
+                    <button onclick="adjustTwoMarketBuyQty(2, 1)" style="width: 36px; height: 36px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-size: 18px; cursor: pointer;">+</button>
+                    <span id="twoMarketBuyCost2" style="font-weight: bold; color: #1d4ed8;">¥0</span>
+                </div>
+            </div>
+
+            <!-- 合計 -->
+            <div style="background: #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center;">
+                <div style="font-size: 13px; color: #92400e;">合計</div>
+                <div style="font-size: 20px; font-weight: bold; color: #78350f;">
+                    <span id="twoMarketBuyTotalQty">0</span>個 / <span id="twoMarketBuyTotalCost">¥0</span>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button onclick="cancelMarketMode()" class="submit-btn" style="background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);">
+                    キャンセル
+                </button>
+                <button id="twoMarketBuyExecuteBtn" onclick="executeTwoMarketBuy()" class="submit-btn" style="background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);" disabled>
+                    📦 購入実行
+                </button>
+            </div>
+        </div>
+    `;
+
+    showModal('2市場購入', content);
+}
+
+// 2市場購入の数量調整
+function adjustTwoMarketBuyQty(marketNum, delta) {
+    const data = window.twoMarketBuyData;
+    const company = gameState.companies[0];
+
+    if (marketNum === 1) {
+        const newQty = Math.max(0, Math.min(data.max1, data.qty1 + delta));
+        // 現金と空き容量のチェック
+        const totalCost = newQty * data.price1 + data.qty2 * data.price2;
+        const totalQty = newQty + data.qty2;
+        if (totalCost <= company.cash && totalQty <= data.spaceAvailable) {
+            data.qty1 = newQty;
+        }
+    } else {
+        const newQty = Math.max(0, Math.min(data.max2, data.qty2 + delta));
+        const totalCost = data.qty1 * data.price1 + newQty * data.price2;
+        const totalQty = data.qty1 + newQty;
+        if (totalCost <= company.cash && totalQty <= data.spaceAvailable) {
+            data.qty2 = newQty;
+        }
+    }
+
+    // 表示更新
+    document.getElementById('twoMarketBuyQty1').textContent = data.qty1;
+    document.getElementById('twoMarketBuyQty2').textContent = data.qty2;
+    document.getElementById('twoMarketBuyCost1').textContent = `¥${data.qty1 * data.price1}`;
+    document.getElementById('twoMarketBuyCost2').textContent = `¥${data.qty2 * data.price2}`;
+    document.getElementById('twoMarketBuyTotalQty').textContent = data.qty1 + data.qty2;
+    document.getElementById('twoMarketBuyTotalCost').textContent = `¥${data.qty1 * data.price1 + data.qty2 * data.price2}`;
+
+    // 両市場から購入する場合のみ実行ボタンを有効化
+    const executeBtn = document.getElementById('twoMarketBuyExecuteBtn');
+    executeBtn.disabled = !(data.qty1 > 0 && data.qty2 > 0);
+}
+
+// 2市場購入実行
+function executeTwoMarketBuy() {
+    const company = gameState.companies[0];
+    const data = window.twoMarketBuyData;
+    const market1 = gameState.markets[gameState.selectedMarkets[0]];
+    const market2 = gameState.markets[gameState.selectedMarkets[1]];
+
+    const totalCost = data.qty1 * data.price1 + data.qty2 * data.price2;
+    const totalQty = data.qty1 + data.qty2;
+
+    // 最終チェック
+    if (company.cash < totalCost) {
+        showToast('現金が不足しています', 'error', 3000);
+        return;
+    }
+
+    const maxMaterialCapacity = getMaterialCapacity(company);
+    if (company.materials + totalQty > maxMaterialCapacity) {
+        showToast('材料置場の容量を超えます', 'error', 3000);
+        return;
+    }
+
+    // 購入実行
+    company.cash -= totalCost;
+    company.materials += totalQty;
+    company.totalMaterialCost += totalCost;
+
+    // 市場在庫を減らす
+    market1.currentStock -= data.qty1;
+    market2.currentStock -= data.qty2;
+
+    // ログ記録
+    const details = `${market1.name}¥${market1.buyPrice}×${data.qty1}, ${market2.name}¥${market2.buyPrice}×${data.qty2}`;
+    logAction(0, '材料購入（2市場）', details, -totalCost, true);
+
+    // 2行使用（1行はendTurnで加算されるので、ここでは1行だけ追加）
+    company.currentRow = (company.currentRow || 1) + 1;
+    gameState.currentRow += 1;
+
+    showToast(`2市場から合計${totalQty}個購入（¥${totalCost}）`, 'success', 3000);
+
+    closeModal();
+    gameState.twoMarketBuyMode = false;
+    gameState.selectedMarkets = [];
+    updateDisplay();
+    endTurn();
+}
+
 // 市場選択モードをキャンセル
 function cancelMarketMode() {
     gameState.salesMode = false;
     gameState.buyMode = false;
     gameState.twoMarketMode = false;
+    gameState.twoMarketBuyMode = false;
     gameState.selectedMarkets = [];
     gameState.pendingSeparateBids = null;
     const instruction = document.getElementById('marketInstruction');
@@ -433,6 +675,37 @@ function onMarketTileClick(marketIndex, action) {
         renderMarketsBoard();
         showSaleConfirmModal(marketIndex);
     } else if (action === 'buy') {
+        // 2市場購入モードの場合
+        if (gameState.twoMarketBuyMode) {
+            if (!gameState.selectedMarkets) gameState.selectedMarkets = [];
+
+            // 既に選択済みなら除外
+            const existingIndex = gameState.selectedMarkets.indexOf(marketIndex);
+            if (existingIndex >= 0) {
+                gameState.selectedMarkets.splice(existingIndex, 1);
+                updateTwoMarketBuyInstruction();
+                renderMarketsBoard();
+                return;
+            }
+
+            // 選択追加
+            gameState.selectedMarkets.push(marketIndex);
+
+            if (gameState.selectedMarkets.length === 2) {
+                // 2市場選択完了
+                const instruction = document.getElementById('marketInstruction');
+                if (instruction) instruction.remove();
+                gameState.buyMode = false;
+                renderMarketsBoard();
+                showTwoMarketBuyModal();
+            } else {
+                updateTwoMarketBuyInstruction();
+                renderMarketsBoard();
+            }
+            return;
+        }
+
+        // 通常の1市場購入
         const instruction = document.getElementById('marketInstruction');
         if (instruction) instruction.remove();
         gameState.buyMode = false;
