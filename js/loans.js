@@ -285,6 +285,9 @@ function startPeriodWithBorrowing() {
     // 行動ログをリセット
     resetActionLog();
 
+    // 景気変動による逆回りをリセット（新期開始時は正順に戻る）
+    gameState.turnReversed = false;
+
     // 120点評価システム用のカウンターをリセット
     gameState.companies.forEach(company => {
         company.periodSalesCount = 0;  // 販売回数リセット
@@ -355,6 +358,9 @@ function startPeriodWithBorrowing() {
 function startPeriodWithoutBorrowing() {
     // 行動ログをリセット
     resetActionLog();
+
+    // 景気変動による逆回りをリセット（新期開始時は正順に戻る）
+    gameState.turnReversed = false;
 
     // 120点評価システム用のカウンターをリセット
     gameState.companies.forEach(company => {
