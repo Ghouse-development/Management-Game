@@ -319,20 +319,41 @@ function optimizeCycleAction(company, plan) {
         };
     }
 
-    // パターン3: 材料のみ or 仕掛品のみ → 生産
-    if ((hasWIP || hasMaterials) && currentState.mfgCapacity > 0) {
-        // 生産後に材料0になる場合、次ターンで仕入れが必要
-        const willNeedBuyNext = hasMaterials && company.materials <= currentState.mfgCapacity;
+    // パターン3: 仕掛品のみ（材料なし）→ 先に材料購入！
+    // 重要: 仕掛品だけで生産すると、完成後に材料0・仕掛品0になり
+    //       次回は2行かかる（材料購入→投入のみ→完成のみ）
+    //       先に材料を買えば、次の生産で完成＋投入が同時にできる
+    if (hasWIP && !hasMaterials && currentState.mfgCapacity > 0) {
+        const periodEndCost = calculatePeriodPayment(company);
+        const safetyMargin = periodEndCost + 30;
+        if (company.cash > safetyMargin + 15) {
+            return {
+                phase: 'BUY',
+                priority: 'CRITICAL',
+                reason: 'パイプライン維持：仕掛品完成前に材料購入',
+                qty: currentState.mfgCapacity
+            };
+        }
+        // 現金不足の場合は仕方なく生産（パイプライン切れるが致し方なし）
         return {
             phase: 'PRODUCE',
             priority: 'HIGH',
-            reason: hasWIP ? 'サイクル：仕掛品完成' : 'サイクル：材料投入',
-            qty: currentState.mfgCapacity,
-            nextAction: willNeedBuyNext ? 'BUY' : null
+            reason: '現金不足：仕掛品完成（パイプライン注意）',
+            qty: currentState.mfgCapacity
         };
     }
 
-    // パターン4: 在庫なし → 材料仕入れ
+    // パターン4: 材料のみ（仕掛品なし）→ 生産（投入のみ）
+    if (hasMaterials && !hasWIP && currentState.mfgCapacity > 0) {
+        return {
+            phase: 'PRODUCE',
+            priority: 'HIGH',
+            reason: 'サイクル：材料投入',
+            qty: currentState.mfgCapacity
+        };
+    }
+
+    // パターン5: 在庫なし → 材料仕入れ
     if (!hasInventory) {
         // 投資判断（行数に余裕がある場合のみ）
         if (recommendation.action.startsWith('INVEST') && currentState.rowsRemaining > 6) {
@@ -1340,10 +1361,28 @@ function aiDoNothing(company, originalReason = '') {
     }
 
     // === 優先順位2: 仕掛品・材料があれば生産（製品を作る） ===
-    if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0 && company.workers > 0) {
+    // パイプライン維持チェック: 仕掛品のみ（材料なし）の場合は先に材料購入
+    if (company.wip > 0 && company.materials === 0 && mfgCapacity > 0) {
+        // 仕掛品のみで生産すると、次回パイプラインが切れる
+        // → 先に材料を買って、次の生産で完成＋投入を同時実行
+        const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed);
+        if (availableMarkets.length > 0 && company.cash >= 15) {
+            console.log(`[AI強制行動] ${company.name}: 仕掛${company.wip}のみ → パイプライン維持で材料先購入`);
+            executeDefaultMaterialPurchase(company, mfgCapacity);
+            return;
+        }
+        // 材料購入できない場合のみ仕掛品完成
+        console.log(`[AI強制行動] ${company.name}: 材料購入不可 → 仕掛品${company.wip}を完成`);
+        executeDefaultProduction(company, mfgCapacity);
+        return;
+    }
+
+    // 材料あり（+仕掛品あれば同時処理）→ 生産
+    if (company.materials > 0 && mfgCapacity > 0 && company.workers > 0) {
         const canProduce = Math.min(mfgCapacity, company.materials + company.wip);
         if (canProduce > 0) {
-            console.log(`[AI強制行動] ${company.name}: 材料${company.materials}/仕掛${company.wip} → 生産実行`);
+            const produceType = company.wip > 0 ? '完成＋投入' : '投入のみ';
+            console.log(`[AI強制行動] ${company.name}: 材料${company.materials}/仕掛${company.wip} → ${produceType}`);
             executeDefaultProduction(company, mfgCapacity);
             return;
         }
@@ -2700,8 +2739,21 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
             }
         } else {
             // 2-4期：在庫を次期に繋げる（売らない！生産して製品を増やす）
-            if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
-                console.log(`[期末継続] ${company.name}: 次期に繋げるため生産（在庫${totalInventory}個維持）`);
+            // ただしパイプライン維持を考慮：
+            // - 仕掛品のみ → 完成させず次期に持越し（次期で材料購入+完成投入同時）
+            // - 材料あり → 投入実行（次期で仕掛品から開始可能）
+            if (company.wip > 0 && company.materials === 0) {
+                // 仕掛品のみ: 完成させると次期で2行かかる
+                // → 仕掛品のまま持ち越し、次期初手で材料購入してから生産
+                console.log(`[期末継続] ${company.name}: 仕掛品${company.wip}個を次期に持越し（パイプライン維持）`);
+                // 何もしないで次の行へ進む（強制行動があれば別の行動を選択）
+                aiDoNothing(company, '期末パイプライン維持');
+                return;
+            }
+            if (company.materials > 0 && mfgCapacity > 0) {
+                // 材料あり → 投入実行
+                const action = company.wip > 0 ? '完成＋投入' : '投入のみ';
+                console.log(`[期末継続] ${company.name}: ${action}で次期に繋げる（在庫${totalInventory}個）`);
                 executeDefaultProduction(company, mfgCapacity);
                 return;
             }
@@ -4521,6 +4573,51 @@ function executeDefaultMaterialPurchase(company, targetQty) {
     }
 
     aiDoNothing(company, '材料・資金不足');
+}
+
+// ============================================
+// 共通関数：パイプライン維持型生産判断
+// ============================================
+/**
+ * パイプラインを維持しながら生産を実行
+ *
+ * 重要なルール:
+ * - 仕掛品のみ（材料なし）で生産すると、完成後に材料0・仕掛品0になる
+ * - これは次回2行必要（材料購入→投入のみ→完成のみ）で非効率
+ * - 先に材料を買えば、次の生産で完成＋投入が同時にできる
+ *
+ * @returns {boolean} true = 生産実行済み, false = 生産しなかった
+ */
+function executeProductionWithPipelineCheck(company, mfgCapacity) {
+    // 仕掛品のみ（材料なし）の場合
+    if (company.wip > 0 && company.materials === 0) {
+        const periodEndCost = calculatePeriodPayment(company);
+        const safetyMargin = periodEndCost + 30;
+
+        // 材料を先に購入してパイプライン維持
+        const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed);
+        if (availableMarkets.length > 0 && company.cash > safetyMargin + 15) {
+            console.log(`[パイプライン維持] ${company.name}: 仕掛品${company.wip}のみ → 先に材料購入`);
+            executeDefaultMaterialPurchase(company, mfgCapacity);
+            return true;
+        }
+
+        // 材料購入できない場合は仕方なく生産（パイプライン切れる）
+        console.log(`[パイプライン注意] ${company.name}: 材料購入不可 → 仕掛品完成のみ`);
+        executeDefaultProduction(company, mfgCapacity);
+        return true;
+    }
+
+    // 材料あり（+仕掛品もあれば同時処理）→ 通常生産
+    if (company.materials > 0) {
+        const action = company.wip > 0 ? '完成＋投入同時' : '投入のみ';
+        console.log(`[最適生産] ${company.name}: ${action}`);
+        executeDefaultProduction(company, mfgCapacity);
+        return true;
+    }
+
+    // 材料も仕掛品もない
+    return false;
 }
 
 // ============================================
