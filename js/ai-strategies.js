@@ -251,46 +251,57 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
 
 /**
  * 各戦略タイプの最適パラメータ
+ *
+ * チップ効果:
+ * - 教育: 製造+1、販売+1（1枚のみ有効、2枚買うと1枚繰越）
+ * - 研究: 価格競争力+2/枚（累積可、最重要）
+ * - 広告: 販売+2/枚（セールスマン数まで有効）
  */
 const STRATEGY_PARAMS = {
     aggressive: {
-        targetResearchChips: 4,
-        targetEducationChips: 1,
-        targetAdvertisingChips: 1,
+        // 攻撃型: 研究チップで入札を制する
+        targetResearchChips: 4,      // 価格競争力+8（コール価格-8円）
+        targetEducationChips: 1,     // 効果は1枚分のみ（+1製造、+1販売）
+        targetAdvertisingChips: 1,   // 販売+2
         aggressiveness: 0.9,
         safetyMultiplier: 0.8
     },
     conservative: {
-        targetResearchChips: 2,
-        targetEducationChips: 2,
+        // 堅実型: 安全重視、研究は最低限
+        targetResearchChips: 2,      // 価格競争力+4
+        targetEducationChips: 1,     // 効果は1枚分のみ
         targetAdvertisingChips: 0,
         aggressiveness: 0.3,
         safetyMultiplier: 1.5
     },
     balanced: {
-        targetResearchChips: 2,
-        targetEducationChips: 2,
+        // バランス型: 均等に投資
+        targetResearchChips: 3,      // 価格競争力+6
+        targetEducationChips: 1,     // 効果は1枚分のみ
         targetAdvertisingChips: 1,
         aggressiveness: 0.5,
         safetyMultiplier: 1.0
     },
     price_focused: {
-        targetResearchChips: 1,
-        targetEducationChips: 1,
-        targetAdvertisingChips: 2,
+        // 販売重視型: 広告で販売量を稼ぐ
+        targetResearchChips: 2,      // 価格競争力+4
+        targetEducationChips: 1,     // 効果は1枚分のみ
+        targetAdvertisingChips: 2,   // 販売+4（セールスマン2人必要）
         aggressiveness: 0.6,
         safetyMultiplier: 0.9
     },
     tech_focused: {
-        targetResearchChips: 5,
-        targetEducationChips: 2,
+        // 技術特化型: 研究チップ全振り
+        targetResearchChips: 5,      // 価格競争力+10（コール価格-10円）
+        targetEducationChips: 1,     // 効果は1枚分のみ
         targetAdvertisingChips: 0,
         aggressiveness: 0.7,
         safetyMultiplier: 0.9
     },
     unpredictable: {
+        // 予測不能型: ランダム
         targetResearchChips: Math.floor(Math.random() * 4) + 1,
-        targetEducationChips: Math.floor(Math.random() * 3) + 1,
+        targetEducationChips: 1,     // 常に1枚（効果は1枚分のみ）
         targetAdvertisingChips: Math.floor(Math.random() * 2),
         aggressiveness: Math.random(),
         safetyMultiplier: 0.8 + Math.random() * 0.4
