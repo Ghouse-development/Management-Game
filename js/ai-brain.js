@@ -2815,34 +2815,178 @@ const AIBrain = {
     },
 
     // ========================================
-    // === 究極AI: リスクカード確率モデル ===
+    // === 究極AI: リスクカード確率モデル（全64枚対応） ===
     // ========================================
 
     /**
-     * リスクカードの確率分布を計算
+     * リスクカードの確率分布（全64枚）
+     * 戦略的に重要なカードには strategicNote を追加
      */
     RISK_CARD_PROBABILITIES: {
-        // 各カードの出現確率（48枚中の枚数）
-        'クレーム発生': { count: 2, probability: 2/48, impact: -5, type: 'cost' },
-        '教育成功': { count: 2, probability: 2/48, impact: 32, type: 'benefit', requires: 'education' },
-        '消費者運動発生': { count: 2, probability: 2/48, impact: -20, type: 'cost' },
-        '得意先倒産': { count: 2, probability: 2/48, impact: -30, type: 'cost' },
-        '研究開発失敗': { count: 3, probability: 3/48, impact: -20, type: 'cost', affectsChip: 'research' },
-        '広告成功': { count: 3, probability: 3/48, impact: 64, type: 'benefit', requires: 'advertising' },
-        '労災発生': { count: 2, probability: 2/48, impact: -15, type: 'cost' },
-        '広告政策失敗': { count: 2, probability: 2/48, impact: -20, type: 'cost', affectsChip: 'advertising' },
-        '特別サービス': { count: 2, probability: 2/48, impact: 15, type: 'benefit' },
-        '返品発生': { count: 3, probability: 3/48, impact: -20, type: 'cost' },
-        'コンピュータートラブル': { count: 2, probability: 2/48, impact: -10, type: 'cost' },
-        '商品の独占販売': { count: 3, probability: 3/48, impact: 64, type: 'benefit' },
-        '製造ミス発生': { count: 2, probability: 2/48, impact: -14, type: 'cost' },
-        '倉庫火災': { count: 2, probability: 2/48, impact: -40, type: 'cost', mitigatedBy: 'insurance' },
-        '縁故採用': { count: 2, probability: 2/48, impact: -5, type: 'cost' },
-        '研究開発成功': { count: 6, probability: 6/48, impact: 64, type: 'benefit', requires: 'research' },
-        '各社共通': { count: 2, probability: 2/48, impact: 6, type: 'special' },
-        'ストライキ発生': { count: 2, probability: 2/48, impact: -25, type: 'cost' },
-        '盗難発見': { count: 2, probability: 2/48, impact: -30, type: 'cost', mitigatedBy: 'insurance' },
-        '長期労務紛争': { count: 2, probability: 2/48, impact: -50, type: 'cost' }
+        // 各カードの出現確率（64枚中の枚数）
+        'クレーム発生': { count: 2, probability: 2/64, impact: -5, type: 'cost', fCost: true },
+        '教育成功': { count: 2, probability: 2/64, impact: 0, type: 'benefit', requires: 'education',
+            strategicNote: '教育チップ保有時: 販売能力の範囲内で最高5個を32円で販売可能' },
+        '消費者運動発生': { count: 2, probability: 2/64, impact: 0, type: 'cost',
+            strategicNote: '販売不可になる。製品を持ちすぎない方が安全' },
+        '得意先倒産': { count: 2, probability: 2/64, impact: -30, type: 'cost', period2Exempt: true },
+        '研究開発失敗': { count: 3, probability: 3/64, impact: 0, type: 'cost', affectsChip: 'research',
+            strategicNote: '研究チップ1枚返却。研究チップを多く持つリスク' },
+        '広告成功': { count: 3, probability: 3/64, impact: 0, type: 'benefit', requires: 'advertising',
+            strategicNote: '広告チップ1枚につき2個まで独占販売（最高5個、32円）' },
+        '労災発生': { count: 2, probability: 2/64, impact: 0, type: 'cost',
+            strategicNote: '生産不可。材料・仕掛品が滞留するリスク' },
+        '広告政策失敗': { count: 2, probability: 2/64, impact: 0, type: 'cost', affectsChip: 'advertising',
+            strategicNote: '広告チップ1枚返却' },
+        '特別サービス': { count: 2, probability: 2/64, impact: 15, type: 'benefit',
+            strategicNote: '材料10円×5個 or 広告チップ20円×2個購入可' },
+        '返品発生': { count: 3, probability: 3/64, impact: -20, type: 'cost', period2Exempt: true,
+            strategicNote: '市場から製品1個戻り、売上-20円' },
+        'コンピュータートラブル': { count: 2, probability: 2/64, impact: -10, type: 'cost', fCost: true },
+        '商品の独占販売': { count: 3, probability: 3/64, impact: 0, type: 'benefit',
+            strategicNote: 'セールスマン1人につき2個まで32円で販売可（最高5個）' },
+        '製造ミス発生': { count: 2, probability: 2/64, impact: -14, type: 'cost',
+            strategicNote: '仕掛品1個没収（14円の損失）' },
+        '倉庫火災': { count: 2, probability: 2/64, impact: 0, type: 'cost', mitigatedBy: 'insurance',
+            strategicNote: '材料全没収！保険あれば1個8円の保険金。材料を溜め込まない方が安全' },
+        '縁故採用': { count: 2, probability: 2/64, impact: -5, type: 'cost', fCost: true },
+        '研究開発成功': { count: 6, probability: 6/64, impact: 0, type: 'benefit', requires: 'research',
+            strategicNote: '研究チップ1枚につき2個まで32円で販売（最高5個）。最も出やすいベネフィット！' },
+        '各社共通': { count: 2, probability: 2/64, impact: 6, type: 'special',
+            strategicNote: '全員が3個まで12円で材料購入可' },
+        'ストライキ発生': { count: 2, probability: 2/64, impact: -25, type: 'cost',
+            strategicNote: '1回休み。行動機会の損失' },
+        '盗難発見': { count: 2, probability: 2/64, impact: 0, type: 'cost', mitigatedBy: 'insurance',
+            strategicNote: '製品2個没収！保険あれば1個10円の保険金。製品を溜め込まない方が安全' },
+        '長期労務紛争': { count: 2, probability: 2/64, impact: -50, type: 'cost',
+            strategicNote: '2回休み。最悪のカードの一つ' },
+        '設計トラブル発生': { count: 2, probability: 2/64, impact: -10, type: 'cost', fCost: true },
+        'ワーカー退職': { count: 2, probability: 2/64, impact: -5, type: 'cost',
+            strategicNote: '労務費+5円、ワーカー減少で製造能力低下' },
+        '景気変動': { count: 2, probability: 2/64, impact: 0, type: 'special',
+            strategicNote: 'ターン順が逆回りに。順番優位が変わる' },
+        '教育失敗': { count: 2, probability: 2/64, impact: 0, type: 'cost', affectsChip: 'education',
+            strategicNote: '教育チップ1枚返却。教育チップ複数持つリスク' },
+        'セールスマン退職': { count: 2, probability: 2/64, impact: -5, type: 'cost',
+            strategicNote: '本社人件費+5円、販売能力低下' },
+        '社長、病気で倒れる': { count: 2, probability: 2/64, impact: -25, type: 'cost',
+            strategicNote: '1回休み' },
+        '不良在庫発生': { count: 2, probability: 2/64, impact: 0, type: 'cost',
+            strategicNote: '★重要★ 在庫20個超過分は全没収！在庫は必ず20以下に維持すべき！' },
+        '機械故障': { count: 2, probability: 2/64, impact: -5, type: 'cost', fCost: true }
+    },
+
+    /**
+     * 戦略的リスク判定：在庫20個制限
+     */
+    checkInventoryRisk: function(company) {
+        const totalInventory = company.materials + company.wip + company.products;
+        const excessRisk = totalInventory > 20;
+        const nearLimit = totalInventory >= 18;
+
+        return {
+            totalInventory,
+            isOverLimit: totalInventory > 20,
+            excessAmount: Math.max(0, totalInventory - 20),
+            riskLevel: excessRisk ? 'critical' : nearLimit ? 'warning' : 'safe',
+            recommendation: excessRisk ?
+                `緊急！在庫${totalInventory}個 → 不良在庫発生で${totalInventory - 20}個没収リスク` :
+                nearLimit ?
+                    `注意: 在庫${totalInventory}個。20個上限に近い` :
+                    `安全: 在庫${totalInventory}個`
+        };
+    },
+
+    /**
+     * 戦略的リスク判定：保険チップの価値
+     */
+    calculateInsuranceValue: function(company) {
+        const materials = company.materials || 0;
+        const products = company.products || 0;
+
+        // 倉庫火災リスク: 材料全没収（保険なら8円/個回収）
+        const fireRisk = (2/64) * materials * 13; // 期待損失
+        const fireInsuranceValue = (2/64) * materials * 8; // 保険の期待価値
+
+        // 盗難リスク: 製品2個没収（保険なら10円/個回収）
+        const theftRisk = (2/64) * Math.min(products, 2) * 15; // 期待損失
+        const theftInsuranceValue = (2/64) * Math.min(products, 2) * 10; // 保険の期待価値
+
+        const totalRiskWithoutInsurance = fireRisk + theftRisk;
+        const totalRiskReduction = fireInsuranceValue + theftInsuranceValue;
+        const insuranceCost = 5; // 保険チップのコスト
+
+        return {
+            fireRisk,
+            theftRisk,
+            totalRiskWithoutInsurance,
+            insuranceValue: totalRiskReduction,
+            netBenefit: totalRiskReduction - insuranceCost,
+            shouldBuyInsurance: materials >= 5 || products >= 4,
+            reasoning: `材料${materials}個・製品${products}個 → 期待損失${totalRiskWithoutInsurance.toFixed(1)}円`
+        };
+    },
+
+    /**
+     * 戦略的リスク判定：チップ返却リスク
+     */
+    calculateChipReturnRisk: function(company) {
+        const research = company.chips.research || 0;
+        const education = company.chips.education || 0;
+        const advertising = company.chips.advertising || 0;
+
+        // 研究開発失敗: 3/64 で研究チップ1枚返却
+        const researchReturnProb = 3/64;
+        const researchReturnRisk = research > 0 ? researchReturnProb * 20 : 0; // チップ価値約20円
+
+        // 教育失敗: 2/64 で教育チップ1枚返却
+        const educationReturnProb = 2/64;
+        const educationReturnRisk = education > 0 ? educationReturnProb * 20 : 0;
+
+        // 広告政策失敗: 2/64 で広告チップ1枚返却
+        const advertisingReturnProb = 2/64;
+        const advertisingReturnRisk = advertising > 0 ? advertisingReturnProb * 20 : 0;
+
+        return {
+            research: {
+                count: research,
+                returnRisk: researchReturnRisk,
+                successBenefit: (6/64) * research * 2 * 32, // 研究成功の期待値
+                netExpected: (6/64) * research * 2 * 32 - researchReturnRisk
+            },
+            education: {
+                count: education,
+                returnRisk: educationReturnRisk,
+                successBenefit: (2/64) * Math.min(education, 1) * 3 * 32, // 教育成功の期待値（効果1枚まで）
+                netExpected: (2/64) * Math.min(education, 1) * 3 * 32 - educationReturnRisk
+            },
+            advertising: {
+                count: advertising,
+                returnRisk: advertisingReturnRisk,
+                successBenefit: (3/64) * advertising * 2 * 32, // 広告成功の期待値
+                netExpected: (3/64) * advertising * 2 * 32 - advertisingReturnRisk
+            },
+            recommendation: this.getChipRecommendation(research, education, advertising)
+        };
+    },
+
+    getChipRecommendation: function(research, education, advertising) {
+        const recommendations = [];
+
+        // 研究チップは最も有利（成功6枚 vs 失敗3枚 = 2:1）
+        if (research < 4) {
+            recommendations.push('研究チップ推奨（成功率2倍）');
+        }
+
+        // 教育チップは1枚で十分
+        if (education === 0) {
+            recommendations.push('教育チップ1枚推奨');
+        } else if (education >= 2) {
+            recommendations.push('教育チップ2枚以上は非効率（効果は1枚分のみ）');
+        }
+
+        // 広告チップはセールスマン数まで
+        return recommendations.join('、') || 'チップバランス良好';
     },
 
     /**

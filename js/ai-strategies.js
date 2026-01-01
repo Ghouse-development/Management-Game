@@ -63,6 +63,31 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
     const safetyMargin = Math.floor(periodEndCost * params.safetyMultiplier) + 20;
     const safeInvestment = Math.max(0, company.cash - safetyMargin);
 
+    // === 0. 在庫20個制限チェック（不良在庫発生リスク） ===
+    // リスクカード「不良在庫発生」: 在庫20個超で全超過分没収
+    if (totalInventory > 20 && company.products > 0) {
+        const excessAmount = totalInventory - 20;
+        const sellQty = Math.min(company.products, excessAmount, salesCapacity);
+        if (sellQty > 0) {
+            return {
+                action: 'EMERGENCY_SELL',
+                params: { priceMultiplier: 0.70, aggressive: true, qty: sellQty },
+                reason: `★在庫超過警告★ ${totalInventory}個 → ${excessAmount}個売却必須`
+            };
+        }
+    }
+    // 在庫18以上で警告（余裕を持って売却）
+    if (totalInventory >= 18 && company.products > 2 && salesCapacity > 0) {
+        const preventiveSellQty = Math.min(company.products - 2, totalInventory - 15, salesCapacity);
+        if (preventiveSellQty > 0) {
+            return {
+                action: 'SELL',
+                params: { qty: preventiveSellQty, priceMultiplier: 0.80 },
+                reason: `在庫警告: ${totalInventory}個 → 20個超過防止で${preventiveSellQty}個売却`
+            };
+        }
+    }
+
     // === 1. 緊急モード: 期末支払い不可能 ===
     if (company.cash < periodEndCost && company.products > 0) {
         return {
