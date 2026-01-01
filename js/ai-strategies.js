@@ -1023,6 +1023,58 @@ function getFirstMoveByStrategy(company, mfgCapacity, salesCapacity) {
 }
 
 // ============================================
+// AIBrain形式 → GMaxAction形式へのコンバーター
+// ============================================
+function convertUltimateToGMaxAction(ultimateDecision, company, mfgCapacity, salesCapacity) {
+    const actionType = ultimateDecision.action?.type || 'WAIT';
+    const quantity = ultimateDecision.action?.quantity;
+    const reason = ultimateDecision.reasoning?.longTermPlan ||
+                   ultimateDecision.reasoning?.dynamicMode ||
+                   `究極AI決定 (信頼度${(ultimateDecision.confidence * 100).toFixed(0)}%)`;
+
+    switch (actionType) {
+        case 'SELL':
+            return {
+                action: 'SELL',
+                params: {
+                    qty: quantity || Math.min(company.products, salesCapacity),
+                    priceMultiplier: 0.80
+                },
+                reason: reason
+            };
+        case 'PRODUCE':
+        case 'COMPLETE':
+            return {
+                action: 'PRODUCE',
+                params: { qty: quantity || mfgCapacity },
+                reason: reason
+            };
+        case 'BUY_MATERIALS':
+            return {
+                action: 'BUY_MATERIALS',
+                params: { qty: quantity || mfgCapacity },
+                reason: reason
+            };
+        case 'BUY_CHIP':
+            return {
+                action: 'BUY_CHIP',
+                params: {
+                    chipType: ultimateDecision.action?.chipType || 'research',
+                    cost: gameState.currentPeriod === 2 ? 20 : 40
+                },
+                reason: reason
+            };
+        case 'WAIT':
+        default:
+            return {
+                action: 'WAIT',
+                params: {},
+                reason: reason
+            };
+    }
+}
+
+// ============================================
 // AI性格別の戦略実行（超強化AI: 統合意思決定エンジン）
 // ============================================
 function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) {
@@ -1032,10 +1084,11 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     // === 究極AI: 全機能統合意思決定 ===
     // ゲーム理論 + モンテカルロ + 期待値 + 学習 + リスク + 長期最適化 + Q学習
     const ultimateDecision = AIBrain.makeUltimateDecision(company, companyIndex);
-    console.log(`[究極AI] ${company.name}: ${ultimateDecision.action.type} (信頼度${(ultimateDecision.confidence * 100).toFixed(0)}%)`);
-    console.log(`  スコア: Base=${ultimateDecision.components.base.toFixed(0)}, Risk=${ultimateDecision.components.riskAdjusted.toFixed(0)}, LT=${ultimateDecision.components.longTerm.toFixed(0)}, RL=${ultimateDecision.components.rl.toFixed(0)}`);
-    console.log(`  長期計画: ${ultimateDecision.reasoning.longTermPlan || 'なし'}`);
-    console.log(`  リスク調整: ${ultimateDecision.reasoning.riskAdjustment}, Q値: ${ultimateDecision.reasoning.rlQValue}`);
+    const actionType = ultimateDecision.action?.type || 'WAIT';
+    console.log(`[究極AI] ${company.name}: ${actionType} (信頼度${(ultimateDecision.confidence * 100).toFixed(0)}%)`);
+    console.log(`  スコア: Base=${ultimateDecision.components?.base?.toFixed(0) || 0}, Risk=${ultimateDecision.components?.riskAdjusted?.toFixed(0) || 0}, LT=${ultimateDecision.components?.longTerm?.toFixed(0) || 0}, RL=${ultimateDecision.components?.rl?.toFixed(0) || 0}`);
+    console.log(`  長期計画: ${ultimateDecision.reasoning?.longTermPlan || 'なし'}`);
+    console.log(`  リスク調整: ${ultimateDecision.reasoning?.riskAdjustment || 'N/A'}, Q値: ${ultimateDecision.reasoning?.rlQValue || 'N/A'}`);
 
     // 相手戦略推定をログ
     for (let i = 1; i < gameState.companies.length; i++) {
@@ -1074,7 +1127,17 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         }
     }
 
-    // === G最大化マスター戦略 ===
+    // === 究極AI意思決定を優先使用（信頼度70%以上） ===
+    if (ultimateDecision.confidence >= 0.70 && actionType !== 'WAIT') {
+        const convertedAction = convertUltimateToGMaxAction(ultimateDecision, company, mfgCapacity, salesCapacity);
+        console.log(`[究極AI採用] ${company.name}: ${convertedAction.action} - ${convertedAction.reason}`);
+        AIBrain.recordAction(companyIndex, convertedAction.action, 'pending');
+        if (executeGMaximizingAction(company, companyIndex, convertedAction)) {
+            return;
+        }
+    }
+
+    // === G最大化マスター戦略（フォールバック） ===
     const strategyParams = STRATEGY_PARAMS[company.strategy] || STRATEGY_PARAMS.balanced;
 
     // 学習による調整を取得

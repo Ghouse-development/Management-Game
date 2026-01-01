@@ -3931,20 +3931,26 @@ const AIBrain = {
      * エラー時のフォールバック意思決定
      */
     getFallbackDecision: function(company) {
-        // 最もシンプルで安全な行動を返す
+        // 最もシンプルで安全な行動を返す（フル能力で実行）
         let action = { type: 'WAIT' };
         let reason = 'フォールバック: ';
 
         if (company) {
-            if (company.products > 0) {
-                action = { type: 'SELL', quantity: 1 };
-                reason += '製品販売';
-            } else if (company.wip > 0) {
-                action = { type: 'COMPLETE', quantity: 1 };
-                reason += '完成';
-            } else if (company.materials > 0) {
-                action = { type: 'PRODUCE', quantity: 1 };
-                reason += '投入';
+            const salesCap = typeof getSalesCapacity === 'function' ? getSalesCapacity(company) : 2;
+            const mfgCap = typeof getManufacturingCapacity === 'function' ? getManufacturingCapacity(company) : 1;
+
+            if (company.products > 0 && salesCap > 0) {
+                const sellQty = Math.min(company.products, salesCap);
+                action = { type: 'SELL', quantity: sellQty };
+                reason += `製品${sellQty}個販売`;
+            } else if (company.wip > 0 && mfgCap > 0) {
+                const completeQty = Math.min(company.wip, mfgCap);
+                action = { type: 'COMPLETE', quantity: completeQty };
+                reason += `${completeQty}個完成`;
+            } else if (company.materials > 0 && mfgCap > 0) {
+                const produceQty = Math.min(company.materials, mfgCap);
+                action = { type: 'PRODUCE', quantity: produceQty };
+                reason += `${produceQty}個投入`;
             } else if (company.cash >= 20) {
                 action = { type: 'BUY_MATERIALS' };
                 reason += '材料購入';
