@@ -285,6 +285,13 @@ function startPeriodWithBorrowing() {
     // 行動ログをリセット
     resetActionLog();
 
+    // 120点評価システム用のカウンターをリセット
+    gameState.companies.forEach(company => {
+        company.periodSalesCount = 0;  // 販売回数リセット
+        company.periodMQ = 0;          // 期間MQリセット
+        company.scoreHistory = [];     // スコア履歴リセット
+    });
+
     // Auto-purchase chips for all companies first
     gameState.companies.forEach(company => {
         const computerCost = 20;
@@ -348,6 +355,13 @@ function startPeriodWithBorrowing() {
 function startPeriodWithoutBorrowing() {
     // 行動ログをリセット
     resetActionLog();
+
+    // 120点評価システム用のカウンターをリセット
+    gameState.companies.forEach(company => {
+        company.periodSalesCount = 0;  // 販売回数リセット
+        company.periodMQ = 0;          // 期間MQリセット
+        company.scoreHistory = [];     // スコア履歴リセット
+    });
 
     // Auto-purchase chips for all companies first
     gameState.companies.forEach(company => {

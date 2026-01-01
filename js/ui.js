@@ -654,6 +654,208 @@ function showAllCompaniesModal() {
     showModal('全社状況一覧', content);
 }
 
+// ============================================
+// 市場コンテナレンダー（メイン画面用）
+// ============================================
+function renderMarkets() {
+    const container = document.getElementById('marketsContainer');
+    let html = '';
+
+    gameState.markets.forEach(market => {
+        html += `
+            <div class="market-card">
+                <div class="market-header">
+                    <span class="market-name">${market.name}</span>
+                    <div class="market-prices">
+                        <span class="price-tag buy">買¥${market.buyPrice}</span>
+                        <span class="price-tag sell">売¥${market.sellPrice}</span>
+                    </div>
+                </div>
+                <div class="market-stock-info">
+                    <div class="market-stock">
+                        ${Array(Math.min(market.currentStock, 20)).fill('<div class="stock-block"></div>').join('')}
+                        ${market.currentStock > 20 ? '...' : ''}
+                    </div>
+                    <span class="stock-count">${market.currentStock}/${market.maxStock}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ============================================
+// 会社コンテナレンダー（メイン画面用）
+// ============================================
+function renderCompanies() {
+    const container = document.getElementById('companiesContainer');
+    let html = '';
+
+    gameState.companies.forEach((company, index) => {
+        const isCurrentTurn = index === gameState.currentPlayerIndex;
+        const isPlayer = company.type === 'player';
+        const mfgCapacity = getManufacturingCapacity(company);
+        const salesCapacity = getSalesCapacity(company);
+
+        // Machine display
+        let machineDisplay = '';
+        company.machines.forEach((machine) => {
+            const machineName = machine.type === 'small' ?
+                (machine.attachments > 0 ? '小型+A' : '小型') : '大型';
+            machineDisplay += `<span class="machine-item">${machineName}</span>`;
+        });
+
+        // Warehouse display
+        let warehouseDisplay = '';
+        if (company.warehouses > 0) {
+            let locationText = '';
+            if (company.warehouses === 2 || company.warehouseLocation === 'both') {
+                locationText = '材+製';
+            } else if (company.warehouseLocation === 'materials') {
+                locationText = '材';
+            } else {
+                locationText = '製';
+            }
+            warehouseDisplay = `<span class="warehouse-item">倉庫(${locationText})</span>`;
+        }
+
+        html += `
+            <div class="company-card ${isPlayer ? 'player' : ''} ${isCurrentTurn ? 'current-turn' : ''}">
+                <div class="company-header">
+                    <span class="company-name">${company.name}</span>
+                    <span class="company-cash">¥${company.cash}</span>
+                    <span style="font-size: 12px; background: ${(company.currentRow || 1) >= gameState.maxRows - 5 ? '#ef4444' : '#3b82f6'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                        行:${company.currentRow || 1}/${gameState.maxRows}
+                    </span>
+                </div>
+                <div class="company-stats">
+                    <div class="stat-item">自己資本: ¥${company.equity}</div>
+                    <div class="stat-item">借入: ¥${company.loans + company.shortLoans}</div>
+                    <div class="stat-item capacity" onclick="showManufacturingCapacityDetail(${index})" style="cursor: pointer;">製造能力: ${mfgCapacity}</div>
+                    <div class="stat-item capacity" onclick="showSalesCapacityDetail(${index})" style="cursor: pointer;">販売能力: ${salesCapacity}</div>
+                </div>
+                <div class="machine-section">
+                    ${machineDisplay || '<span class="machine-item">機械なし</span>'}
+                </div>
+                ${warehouseDisplay ? `<div class="warehouse-section">${warehouseDisplay}</div>` : ''}
+                <div class="personnel-section">
+                    <div class="personnel-group">
+                        <span class="personnel-label">ワーカー:</span>
+                        <div class="personnel-dots">
+                            ${Array(company.workers).fill('<div class="personnel-dot"></div>').join('')}
+                        </div>
+                        <span>(${company.workers})</span>
+                    </div>
+                    <div class="personnel-group">
+                        <span class="personnel-label">セールス:</span>
+                        <div class="personnel-dots">
+                            ${Array(company.salesmen).fill('<div class="personnel-dot"></div>').join('')}
+                        </div>
+                        <span>(${company.salesmen})</span>
+                    </div>
+                </div>
+                <div class="inventory-section">
+                    <div class="inventory-box">
+                        <div class="inventory-label">材料</div>
+                        <div class="inventory-blocks">
+                            ${Array(Math.min(company.materials, 10)).fill('<div class="inventory-block material"></div>').join('')}
+                            ${company.materials > 10 ? `<small>+${company.materials - 10}</small>` : ''}
+                        </div>
+                    </div>
+                    <div class="inventory-box">
+                        <div class="inventory-label">仕掛品</div>
+                        <div class="inventory-blocks">
+                            ${Array(Math.min(company.wip, 10)).fill('<div class="inventory-block wip"></div>').join('')}
+                            ${company.wip > 10 ? `<small>+${company.wip - 10}</small>` : ''}
+                        </div>
+                    </div>
+                    <div class="inventory-box">
+                        <div class="inventory-label">製品</div>
+                        <div class="inventory-blocks">
+                            ${Array(Math.min(company.products, 10)).fill('<div class="inventory-block product"></div>').join('')}
+                            ${company.products > 10 ? `<small>+${company.products - 10}</small>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="chips-section">
+                    <div class="chip-row">
+                        <span class="chip-label">PC:</span>
+                        <div class="chip-dots">
+                            ${Array(3).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < company.chips.computer ? 'filled computer' : ''}"></div>`
+                            ).join('')}
+                        </div>
+                        <span class="chip-count">${company.chips.computer}</span>
+                    </div>
+                    <div class="chip-row">
+                        <span class="chip-label">保険:</span>
+                        <div class="chip-dots">
+                            ${Array(3).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < company.chips.insurance ? 'filled insurance' : ''}"></div>`
+                            ).join('')}
+                        </div>
+                        <span class="chip-count">${company.chips.insurance}</span>
+                    </div>
+                    <div class="chip-row">
+                        <span class="chip-label">研究:</span>
+                        <div class="chip-dots">
+                            ${Array(5).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < (company.chips.research + (company.nextPeriodChips?.research || 0)) ? 'filled research' : ''}"></div>`
+                            ).join('')}
+                        </div>
+                        <span class="chip-count">${company.chips.research + (company.nextPeriodChips?.research || 0)}</span>
+                    </div>
+                    <div class="chip-row">
+                        <span class="chip-label">教育:</span>
+                        <div class="chip-dots">
+                            ${Array(gameState.currentPeriod === 2 ? 2 : 1).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < (company.chips.education + (company.nextPeriodChips?.education || 0)) ? 'filled education' : ''}"></div>`
+                            ).join('')}
+                        </div>
+                        <span class="chip-count">${company.chips.education + (company.nextPeriodChips?.education || 0)}</span>
+                    </div>
+                    <div class="chip-row">
+                        <span class="chip-label">広告:</span>
+                        <div class="chip-dots">
+                            ${Array(5).fill(0).map((_, i) =>
+                                `<div class="chip-dot ${i < (company.chips.advertising + (company.nextPeriodChips?.advertising || 0)) ? 'filled advertising' : ''}"></div>`
+                            ).join('')}
+                        </div>
+                        <span class="chip-count">${company.chips.advertising + (company.nextPeriodChips?.advertising || 0)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ============================================
+// アクションボタンレンダー
+// ============================================
+function renderActionButtons() {
+    const container = document.getElementById('actionButtons');
+    const isPlayerTurn = gameState.currentPlayerIndex === 0;
+
+    let html = '';
+
+    if (!gameState.periodStarted) {
+        html = `<button class="action-btn warning" onclick="startPeriod()">第${gameState.currentPeriod}期を開始</button>`;
+    } else if (isPlayerTurn) {
+        html = `
+            <button class="action-btn main mobile-card-btn" onclick="showTurnStartOptions()">カードを引く</button>
+        `;
+    } else {
+        html = `
+            <button class="action-btn secondary" disabled>AIのターン中...</button>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
 // グローバル公開
 if (typeof window !== 'undefined') {
     window.updateDisplay = updateDisplay;
@@ -661,6 +863,9 @@ if (typeof window !== 'undefined') {
     window.renderMarketsBoard = renderMarketsBoard;
     window.renderFixedCostBreakdown = renderFixedCostBreakdown;
     window.renderOtherCompanies = renderOtherCompanies;
+    window.renderMarkets = renderMarkets;
+    window.renderCompanies = renderCompanies;
+    window.renderActionButtons = renderActionButtons;
     window.showToast = showToast;
     window.showModal = showModal;
     window.closeModal = closeModal;

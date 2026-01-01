@@ -6,6 +6,1140 @@
  */
 
 // ============================================
+// 🎯 目標逆算型戦略エンジン（450達成計画）
+// ============================================
+/**
+ * 5期終了時自己資本450達成のための逆算計画
+ *
+ * 【基本計算】
+ * - 初期自己資本: 300
+ * - 目標増加額: 150
+ * - 法人税40%考慮: 税引前G ≈ 250以上必要
+ *
+ * 【3ターンサイクル】
+ * 利益創出には「材料購入→生産→販売」で3ターン必要
+ * - 2期: 25行 → 8サイクル + 投資1行
+ * - 3期: 22行 → 7サイクル + 投資1行
+ * - 4期: 20行 → 6サイクル + 投資2行
+ * - 5期: 17行 → 5サイクル + 投資2行
+ */
+
+/**
+ * リスクカード考慮
+ * - 75枚中15枚がリスクカード（確率20%）
+ * - 意思決定カード60枚（確率80%）
+ * - 1期あたり約5回リスクカードを引く計算（25行×20%=5回）
+ * - リスクカードで行動できない場合があるため、有効行数は約80%
+ */
+const RISK_CARD_PROBABILITY = 15 / 75;  // 20%
+const EFFECTIVE_ROW_MULTIPLIER = 1 - RISK_CARD_PROBABILITY;  // 80%
+
+const PERIOD_STRATEGY_TARGETS = {
+    2: {
+        rows: 25,
+        effectiveRows: Math.floor(25 * EFFECTIVE_ROW_MULTIPLIER),  // 20行
+        cycles: 6,         // 実効20行 ÷ 3 ≈ 6サイクル（リスク考慮）
+        investRows: 2,     // チップ・人員投資用（リスクカード分含む）
+        gTarget: 5,        // 損益分岐点がやっと（リスク考慮で下方修正）
+        fBudget: 65,       // 固定費予算
+        mqRequired: 70,    // G5 + F65 = MQ70
+        salesPerCycle: 1,  // 1サイクルあたり販売数
+        priceTarget: 12,   // 目標MQ単価（売価-原価）※研究チップ効果
+        investPriority: ['education', 'research', 'research'],
+        riskBuffer: 20,    // リスクカード用現金バッファ
+        description: '投資期：教育1枚+研究2枚、6サイクル確保',
+        // 詳細行動計画（25行の内訳）
+        actionPlan: {
+            buyMaterials: 6,     // 材料購入6回
+            produce: 6,          // 完成投入6回
+            sell: 6,             // 商品販売6回（6個×MQ12=MQ72）
+            riskCards: 5,        // リスクカード5回（20%想定）
+            invest: 2,           // 投資2回（教育1+研究1）
+            total: 25
+        },
+        // 投資詳細
+        investmentPlan: {
+            education: 1,        // 教育チップ1枚（製造+1、販売+1）
+            research: 1,         // 研究チップ1枚（価格+2）→次期に追加
+            advertising: 0,
+            worker: 0,
+            machine: 0
+        }
+    },
+    3: {
+        rows: 22,
+        effectiveRows: Math.floor(22 * EFFECTIVE_ROW_MULTIPLIER),  // 17行
+        cycles: 5,         // 実効17行 ÷ 3 ≈ 5サイクル
+        investRows: 2,
+        gTarget: 20,       // 賃金上昇・市場閉鎖で厳しい
+        fBudget: 85,       // 固定費増加（賃金上昇）
+        mqRequired: 105,   // G20 + F85 = MQ105
+        salesPerCycle: 2,  // 製造能力・販売能力向上
+        priceTarget: 10,   // 競争激化で価格下落
+        investPriority: ['research', 'advertising', 'worker'],
+        riskBuffer: 25,
+        description: '能力拡張期：研究追加、広告、5サイクル',
+        actionPlan: {
+            buyMaterials: 5,     // 材料購入5回
+            produce: 5,          // 完成投入5回
+            sell: 5,             // 商品販売5回（10個×MQ10=MQ100）
+            riskCards: 5,        // リスクカード5回
+            invest: 2,           // 投資2回
+            total: 22
+        },
+        investmentPlan: {
+            education: 0,        // 既に保有
+            research: 1,         // 研究チップ追加（計2枚、価格+4）
+            advertising: 1,      // 広告チップ（販売+2）
+            worker: 0,           // 採用は期首処理で
+            machine: 0
+        }
+    },
+    4: {
+        rows: 20,
+        effectiveRows: Math.floor(20 * EFFECTIVE_ROW_MULTIPLIER),  // 16行
+        cycles: 5,         // 実効16行 ÷ 3 ≈ 5サイクル
+        investRows: 1,
+        gTarget: 70,       // 投資回収開始
+        fBudget: 100,
+        mqRequired: 170,   // G70 + F100 = MQ170
+        salesPerCycle: 3,
+        priceTarget: 12,
+        investPriority: ['research', 'machine', 'salesman'],
+        riskBuffer: 30,
+        description: '回収期：研究チップ最大化、5サイクル集中',
+        actionPlan: {
+            buyMaterials: 5,     // 材料購入5回
+            produce: 5,          // 完成投入5回
+            sell: 5,             // 商品販売5回（15個×MQ12=MQ180）
+            riskCards: 4,        // リスクカード4回
+            invest: 1,           // 投資1回（研究チップ次期繰越）
+            total: 20
+        },
+        investmentPlan: {
+            education: 0,
+            research: 1,         // 研究チップ繰越（5期用）
+            advertising: 0,
+            worker: 0,
+            machine: 1           // 期首でアタッチメントor大型
+        }
+    },
+    5: {
+        rows: 17,
+        effectiveRows: Math.floor(17 * EFFECTIVE_ROW_MULTIPLIER),  // 13行
+        cycles: 4,         // 実効13行 ÷ 3 ≈ 4サイクル
+        investRows: 1,
+        gTarget: 160,      // 最大利益創出（税引後96→累計G ≈ 255）
+        fBudget: 105,
+        mqRequired: 265,   // G160 + F105 = MQ265
+        salesPerCycle: 4,  // 最大販売能力活用
+        priceTarget: 16,   // 研究チップ効果で高価格維持
+        investPriority: ['sellAll'],
+        riskBuffer: 20,
+        description: '利益最大化期：4サイクルで全力販売',
+        actionPlan: {
+            buyMaterials: 4,     // 材料購入4回（期首在庫+16個）
+            produce: 4,          // 完成投入4回
+            sell: 5,             // 商品販売5回（20個×MQ16=MQ320目標）
+            riskCards: 3,        // リスクカード3回
+            invest: 1,           // 投資1回（次期繰越チップ使用）
+            total: 17
+        },
+        investmentPlan: {
+            education: 0,
+            research: 0,         // 4期からの繰越を使用
+            advertising: 0,
+            worker: 0,
+            machine: 0           // 投資なし、利益最大化
+        }
+    }
+};
+
+/**
+ * 累積G目標（450達成のための期別目標）
+ * 税率40%想定：税引前G合計255 → 税引後153 → 自己資本453達成
+ */
+const CUMULATIVE_G_TARGETS = {
+    2: { periodG: 5, cumulativeG: 5, equityTarget: 305 },
+    3: { periodG: 20, cumulativeG: 25, equityTarget: 315 },
+    4: { periodG: 70, cumulativeG: 95, equityTarget: 357 },
+    5: { periodG: 160, cumulativeG: 255, equityTarget: 453 }
+};
+
+/**
+ * 現在期の戦略計画を取得
+ */
+function getStrategicPlan(company, period) {
+    const target = PERIOD_STRATEGY_TARGETS[period] || PERIOD_STRATEGY_TARGETS[2];
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const currentRow = company.currentRow || 1;
+    const rowsRemaining = gameState.maxRows - currentRow;
+    const cyclesRemaining = Math.floor(rowsRemaining / 3);
+
+    // 現在の能力で達成可能なMQを計算
+    const effectiveSales = Math.min(mfgCapacity, salesCapacity);
+    const priceComp = getPriceCompetitiveness(company, gameState.companies.indexOf(company));
+    const estimatedMQPerUnit = 20 + priceComp - 10;  // 売価20 + 価格競争力 - 原価10
+    const potentialMQPerCycle = effectiveSales * estimatedMQPerUnit;
+    const potentialTotalMQ = potentialMQPerCycle * cyclesRemaining;
+
+    // 目標達成度を評価
+    const achievability = potentialTotalMQ / target.mqRequired;
+    const needsMoreCapacity = achievability < 0.8;
+    const needsMorePriceComp = estimatedMQPerUnit < target.priceTarget;
+
+    // 推奨行動を決定
+    let recommendedAction = 'CYCLE';  // デフォルト：MQサイクル継続
+    let actionReason = '';
+
+    if (rowsRemaining <= 3) {
+        // 期末処理：5期のみ超過分売却、2-4期は次期に繋げる
+        if (period === 5) {
+            recommendedAction = 'SELL_EXCESS';
+            actionReason = '5期最終：在庫10個超過分を売却';
+        } else {
+            recommendedAction = 'PRODUCE_CARRY';
+            actionReason = '期末：次期に繋げるため生産継続';
+        }
+    } else if (needsMoreCapacity && target.investPriority.includes('machine')) {
+        recommendedAction = 'INVEST_MACHINE';
+        actionReason = `製造能力不足（${mfgCapacity}→目標${target.salesPerCycle}）`;
+    } else if (needsMorePriceComp && company.chips.research < 4) {
+        recommendedAction = 'INVEST_RESEARCH';
+        actionReason = `価格競争力不足（MQ${estimatedMQPerUnit}→目標${target.priceTarget}）`;
+    } else if (mfgCapacity < salesCapacity && !company.chips.education) {
+        recommendedAction = 'INVEST_EDUCATION';
+        actionReason = '製造能力が販売能力より低い';
+    }
+
+    return {
+        period,
+        target,
+        currentState: {
+            row: currentRow,
+            rowsRemaining,
+            cyclesRemaining,
+            mfgCapacity,
+            salesCapacity,
+            priceCompetitiveness: priceComp
+        },
+        projection: {
+            potentialMQPerCycle,
+            potentialTotalMQ,
+            targetMQ: target.mqRequired,
+            achievability: Math.round(achievability * 100),
+            estimatedG: potentialTotalMQ - target.fBudget
+        },
+        recommendation: {
+            action: recommendedAction,
+            reason: actionReason,
+            needsMoreCapacity,
+            needsMorePriceComp
+        }
+    };
+}
+
+/**
+ * 3ターンサイクルの最適化判断
+ * 材料購入→生産→販売のサイクルで最大MQを得るための判断
+ */
+function optimizeCycleAction(company, plan) {
+    const { currentState, recommendation } = plan;
+    const period = gameState.currentPeriod;
+
+    // サイクル状態を判断
+    // 製品あり → 販売フェーズ
+    // 仕掛品あり → 完成フェーズ
+    // 材料あり → 投入フェーズ
+    // なにもなし → 仕入れフェーズ
+
+    const hasProducts = company.products > 0;
+    const hasWIP = company.wip > 0;
+    const hasMaterials = company.materials > 0;
+    const hasInventory = hasProducts || hasWIP || hasMaterials;
+
+    // 期末間近は次期に繋げる戦略
+    // ※5期のみ在庫10個超過分を売却、2-4期は売らない
+    if (currentState.rowsRemaining <= 5) {
+        const totalInventory = company.products + company.wip + company.materials;
+        if (period === 5 && company.products > 10) {
+            // 5期のみ：在庫10個超過分を売却
+            return {
+                phase: 'SELL',
+                priority: 'HIGH',
+                reason: '5期最終：在庫10個超過分を売却',
+                qty: Math.min(currentState.salesCapacity, company.products - 10)
+            };
+        } else if (period !== 5 && (hasWIP || hasMaterials)) {
+            // 2-4期：生産して次期に繋げる
+            return {
+                phase: 'PRODUCE',
+                priority: 'HIGH',
+                reason: '期末継続：次期のため生産',
+                qty: currentState.mfgCapacity
+            };
+        }
+    }
+
+    // 通常サイクル
+    if (hasProducts && currentState.salesCapacity > 0) {
+        return {
+            phase: 'SELL',
+            priority: 'HIGH',
+            reason: 'サイクル完了：製品販売',
+            qty: Math.min(currentState.salesCapacity, company.products)
+        };
+    }
+
+    if ((hasWIP || hasMaterials) && currentState.mfgCapacity > 0) {
+        return {
+            phase: 'PRODUCE',
+            priority: 'HIGH',
+            reason: 'サイクル中：生産実行',
+            qty: currentState.mfgCapacity
+        };
+    }
+
+    // 仕入れフェーズ（投資判断含む）
+    if (!hasInventory) {
+        // 投資が必要な場合
+        if (recommendation.action.startsWith('INVEST') && currentState.rowsRemaining > 6) {
+            return {
+                phase: 'INVEST',
+                priority: 'MEDIUM',
+                reason: recommendation.reason,
+                type: recommendation.action
+            };
+        }
+
+        // 材料仕入れ
+        return {
+            phase: 'BUY',
+            priority: 'HIGH',
+            reason: 'サイクル開始：材料仕入れ',
+            qty: currentState.mfgCapacity
+        };
+    }
+
+    return {
+        phase: 'WAIT',
+        priority: 'LOW',
+        reason: '状態異常：判断不能'
+    };
+}
+
+/**
+ * 期別G達成度評価
+ */
+function evaluatePeriodPerformance(company, period) {
+    const target = PERIOD_STRATEGY_TARGETS[period];
+    if (!target) return null;
+
+    // 実際のGを計算（簡易版）
+    const mq = company.periodMQ || 0;
+    const f = calculateFixedCost(company);
+    const estimatedG = mq - f;
+
+    const score = Math.min(100, Math.round((estimatedG / target.gTarget) * 100));
+    const grade = score >= 100 ? 'S' : score >= 80 ? 'A' : score >= 60 ? 'B' : score >= 40 ? 'C' : 'D';
+
+    return {
+        period,
+        targetG: target.gTarget,
+        estimatedG,
+        score,
+        grade,
+        analysis: {
+            mqAchieved: mq,
+            mqTarget: target.mqRequired,
+            fActual: f,
+            fBudget: target.fBudget
+        }
+    };
+}
+
+// ============================================
+// 🎯 戦略評価・改善エンジン（120点目標）
+// ============================================
+/**
+ * 戦略の総合評価（0-120点）
+ *
+ * 評価項目:
+ * 1. MQ効率（40点）: 1サイクルあたりのMQ
+ * 2. 投資効率（30点）: チップ投資のROI
+ * 3. リスク管理（20点）: 現金管理、保険
+ * 4. 行動効率（30点）: 無駄な行動の削減
+ *
+ * 合計120点満点（100点=標準、120点=完璧）
+ */
+function evaluateStrategyScore(company, period) {
+    const target = PERIOD_STRATEGY_TARGETS[period];
+    if (!target) return { total: 0, breakdown: {} };
+
+    const companyIndex = gameState.companies.indexOf(company);
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const priceComp = getPriceCompetitiveness(company, companyIndex);
+    const effectiveSales = Math.min(mfgCapacity, salesCapacity);
+
+    // ============================================
+    // 1. MQ効率（40点）- サイクル完遂率と価格競争力
+    // ============================================
+    const mqPerUnit = 20 + priceComp - 10;  // 売価20 + 価格競争力 - 原価10
+    const mqPerCycle = effectiveSales * mqPerUnit;
+    const targetMQPerCycle = target.mqRequired / target.cycles;
+
+    // サブスコア: MQ/サイクル達成度（20点）
+    const mqAchievementRate = Math.min(1.5, mqPerCycle / targetMQPerCycle);
+    const mqAchievementScore = Math.round(mqAchievementRate * 20);
+
+    // サブスコア: 価格競争力（10点）- 研究チップ効果
+    const researchChips = company.chips.research || 0;
+    const targetResearch = period <= 2 ? 1 : period === 3 ? 2 : 3;  // 期別目標
+    const researchScore = Math.min(10, Math.round((researchChips / targetResearch) * 10));
+
+    // サブスコア: 能力バランス（10点）- 製造=販売が理想
+    const capacityDiff = Math.abs(mfgCapacity - salesCapacity);
+    const balanceScore = Math.max(0, 10 - capacityDiff * 3);
+
+    const mqEfficiency = Math.min(40, mqAchievementScore + researchScore + balanceScore);
+
+    // ============================================
+    // 2. 投資効率（30点）- タイミングと累積効果
+    // ============================================
+    // サブスコア: 教育チップ（早期投資ボーナス）（10点）
+    const hasEducation = (company.chips.education || 0) > 0;
+    const educationScore = hasEducation ? (period === 2 ? 10 : period === 3 ? 8 : 6) : 0;
+
+    // サブスコア: 研究チップ累積効果（12点）
+    // 研究チップは1枚で+2価格、期を重ねるほど累積MQに寄与
+    const researchCumulativeValue = researchChips * 2 * (6 - period);  // 残り期数で乗算
+    const maxResearchValue = 12;  // 3枚×2×3期=18だが上限12
+    const researchInvestScore = Math.min(12, Math.round((researchCumulativeValue / 18) * 12));
+
+    // サブスコア: 広告チップ効率（8点）
+    const adChips = company.chips.advertising || 0;
+    const effectiveAds = Math.min(adChips, company.salesmen);  // セールスマン数以上は無駄
+    const adUtilization = company.salesmen > 0 ? effectiveAds / company.salesmen : 0;
+    const adScore = Math.min(8, Math.round(adUtilization * 8));
+
+    const investEfficiency = Math.min(30, educationScore + researchInvestScore + adScore);
+
+    // ============================================
+    // 3. リスク管理（20点）- 現金・借入・保険
+    // ============================================
+    // サブスコア: 現金安全率（8点）
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyRatio = company.cash / (periodEndCost + 30);
+    const cashSafetyScore = Math.min(8, Math.round(safetyRatio * 4));
+
+    // サブスコア: 借入回避（7点）
+    const hasLoans = company.loans > 0 || company.shortLoans > 0;
+    const loanPenalty = hasLoans ?
+        (company.shortLoans > 0 ? 7 : 3) : 0;  // 短期借入はより大きなペナルティ
+    const loanAvoidScore = 7 - loanPenalty;
+
+    // サブスコア: 保険（5点）
+    const hasInsurance = (company.chips.insurance || 0) > 0;
+    const insuranceScore = hasInsurance ? 5 : 0;
+
+    const riskScore = Math.max(0, cashSafetyScore + loanAvoidScore + insuranceScore);
+
+    // ============================================
+    // 4. 行動効率（30点）- サイクル実行とG目標進捗
+    // ============================================
+    // サブスコア: 在庫フロー効率（10点）
+    // 理想：材料→仕掛品→製品の流れがスムーズ（滞留なし）
+    const inventoryFlow = company.materials + company.wip * 0.5;  // 仕掛品は半カウント
+    const productReady = company.products;
+    const flowScore = productReady > 0 ?
+        Math.min(10, 5 + Math.min(5, productReady)) :
+        Math.max(0, 10 - inventoryFlow);  // 製品0でも在庫少なければOK
+
+    // サブスコア: G目標進捗（12点）
+    const currentMQ = company.periodMQ || 0;
+    const currentF = calculateFixedCost(company);
+    const currentG = currentMQ - currentF;
+    const gProgress = target.gTarget > 0 ? currentG / target.gTarget : 1;
+    const gProgressScore = Math.min(12, Math.round(Math.max(0, gProgress) * 12));
+
+    // サブスコア: 行動密度（8点）- 無駄な行動がないか
+    const rowsUsed = company.rowsUsed || 0;
+    const actualSales = company.periodSalesCount || 0;
+    const expectedSalesPerRow = 0.25;  // 4行に1回販売が理想
+    const salesDensity = rowsUsed > 0 ? actualSales / (rowsUsed * expectedSalesPerRow) : 1;
+    const densityScore = Math.min(8, Math.round(Math.min(1.5, salesDensity) * 5.3));
+
+    const actionEfficiency = Math.min(30, flowScore + gProgressScore + densityScore);
+
+    // ============================================
+    // 合計スコアと評価
+    // ============================================
+    const total = mqEfficiency + investEfficiency + riskScore + actionEfficiency;
+
+    // 120点達成条件を詳細に判定
+    const weaknesses = {
+        mqEfficiency: mqEfficiency < 32,         // 40点中32点未満
+        investEfficiency: investEfficiency < 24, // 30点中24点未満
+        riskManagement: riskScore < 16,          // 20点中16点未満
+        actionEfficiency: actionEfficiency < 24  // 30点中24点未満
+    };
+
+    return {
+        total,
+        grade: total >= 115 ? 'S+' : total >= 105 ? 'S' : total >= 95 ? 'A' : total >= 85 ? 'B' : total >= 75 ? 'C' : 'D',
+        breakdown: {
+            mqEfficiency: {
+                score: mqEfficiency,
+                max: 40,
+                detail: `MQ達成${mqAchievementScore}/20 + 研究${researchScore}/10 + バランス${balanceScore}/10`,
+                subScores: { achievement: mqAchievementScore, research: researchScore, balance: balanceScore }
+            },
+            investEfficiency: {
+                score: investEfficiency,
+                max: 30,
+                detail: `教育${educationScore}/10 + 研究累積${researchInvestScore}/12 + 広告${adScore}/8`,
+                subScores: { education: educationScore, research: researchInvestScore, advertising: adScore }
+            },
+            riskManagement: {
+                score: riskScore,
+                max: 20,
+                detail: `現金${cashSafetyScore}/8 + 借入回避${loanAvoidScore}/7 + 保険${insuranceScore}/5`,
+                subScores: { cash: cashSafetyScore, loan: loanAvoidScore, insurance: insuranceScore }
+            },
+            actionEfficiency: {
+                score: actionEfficiency,
+                max: 30,
+                detail: `フロー${flowScore}/10 + G進捗${gProgressScore}/12 + 密度${densityScore}/8`,
+                subScores: { flow: flowScore, gProgress: gProgressScore, density: densityScore }
+            }
+        },
+        improvements: generateImprovements(company, period, weaknesses),
+        weaknesses
+    };
+}
+
+/**
+ * 改善提案を生成（120点達成のための具体的アクション）
+ */
+function generateImprovements(company, period, weaknesses) {
+    const improvements = [];
+    const mfgCap = getManufacturingCapacity(company);
+    const salesCap = getSalesCapacity(company);
+    const target = PERIOD_STRATEGY_TARGETS[period];
+
+    // ============================================
+    // MQ効率の改善提案
+    // ============================================
+    if (weaknesses.mqEfficiency) {
+        const researchChips = company.chips.research || 0;
+        const targetResearch = period <= 2 ? 1 : period === 3 ? 2 : 3;
+
+        // 研究チップ不足
+        if (researchChips < targetResearch) {
+            const needed = targetResearch - researchChips;
+            const useExpress = period >= 3;
+            improvements.push({
+                priority: 'CRITICAL',
+                action: useExpress ? `研究チップ${needed}枚特急購入` : `研究チップ${needed}枚購入`,
+                reason: `価格競争力不足: 現${researchChips}→目標${targetResearch}枚`,
+                expectedGain: needed * 2 * target.cycles,  // 1枚で1サイクルあたり+2 MQ
+                costBenefit: `投資${needed * (useExpress ? 40 : 20)}円 → MQ+${needed * 2 * target.cycles}`
+            });
+        }
+
+        // 製造能力不足
+        if (mfgCap < salesCap) {
+            if (company.machines.some(m => m.type === 'small' && m.attachments === 0)) {
+                improvements.push({
+                    priority: 'HIGH',
+                    action: 'アタッチメント購入',
+                    reason: `製造能力不足: ${mfgCap} < 販売${salesCap}`,
+                    expectedGain: (salesCap - mfgCap) * 10 * target.cycles,
+                    costBenefit: '投資30円 → 製造能力+1'
+                });
+            } else {
+                improvements.push({
+                    priority: 'MEDIUM',
+                    action: 'ワーカー追加採用',
+                    reason: `製造能力不足: ${mfgCap} < 販売${salesCap}`,
+                    costBenefit: '採用30円 + 給与で製造能力向上'
+                });
+            }
+        }
+
+        // 販売能力不足
+        if (salesCap < mfgCap) {
+            improvements.push({
+                priority: 'HIGH',
+                action: company.salesmen < 2 ? 'セールスマン採用' : '広告チップ購入',
+                reason: `販売能力不足: ${salesCap} < 製造${mfgCap}`,
+                costBenefit: company.salesmen < 2 ? '採用30円' : '投資20円 → 販売能力+2'
+            });
+        }
+    }
+
+    // ============================================
+    // 投資効率の改善提案
+    // ============================================
+    if (weaknesses.investEfficiency) {
+        // 教育チップ（早期投資が重要）
+        if (!(company.chips.education || 0) && period <= 3) {
+            improvements.push({
+                priority: period === 2 ? 'CRITICAL' : 'HIGH',
+                action: period >= 3 ? '教育チップ特急購入' : '教育チップ次期繰越購入',
+                reason: '製造+1、販売+1の効果（早期投資推奨）',
+                expectedGain: 2 * 10 * (6 - period),  // 残り期数で累積効果
+                costBenefit: `投資${period >= 3 ? 40 : 20}円 → 能力+2、累積効果大`
+            });
+        }
+
+        // 広告チップ効率
+        const adChips = company.chips.advertising || 0;
+        if (adChips < company.salesmen && company.salesmen > 0) {
+            const needed = company.salesmen - adChips;
+            improvements.push({
+                priority: 'MEDIUM',
+                action: `広告チップ${needed}枚追加`,
+                reason: `広告効率改善: ${adChips}/${company.salesmen}（セールスマン当たり1枚）`,
+                costBenefit: `投資${needed * 20}円 → 販売能力+${needed * 2}`
+            });
+        }
+    }
+
+    // ============================================
+    // リスク管理の改善提案
+    // ============================================
+    if (weaknesses.riskManagement) {
+        const periodEndCost = calculatePeriodPayment(company);
+
+        // 現金不足
+        if (company.cash < periodEndCost + 50) {
+            improvements.push({
+                priority: 'CRITICAL',
+                action: '現金確保（販売優先）',
+                reason: `期末支払い危険: 現金${company.cash} < 必要${periodEndCost + 50}`,
+                costBenefit: '製品があれば即売却推奨'
+            });
+        }
+
+        // 短期借入がある
+        if (company.shortLoans > 0) {
+            improvements.push({
+                priority: 'CRITICAL',
+                action: '短期借入返済',
+                reason: `短期借入${company.shortLoans}円: 金利8%で損失大`,
+                costBenefit: `返済で年間${Math.floor(company.shortLoans * 0.08)}円節約`
+            });
+        }
+
+        // 保険チップ
+        if (!(company.chips.insurance || 0)) {
+            improvements.push({
+                priority: 'LOW',
+                action: '保険チップ購入',
+                reason: 'リスクカード対策（火災・盗難）',
+                costBenefit: '投資5円 → 期待損失回避約20円'
+            });
+        }
+    }
+
+    // ============================================
+    // 行動効率の改善提案
+    // ============================================
+    if (weaknesses.actionEfficiency) {
+        // 在庫滞留
+        if (company.materials > mfgCap * 2) {
+            improvements.push({
+                priority: 'HIGH',
+                action: '材料消化（生産優先）',
+                reason: `材料滞留: ${company.materials}個 > 2サイクル分${mfgCap * 2}`,
+                costBenefit: '材料→製品でMQ実現'
+            });
+        }
+
+        if (company.wip > mfgCap) {
+            improvements.push({
+                priority: 'HIGH',
+                action: '仕掛品完成（製品化）',
+                reason: `仕掛品滞留: ${company.wip}個`,
+                costBenefit: '完成→販売でMQ実現'
+            });
+        }
+
+        // G目標進捗が低い
+        const currentMQ = company.periodMQ || 0;
+        const currentF = calculateFixedCost(company);
+        const currentG = currentMQ - currentF;
+        if (currentG < target.gTarget * 0.5) {
+            improvements.push({
+                priority: 'CRITICAL',
+                action: '販売サイクル加速',
+                reason: `G進捗遅れ: ${currentG} < 目標${target.gTarget}の50%`,
+                costBenefit: 'サイクル完遂でMQ確保'
+            });
+        }
+    }
+
+    // 優先度でソート
+    const priorityOrder = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+    improvements.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+    return improvements;
+}
+
+/**
+ * 戦略評価ログ出力
+ */
+function logStrategyEvaluation(company, period) {
+    const evaluation = evaluateStrategyScore(company, period);
+    console.log(`\n========== 戦略評価: ${company.name} (${period}期) ==========`);
+    console.log(`総合スコア: ${evaluation.total}/120点 (${evaluation.grade})`);
+    console.log(`\n内訳:`);
+    Object.entries(evaluation.breakdown).forEach(([key, val]) => {
+        console.log(`  ${key}: ${val.score}/${val.max}点 - ${val.detail}`);
+    });
+    if (evaluation.improvements.length > 0) {
+        console.log(`\n改善提案:`);
+        evaluation.improvements.forEach(imp => {
+            console.log(`  [${imp.priority}] ${imp.action}: ${imp.reason}`);
+            if (imp.costBenefit) console.log(`    効果: ${imp.costBenefit}`);
+        });
+    }
+
+    // 120点達成状況
+    const targetScore = 120;
+    const gap = targetScore - evaluation.total;
+    if (gap > 0) {
+        console.log(`\n【120点まであと${gap}点】`);
+        const biggestWeakness = Object.entries(evaluation.breakdown)
+            .map(([k, v]) => ({ key: k, gap: v.max - v.score }))
+            .sort((a, b) => b.gap - a.gap)[0];
+        console.log(`  最大改善余地: ${biggestWeakness.key} (+${biggestWeakness.gap}点可能)`);
+    } else {
+        console.log(`\n🏆 120点達成！完璧な戦略です！`);
+    }
+    console.log(`================================================\n`);
+
+    return evaluation;
+}
+
+/**
+ * 改善提案を実行可能なアクションに変換
+ * @returns {Object|null} 実行すべきアクション、または null
+ */
+function applyImprovementAction(company, period) {
+    const evaluation = evaluateStrategyScore(company, period);
+    const companyIndex = gameState.companies.indexOf(company);
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+
+    // CRITICALまたはHIGH優先度の改善のみ即時適用
+    const urgentImprovements = evaluation.improvements.filter(
+        imp => imp.priority === 'CRITICAL' || imp.priority === 'HIGH'
+    );
+
+    if (urgentImprovements.length === 0) return null;
+
+    const improvement = urgentImprovements[0];
+    console.log(`[自己改善] ${company.name}: ${improvement.action} を適用`);
+
+    // 改善内容をアクションに変換
+    const action = improvement.action.toLowerCase();
+
+    // 現金確保（販売優先）
+    if (action.includes('現金確保') || action.includes('販売サイクル')) {
+        if (company.products > 0 && salesCapacity > 0) {
+            return {
+                type: 'SELL',
+                qty: Math.min(salesCapacity, company.products),
+                priceMultiplier: 0.75,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+        if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+            return {
+                type: 'PRODUCE',
+                reason: `改善: 販売準備のため生産`
+            };
+        }
+    }
+
+    // 研究チップ購入
+    if (action.includes('研究チップ')) {
+        const isExpress = action.includes('特急');
+        const cost = isExpress ? 40 : 20;
+        if (aiCanAffordSafely(company, cost)) {
+            return {
+                type: 'BUY_CHIP',
+                chipType: 'research',
+                cost: cost,
+                express: isExpress,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // 教育チップ購入
+    if (action.includes('教育チップ')) {
+        const isExpress = action.includes('特急');
+        const cost = isExpress ? 40 : 20;
+        if (aiCanAffordSafely(company, cost)) {
+            return {
+                type: 'BUY_CHIP',
+                chipType: 'education',
+                cost: cost,
+                express: isExpress,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // 広告チップ購入
+    if (action.includes('広告チップ')) {
+        if (aiCanAffordSafely(company, 20)) {
+            return {
+                type: 'BUY_CHIP',
+                chipType: 'advertising',
+                cost: 20,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // アタッチメント購入
+    if (action.includes('アタッチメント')) {
+        if (aiCanAffordSafely(company, 30)) {
+            return {
+                type: 'BUY_ATTACHMENT',
+                cost: 30,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // 材料消化・仕掛品完成
+    if (action.includes('材料消化') || action.includes('仕掛品完成') || action.includes('生産優先')) {
+        if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+            return {
+                type: 'PRODUCE',
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // セールスマン採用
+    if (action.includes('セールスマン')) {
+        if (aiCanAffordSafely(company, 30) && company.salesmen < (company.maxPersonnel || 2)) {
+            return {
+                type: 'HIRE_SALESMAN',
+                cost: 30,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // ワーカー採用
+    if (action.includes('ワーカー')) {
+        if (aiCanAffordSafely(company, 30) && company.workers < (company.maxPersonnel || 2)) {
+            return {
+                type: 'HIRE_WORKER',
+                cost: 30,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // 短期借入返済
+    if (action.includes('短期借入返済')) {
+        if (company.shortLoans > 0 && company.cash >= company.shortLoans) {
+            return {
+                type: 'REPAY_SHORT_LOAN',
+                amount: company.shortLoans,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    // 保険チップ
+    if (action.includes('保険')) {
+        if (aiCanAffordSafely(company, 5)) {
+            return {
+                type: 'BUY_CHIP',
+                chipType: 'insurance',
+                cost: 5,
+                reason: `改善: ${improvement.reason}`
+            };
+        }
+    }
+
+    return null;
+}
+
+/**
+ * 120点達成状態を追跡・報告
+ */
+function trackScoreProgress(company, period) {
+    if (!company.scoreHistory) {
+        company.scoreHistory = [];
+    }
+
+    const evaluation = evaluateStrategyScore(company, period);
+    company.scoreHistory.push({
+        period: period,
+        row: company.currentRow || 1,
+        score: evaluation.total,
+        breakdown: {
+            mq: evaluation.breakdown.mqEfficiency.score,
+            invest: evaluation.breakdown.investEfficiency.score,
+            risk: evaluation.breakdown.riskManagement.score,
+            action: evaluation.breakdown.actionEfficiency.score
+        }
+    });
+
+    // スコアの推移を分析
+    if (company.scoreHistory.length >= 2) {
+        const prev = company.scoreHistory[company.scoreHistory.length - 2];
+        const curr = company.scoreHistory[company.scoreHistory.length - 1];
+        const delta = curr.score - prev.score;
+
+        if (delta > 0) {
+            console.log(`📈 [スコア上昇] ${company.name}: ${prev.score}→${curr.score} (+${delta})`);
+        } else if (delta < 0) {
+            console.log(`📉 [スコア下落] ${company.name}: ${prev.score}→${curr.score} (${delta})`);
+            // 下落要因を特定
+            const factors = [];
+            if (curr.breakdown.mq < prev.breakdown.mq) factors.push(`MQ-${prev.breakdown.mq - curr.breakdown.mq}`);
+            if (curr.breakdown.invest < prev.breakdown.invest) factors.push(`投資-${prev.breakdown.invest - curr.breakdown.invest}`);
+            if (curr.breakdown.risk < prev.breakdown.risk) factors.push(`リスク-${prev.breakdown.risk - curr.breakdown.risk}`);
+            if (curr.breakdown.action < prev.breakdown.action) factors.push(`行動-${prev.breakdown.action - curr.breakdown.action}`);
+            if (factors.length > 0) {
+                console.log(`    下落要因: ${factors.join(', ')}`);
+            }
+        }
+    }
+
+    return evaluation;
+}
+
+// ============================================
+// 🔍 競合観察・動的適応エンジン
+// ============================================
+/**
+ * 競合他社の状況を分析し、自社戦略を動的に調整
+ */
+function analyzeCompetitors(company, companyIndex) {
+    const rivals = gameState.companies.filter((c, i) => i !== companyIndex);
+
+    // ライバルの研究チップ数（入札価格に直結）
+    const rivalResearch = rivals.map(c => ({
+        name: c.name,
+        research: c.chips.research || 0,
+        priceComp: getPriceCompetitiveness(c, gameState.companies.indexOf(c))
+    })).sort((a, b) => b.priceComp - a.priceComp);
+
+    const myPriceComp = getPriceCompetitiveness(company, companyIndex);
+    const topRivalPriceComp = rivalResearch[0]?.priceComp || 0;
+    const avgRivalPriceComp = rivalResearch.reduce((sum, r) => sum + r.priceComp, 0) / rivalResearch.length;
+
+    // ライバルの在庫状況
+    const rivalInventory = rivals.map(c => ({
+        name: c.name,
+        products: c.products,
+        wip: c.wip,
+        materials: c.materials,
+        total: c.products + c.wip + c.materials
+    }));
+    const avgRivalProducts = rivalInventory.reduce((sum, r) => sum + r.products, 0) / rivalInventory.length;
+
+    // ライバルの資金状況
+    const rivalCash = rivals.map(c => c.cash);
+    const avgRivalCash = rivalCash.reduce((sum, c) => sum + c, 0) / rivalCash.length;
+
+    // ライバルの自己資本
+    const rivalEquity = rivals.map(c => ({ name: c.name, equity: c.equity }))
+        .sort((a, b) => b.equity - a.equity);
+    const topRivalEquity = rivalEquity[0]?.equity || 300;
+    const myEquity = company.equity;
+    const equityGap = topRivalEquity - myEquity;
+
+    return {
+        priceAnalysis: {
+            myPriceComp,
+            topRivalPriceComp,
+            avgRivalPriceComp,
+            isBehind: myPriceComp < topRivalPriceComp - 2,
+            isLeading: myPriceComp > topRivalPriceComp + 2,
+            recommendation: myPriceComp < avgRivalPriceComp ? '研究チップ追加を検討' : '価格競争力は十分'
+        },
+        inventoryAnalysis: {
+            myProducts: company.products,
+            avgRivalProducts,
+            rivalsHaveProducts: avgRivalProducts > 1,
+            recommendation: avgRivalProducts > company.products ? '販売ペースを上げる' : '在庫は適正'
+        },
+        cashAnalysis: {
+            myCash: company.cash,
+            avgRivalCash,
+            isRich: company.cash > avgRivalCash * 1.2,
+            isPoor: company.cash < avgRivalCash * 0.8,
+            recommendation: company.cash < avgRivalCash ? '現金確保を優先' : '投資余力あり'
+        },
+        equityAnalysis: {
+            myEquity,
+            topRivalEquity,
+            equityGap,
+            isLeading: equityGap <= 0,
+            isBehind: equityGap > 30,
+            recommendation: equityGap > 30 ? '挽回のため積極投資' : '現状維持で勝利可能'
+        }
+    };
+}
+
+/**
+ * 行別の推奨行動を計算（何行目に何をすべきか）
+ */
+function getRowBasedActionPlan(company, period) {
+    const target = PERIOD_STRATEGY_TARGETS[period];
+    if (!target) return [];
+
+    const currentRow = company.currentRow || 1;
+    const maxRows = gameState.maxRows;
+    const rowsRemaining = maxRows - currentRow;
+
+    // 行動計画を生成
+    const actionPlan = [];
+    const plan = target.actionPlan;
+
+    // サイクル数からスケジュールを逆算
+    // 期末から逆算して行動を配置
+    let row = currentRow;
+
+    // フェーズ1: 序盤（投資フェーズ）- 最初の1-3行
+    if (row <= 3) {
+        if (plan.invest > 0 && target.investmentPlan.education > 0 && !company.chips.education) {
+            actionPlan.push({ row, action: 'BUY_CHIP', type: 'education', reason: '序盤投資：教育チップ' });
+            row++;
+        }
+        if (row <= 3 && plan.invest > 0 && target.investmentPlan.research > 0 && company.chips.research < 3) {
+            actionPlan.push({ row, action: 'BUY_CHIP', type: 'research', reason: '序盤投資：研究チップ' });
+            row++;
+        }
+    }
+
+    // フェーズ2: 中盤（サイクル実行）
+    const cycleStartRow = row;
+    const cycleEndRow = maxRows - 5;  // 期末5行前まで
+
+    for (let cycle = 0; cycle < plan.sell && row < cycleEndRow; cycle++) {
+        // 材料購入 → 生産 → 販売の3行1セット
+        actionPlan.push({ row: row++, action: 'BUY_MATERIALS', reason: `サイクル${cycle + 1}: 材料購入` });
+        if (row < cycleEndRow) {
+            actionPlan.push({ row: row++, action: 'PRODUCE', reason: `サイクル${cycle + 1}: 生産` });
+        }
+        if (row < cycleEndRow) {
+            actionPlan.push({ row: row++, action: 'SELL', reason: `サイクル${cycle + 1}: 販売` });
+        }
+    }
+
+    // フェーズ3: 終盤（次期に繋げる）- 期末5行
+    // ※2-4期は次期に繋げるため生産継続、5期のみ10個超過分を売却
+    const isFinalPeriod = period === 5;
+    for (let i = 0; i < 5 && row <= maxRows; i++) {
+        if (company.products > 0 || company.wip > 0 || company.materials > 0) {
+            if (isFinalPeriod) {
+                actionPlan.push({ row: row++, action: 'SELL_OR_PRODUCE', reason: '5期最終：在庫10個超過分売却' });
+            } else {
+                actionPlan.push({ row: row++, action: 'PRODUCE', reason: '期末継続：次期に繋げる' });
+            }
+        }
+    }
+
+    return actionPlan;
+}
+
+/**
+ * 動的行動決定（競合観察＋行別計画を統合）
+ */
+function getDynamicAction(company, companyIndex) {
+    const period = gameState.currentPeriod;
+    const currentRow = company.currentRow || 1;
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+
+    // 競合分析
+    const competitors = analyzeCompetitors(company, companyIndex);
+
+    // 行別計画
+    const rowPlan = getRowBasedActionPlan(company, period);
+    const currentRowPlan = rowPlan.find(p => p.row === currentRow);
+
+    console.log(`[動的戦略] ${company.name} ${period}期${currentRow}行目`);
+    console.log(`  競合分析: 価格差${competitors.priceAnalysis.myPriceComp - competitors.priceAnalysis.avgRivalPriceComp}、自己資本差${-competitors.equityAnalysis.equityGap}`);
+    console.log(`  計画行動: ${currentRowPlan?.action || 'なし'} - ${currentRowPlan?.reason || ''}`);
+
+    // 動的調整ルール
+    let action = currentRowPlan?.action || 'CYCLE';
+    let reason = currentRowPlan?.reason || '';
+
+    // ルール1: 価格競争力が大幅に負けている場合、研究チップを優先
+    if (competitors.priceAnalysis.isBehind && company.chips.research < 4 && company.cash > 60) {
+        action = 'BUY_CHIP';
+        reason = `競合対策: 価格競争力が${competitors.priceAnalysis.topRivalPriceComp - competitors.priceAnalysis.myPriceComp}点負け`;
+    }
+
+    // ルール2: 自己資本で大幅に負けている場合、リスクを取って投資
+    if (competitors.equityAnalysis.isBehind && competitors.equityAnalysis.equityGap > 50) {
+        if (company.products > 0) {
+            action = 'SELL';
+            reason = `挽回戦略: 自己資本${competitors.equityAnalysis.equityGap}円負け→積極販売`;
+        } else if (company.materials + company.wip > 0) {
+            action = 'PRODUCE';
+            reason = `挽回戦略: 自己資本${competitors.equityAnalysis.equityGap}円負け→急いで生産`;
+        }
+    }
+
+    // ルール3: ライバルが製品を大量に持っている場合、入札競争に備える
+    if (competitors.inventoryAnalysis.rivalsHaveProducts && company.chips.research < 3) {
+        action = 'BUY_CHIP';
+        reason = '入札対策: ライバルが製品保有→価格競争力強化';
+    }
+
+    // ルール4: 期末間近は「次期に繋げる」戦略
+    // ※在庫処分は間違い！次期開始時に在庫があると有利
+    const rowsRemaining = gameState.maxRows - currentRow;
+    if (rowsRemaining <= 5) {
+        const totalInventory = company.materials + company.wip + company.products;
+
+        if (period === 5) {
+            // 5期のみ：在庫10個以上キープ、超過分売却
+            if (company.products > 10 && salesCapacity > 0) {
+                action = 'SELL';
+                reason = '5期最終: 在庫10個超過分を売却';
+            } else if (totalInventory < 10 && (company.wip > 0 || company.materials > 0)) {
+                action = 'PRODUCE';
+                reason = '5期最終: 在庫10個確保のため生産';
+            }
+        } else {
+            // 2-4期：在庫を積み上げて次期に繋げる
+            if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                action = 'PRODUCE';
+                reason = '期末継続: 次期のため在庫積み上げ';
+            }
+            // 製品のみの場合は売らない（現金不足時のみ例外）
+        }
+    }
+
+    return {
+        action,
+        reason,
+        competitors,
+        rowPlan: currentRowPlan
+    };
+}
+
+// ============================================
 // 🛡️ 短期借入回避ヘルパー（全AI購入処理で使用）
 // ============================================
 function aiCanAffordSafely(company, cost) {
@@ -23,6 +1157,136 @@ function aiCanAffordSafely(company, cost) {
     }
 
     return canAfford;
+}
+
+// ============================================
+// 改善アクション実行ヘルパー関数
+// ============================================
+
+/**
+ * チップ購入実行（改善アクション用）
+ */
+function executeChipPurchase(company, companyIndex, chipType, cost, isExpress = false) {
+    const period = gameState.currentPeriod;
+
+    // 2期は通常購入、3期以降は特急購入
+    const actualCost = (period >= 3 && !isExpress) ? cost : (isExpress ? 40 : 20);
+
+    if (!aiCanAffordSafely(company, actualCost)) {
+        console.log(`[チップ購入失敗] ${company.name}: 資金不足で${chipType}購入見送り`);
+        return false;
+    }
+
+    // チップ上限チェック
+    const maxChips = chipType === 'insurance' ? 1 : (chipType === 'computer' ? 2 : 5);
+    if ((company.chips[chipType] || 0) >= maxChips) {
+        console.log(`[チップ購入失敗] ${company.name}: ${chipType}チップ上限達成`);
+        return false;
+    }
+
+    company.cash -= actualCost;
+
+    if (period >= 3 && isExpress) {
+        // 特急購入
+        company.chips[chipType] = (company.chips[chipType] || 0) + 1;
+        company.expressChipsPurchased[chipType] = (company.expressChipsPurchased[chipType] || 0) + 1;
+    } else if (period === 2) {
+        // 2期は今期使用
+        company.chips[chipType] = (company.chips[chipType] || 0) + 1;
+        company.chipsPurchasedThisPeriod[chipType] = (company.chipsPurchasedThisPeriod[chipType] || 0) + 1;
+    } else {
+        // 3期以降の次期繰越
+        company.nextPeriodChips[chipType] = (company.nextPeriodChips[chipType] || 0) + 1;
+    }
+
+    const icons = { research: '🔬', education: '📚', advertising: '📢', insurance: '🛡️', computer: '💻' };
+    incrementRow(companyIndex);
+    showAIActionModal(company, `チップ購入${isExpress ? '(特急)' : ''}`, icons[chipType] || '🎯', `${chipType}チップ購入（改善）`);
+
+    console.log(`[チップ購入成功] ${company.name}: ${chipType} (¥${actualCost})`);
+    return true;
+}
+
+/**
+ * アタッチメント購入実行
+ */
+function executeAttachmentPurchase(company, companyIndex) {
+    const attachmentCost = 30;
+
+    if (!aiCanAffordSafely(company, attachmentCost)) {
+        console.log(`[アタッチメント購入失敗] ${company.name}: 資金不足`);
+        return false;
+    }
+
+    // 小型機械でアタッチメントがないものを探す
+    const machine = company.machines.find(m => m.type === 'small' && m.attachments === 0);
+    if (!machine) {
+        console.log(`[アタッチメント購入失敗] ${company.name}: 装着可能な機械なし`);
+        return false;
+    }
+
+    company.cash -= attachmentCost;
+    machine.attachments = 1;
+
+    incrementRow(companyIndex);
+    showAIActionModal(company, 'アタッチメント購入', '🔧', '製造能力+1（改善）');
+
+    console.log(`[アタッチメント購入成功] ${company.name}`);
+    return true;
+}
+
+/**
+ * セールスマン採用実行
+ */
+function executeSalesmanHire(company, companyIndex) {
+    const hireCost = 30;
+
+    if (!aiCanAffordSafely(company, hireCost)) {
+        console.log(`[採用失敗] ${company.name}: 資金不足でセールスマン採用見送り`);
+        return false;
+    }
+
+    // 採用上限チェック
+    if (company.salesmen >= (company.maxPersonnel || 2)) {
+        console.log(`[採用失敗] ${company.name}: セールスマン採用上限`);
+        return false;
+    }
+
+    company.cash -= hireCost;
+    company.salesmen++;
+
+    incrementRow(companyIndex);
+    showAIActionModal(company, '人員採用', '👔', 'セールスマン採用（改善）');
+
+    console.log(`[採用成功] ${company.name}: セールスマン（計${company.salesmen}名）`);
+    return true;
+}
+
+/**
+ * ワーカー採用実行
+ */
+function executeWorkerHire(company, companyIndex) {
+    const hireCost = 30;
+
+    if (!aiCanAffordSafely(company, hireCost)) {
+        console.log(`[採用失敗] ${company.name}: 資金不足でワーカー採用見送り`);
+        return false;
+    }
+
+    // 採用上限チェック
+    if (company.workers >= (company.maxPersonnel || 2)) {
+        console.log(`[採用失敗] ${company.name}: ワーカー採用上限`);
+        return false;
+    }
+
+    company.cash -= hireCost;
+    company.workers++;
+
+    incrementRow(companyIndex);
+    showAIActionModal(company, '人員採用', '👷', 'ワーカー採用（改善）');
+
+    console.log(`[採用成功] ${company.name}: ワーカー（計${company.workers}名）`);
+    return true;
 }
 
 // ============================================
@@ -562,8 +1826,8 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
         }
     }
 
-    // === 7. 3期以降：機械投資戦略 ===
-    if (period >= 3 && safeInvestment >= 30 && rowsRemaining > 8) {
+    // === 7. 3期以降：機械投資戦略（戦略別に分岐） ===
+    if (period >= 3 && rowsRemaining > 4) {
         const smallMachines = company.machines.filter(m => m.type === 'small');
         const largeMachines = company.machines.filter(m => m.type === 'large');
         const attachableMachines = smallMachines.filter(m => m.attachments === 0);
@@ -572,13 +1836,45 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
             return sum + (m.attachments > 0 ? 2 : 1);
         }, 0);
 
-        // 目標：製造能力 >= 販売能力を目指す
-        const targetMfgCapacity = Math.max(salesCapacity, 3);
+        // 戦略別の目標設定
+        const strategyMachinePreference = {
+            'aggressive': { preferLarge: true, targetCapacity: 5, investThreshold: 50 },
+            'tech_focused': { preferLarge: true, targetCapacity: 4, investThreshold: 60 },
+            'balanced': { preferLarge: false, targetCapacity: 4, investThreshold: 70 },
+            'conservative': { preferLarge: false, targetCapacity: 3, investThreshold: 100 },
+            'price_focused': { preferLarge: false, targetCapacity: 3, investThreshold: 80 },
+            'unpredictable': { preferLarge: Math.random() > 0.5, targetCapacity: 4, investThreshold: 60 }
+        };
+
+        const pref = strategyMachinePreference[company.strategy] || strategyMachinePreference['balanced'];
+        const targetMfgCapacity = Math.max(salesCapacity, pref.targetCapacity);
         const needsMoreCapacity = mfgCapacity < targetMfgCapacity;
 
-        if (needsMoreCapacity) {
+        // 戦略によって大型機械を優先する会社
+        if (pref.preferLarge && smallMachines.length > 0 && largeMachines.length === 0 &&
+            company.workers >= 3 && safeInvestment >= pref.investThreshold) {
+            const smallMachine = smallMachines[0];
+            const bookValue = smallMachine.attachments > 0 ? 40 : 30;
+            const salePrice = Math.floor(bookValue * 0.7);
+            const netCost = 100 - salePrice;
+
+            if (safeInvestment >= netCost) {
+                return {
+                    action: 'UPGRADE_TO_LARGE',
+                    params: {
+                        sellMachineIndex: company.machines.indexOf(smallMachine),
+                        salePrice: salePrice,
+                        purchaseCost: 100,
+                        bookValue: bookValue
+                    },
+                    reason: `${company.strategy}戦略：大型機械へ投資（製造+3）`
+                };
+            }
+        }
+
+        if (needsMoreCapacity && safeInvestment >= 30) {
             // オプション1：アタッチメント購入（30円、+1能力）
-            if (attachableMachines.length > 0 && safeInvestment >= 30) {
+            if (attachableMachines.length > 0) {
                 return {
                     action: 'BUY_ATTACHMENT',
                     params: { cost: 30 },
@@ -596,7 +1892,6 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
             }
 
             // オプション3：大型機械へのアップグレード（売却+購入）
-            // 条件：小型機械あり、ワーカー3人以上、十分な資金
             if (smallMachines.length > 0 && largeMachines.length === 0 &&
                 company.workers >= 3 && safeInvestment >= 70) {
                 const smallMachine = smallMachines[0];
@@ -1295,6 +2590,201 @@ function convertUltimateToGMaxAction(ultimateDecision, company, mfgCapacity, sal
 function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) {
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
+
+    // === 【最重要】動的戦略エンジン（競合観察＋行別計画＋サイクル最適化） ===
+    const strategicPlan = getStrategicPlan(company, period);
+    const dynamicAction = getDynamicAction(company, companyIndex);
+    const cycleAction = optimizeCycleAction(company, strategicPlan);
+
+    // 戦略評価とスコア追跡
+    if ((company.currentRow || 1) === 1 || (company.currentRow || 1) % 5 === 0) {
+        logStrategyEvaluation(company, period);
+    }
+    trackScoreProgress(company, period);
+
+    // === 【自己改善システム】120点達成に向けた自動改善 ===
+    const improvementAction = applyImprovementAction(company, period);
+    if (improvementAction) {
+        console.log(`[自己改善実行] ${company.name}: ${improvementAction.type} - ${improvementAction.reason}`);
+
+        // 改善アクションを実行
+        let executed = false;
+        switch (improvementAction.type) {
+            case 'SELL':
+                if (company.products > 0 && salesCapacity > 0) {
+                    executeDefaultSale(company, improvementAction.qty || Math.min(salesCapacity, company.products), improvementAction.priceMultiplier || 0.75);
+                    executed = true;
+                }
+                break;
+            case 'PRODUCE':
+                if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                    executeDefaultProduction(company, mfgCapacity);
+                    executed = true;
+                }
+                break;
+            case 'BUY_CHIP':
+                executed = executeChipPurchase(company, companyIndex, improvementAction.chipType, improvementAction.cost, improvementAction.express);
+                break;
+            case 'BUY_ATTACHMENT':
+                executed = executeAttachmentPurchase(company, companyIndex);
+                break;
+            case 'HIRE_SALESMAN':
+                executed = executeSalesmanHire(company, companyIndex);
+                break;
+            case 'HIRE_WORKER':
+                executed = executeWorkerHire(company, companyIndex);
+                break;
+        }
+
+        if (executed) {
+            return;  // 改善アクションが実行されたら終了
+        }
+    }
+
+    console.log(`[戦略計画] ${company.name}: 期${period} 残${strategicPlan.currentState.rowsRemaining}行 残${strategicPlan.currentState.cyclesRemaining}サイクル`);
+    console.log(`  目標MQ: ${strategicPlan.target.mqRequired} 達成可能性: ${strategicPlan.projection.achievability}%`);
+    console.log(`  動的判断: ${dynamicAction.action} - ${dynamicAction.reason}`);
+    console.log(`  サイクル判断: ${cycleAction.phase} - ${cycleAction.reason}`);
+
+    // 期末の在庫戦略（重要：次期に繋げる！）
+    // ※期末在庫処分は間違い。次期開始時に在庫があると有利
+    // ※5期のみ例外：終了時在庫10個以上で良いので、超過分は売却可
+    if (strategicPlan.currentState.rowsRemaining <= 5) {
+        const totalInventory = company.materials + company.wip + company.products;
+        const isFinalPeriod = period === 5;
+
+        if (isFinalPeriod) {
+            // 5期終了時：在庫10個以上キープ、超過分のみ売却
+            const excessProducts = Math.max(0, company.products - 10);
+            if (excessProducts > 0 && salesCapacity > 0) {
+                console.log(`[5期最終] ${company.name}: 在庫10個キープ、超過${excessProducts}個を売却`);
+                executeDefaultSale(company, Math.min(salesCapacity, excessProducts), 0.75);
+                return;
+            }
+            // 在庫10個未満なら生産して積み上げ
+            if (totalInventory < 10 && (company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                console.log(`[5期最終] ${company.name}: 在庫${totalInventory}個→10個目標で生産`);
+                executeDefaultProduction(company, mfgCapacity);
+                return;
+            }
+        } else {
+            // 2-4期：在庫を次期に繋げる（売らない！生産して製品を増やす）
+            if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                console.log(`[期末継続] ${company.name}: 次期に繋げるため生産（在庫${totalInventory}個維持）`);
+                executeDefaultProduction(company, mfgCapacity);
+                return;
+            }
+            // 製品しかない場合も基本的に売らない（次期初手で売れる）
+            // ただし現金が極端に少ない場合のみ売却
+            if (company.products > 0 && company.cash < 30) {
+                console.log(`[期末緊急] ${company.name}: 現金不足で1個のみ売却`);
+                executeDefaultSale(company, 1, 0.70);
+                return;
+            }
+        }
+    }
+
+    // サイクル最適化に従って行動（優先度CRITICAL/HIGHの場合）
+    if (cycleAction.priority === 'CRITICAL' || cycleAction.priority === 'HIGH') {
+        let executed = false;
+
+        switch (cycleAction.phase) {
+            case 'SELL':
+                if (company.products > 0 && salesCapacity > 0) {
+                    executeDefaultSale(company, cycleAction.qty || Math.min(salesCapacity, company.products), 0.80);
+                    executed = true;
+                }
+                break;
+            case 'PRODUCE':
+                if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                    executeDefaultProduction(company, mfgCapacity);
+                    executed = true;
+                }
+                break;
+            case 'BUY':
+                const safetyMargin = (PERIOD_STRATEGY_TARGETS[period]?.riskBuffer || 20) + 50;
+                if (company.cash > safetyMargin + 10) {
+                    executeDefaultMaterialPurchase(company, cycleAction.qty || mfgCapacity);
+                    executed = true;
+                }
+                break;
+        }
+
+        if (executed) {
+            return;
+        }
+    }
+
+    // === 【最優先】2期初手：戦略別に多様な行動を強制 ===
+    if (period === 2 && (company.currentRow || 1) <= 2) {
+        const strategy = company.strategy || 'balanced';
+        const safeInvestment = company.cash - 80;
+
+        console.log(`[2期初手強制] ${company.name} 戦略=${strategy}`);
+
+        let forcedAction = null;
+
+        switch (strategy) {
+            case 'tech_focused':
+                // 技術重視：チップ購入最優先
+                if ((company.chips.research || 0) < 2 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'research', cost: 20 }, reason: 'tech_focused: 研究チップ優先' };
+                }
+                break;
+
+            case 'aggressive':
+                // 攻撃的：広告チップ優先（製品があれば販売）
+                if (company.products > 0 && salesCapacity > 0) {
+                    forcedAction = { action: 'SELL', params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.75 }, reason: 'aggressive: 販売で現金回収' };
+                } else if (safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'advertising', cost: 20 }, reason: 'aggressive: 広告チップ' };
+                }
+                break;
+
+            case 'price_focused':
+                // 価格重視：材料仕入れ優先
+                if (safeInvestment >= 30) {
+                    forcedAction = { action: 'BUY_MATERIALS', params: { qty: Math.min(mfgCapacity, 3) }, reason: 'price_focused: 材料仕入れ優先' };
+                }
+                break;
+
+            case 'conservative':
+                // 保守的：保険チップ→教育チップ優先
+                if (!company.chips.insurance && safeInvestment >= 5) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'insurance', cost: 5 }, reason: 'conservative: 保険チップ' };
+                } else if ((company.chips.education || 0) < 1 && safeInvestment >= 20) {
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: 'education', cost: 20 }, reason: 'conservative: 教育チップ' };
+                }
+                break;
+
+            case 'unpredictable':
+                // 予測不能：ランダム
+                const rand = Math.random();
+                if (rand < 0.33 && safeInvestment >= 20) {
+                    const chips = ['research', 'education', 'advertising'];
+                    forcedAction = { action: 'BUY_CHIP', params: { chipType: chips[Math.floor(Math.random() * 3)], cost: 20 }, reason: 'unpredictable: ランダムチップ' };
+                } else if (rand < 0.66 && safeInvestment >= 30) {
+                    forcedAction = { action: 'BUY_MATERIALS', params: { qty: 2 }, reason: 'unpredictable: ランダム材料購入' };
+                }
+                // else: 通常ロジックへフォールスルー
+                break;
+
+            case 'balanced':
+            default:
+                // バランス型：販売優先
+                if (company.products > 0 && salesCapacity > 0) {
+                    forcedAction = { action: 'SELL', params: { qty: Math.min(salesCapacity, company.products), priceMultiplier: 0.80 }, reason: 'balanced: 販売' };
+                }
+                break;
+        }
+
+        if (forcedAction) {
+            console.log(`[2期初手実行] ${company.name}: ${forcedAction.action} - ${forcedAction.reason}`);
+            if (executeGMaximizingAction(company, companyIndex, forcedAction)) {
+                return; // 成功したら終了
+            }
+        }
+    }
 
     // === 自己資本450目標戦略 ===
     if (AIBrain.getEquityMaximizingAction) {
@@ -2870,6 +4360,8 @@ function executeDefaultSale(company, salesCapacity, priceBase) {
                 company.products -= selectedQty;
                 company.totalSales += revenue;
                 company.totalSoldQuantity = (company.totalSoldQuantity || 0) + selectedQty;
+                company.periodSalesCount = (company.periodSalesCount || 0) + 1;  // 販売回数追跡（120点評価用）
+                company.periodMQ = (company.periodMQ || 0) + (selectedMarket.sellPrice - 10) * selectedQty;  // MQ追跡
                 selectedMarket.currentStock += selectedQty;
 
                 incrementRow(gameState.companies.indexOf(company));
@@ -2904,14 +4396,16 @@ function executeDefaultMaterialPurchase(company, targetQty) {
     const canStore = Math.max(0, materialCapacity - company.materials);
     const maxBuyable = gameState.currentPeriod === 2 ? canStore : Math.min(mfgCapacity, canStore);
     const actualTargetQty = Math.min(targetQty, maxBuyable);
+    const companyIndex = gameState.companies.indexOf(company);
 
     const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed)
         .sort((a, b) => a.buyPrice - b.buyPrice);
 
     if (availableMarkets.length > 0) {
-        // 常に2市場同時購入を試みる（複数市場から安い順に購入）
-        // 条件: 購入目標が2個以上、かつ複数市場が利用可能
-        const shouldDistribute = actualTargetQty >= 2 && availableMarkets.length >= 1;
+        // 2市場同時購入を検討（購入目標が2個以上、複数市場が利用可能、行数に余裕）
+        // 重要: 2市場から購入する場合は2行使用する
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+        const shouldDistribute = actualTargetQty >= 2 && availableMarkets.length >= 2 && rowsRemaining >= 2;
 
         if (shouldDistribute) {
             let simulatedTotal = 0;
@@ -2920,6 +4414,7 @@ function executeDefaultMaterialPurchase(company, targetQty) {
 
             for (const market of availableMarkets) {
                 if (simulatedTotal >= actualTargetQty) break;
+                if (purchases.length >= 2) break; // 最大2市場まで
                 const maxAffordable = Math.floor(simulatedCash / market.buyPrice);
                 const buyQty = Math.min(actualTargetQty - simulatedTotal, market.currentStock, maxAffordable);
 
@@ -2930,7 +4425,8 @@ function executeDefaultMaterialPurchase(company, targetQty) {
                 }
             }
 
-            if (simulatedTotal >= 1) {
+            // 2市場から購入する場合は2行使用
+            if (purchases.length >= 2 && simulatedTotal >= 2) {
                 let totalCost = 0;
                 let purchaseDetails = [];
 
@@ -2940,23 +4436,25 @@ function executeDefaultMaterialPurchase(company, targetQty) {
                     company.totalMaterialCost += p.cost;
                     p.market.currentStock -= p.qty;
                     totalCost += p.cost;
-                    purchaseDetails.push(`${p.market.name}:${p.qty}`);
+                    purchaseDetails.push(`${p.market.name}:${p.qty}個`);
                 }
 
-                incrementRow(gameState.companies.indexOf(company));
-                const detailText = purchases.length > 1
-                    ? `${purchases.length}市場から購入: ${purchaseDetails.join('、')}`
-                    : purchaseDetails.join('、');
-                showAIActionModal(company, '材料仕入', '📦', detailText, [
+                // 2市場購入 = 2行使用
+                incrementRow(companyIndex);
+                incrementRow(companyIndex);
+
+                const detailText = `2市場購入（2行使用）: ${purchaseDetails.join('、')}`;
+                showAIActionModal(company, '材料仕入（2行）', '📦📦', detailText, [
                     { label: '購入数', value: `${simulatedTotal}個` },
-                    { label: '支払', value: `¥${totalCost}` }
+                    { label: '支払', value: `¥${totalCost}` },
+                    { label: '使用行数', value: '2行', highlight: true }
                 ]);
-                console.log(`[2市場購入] ${company.name}: ${purchaseDetails.join(', ')} 合計${simulatedTotal}個 ¥${totalCost}`);
+                console.log(`[2市場購入-2行] ${company.name}: ${purchaseDetails.join(', ')} 合計${simulatedTotal}個 ¥${totalCost}`);
                 return;
             }
         }
 
-        // フォールバック: 単一市場から購入
+        // 1市場から購入（1行使用）
         const market = availableMarkets[0];
         const buyQty = Math.min(actualTargetQty, market.currentStock, Math.floor(company.cash / market.buyPrice));
 
@@ -2967,7 +4465,7 @@ function executeDefaultMaterialPurchase(company, targetQty) {
             company.totalMaterialCost += cost;
             market.currentStock -= buyQty;
 
-            incrementRow(gameState.companies.indexOf(company));
+            incrementRow(companyIndex);
             showAIActionModal(company, '材料仕入', '📦', `${market.name}から${buyQty}個購入`, [
                 { label: '仕入価格', value: `¥${market.buyPrice}/個` },
                 { label: '支払', value: `¥${cost}` }
@@ -3379,6 +4877,8 @@ function processAIBidResults(marketIndex, allBids) {
             bidCompany.products -= actualQty;
             bidCompany.totalSales += revenue;
             bidCompany.totalSoldQuantity = (bidCompany.totalSoldQuantity || 0) + actualQty;
+            bidCompany.periodSalesCount = (bidCompany.periodSalesCount || 0) + 1;  // 販売回数追跡（120点評価用）
+            bidCompany.periodMQ = (bidCompany.periodMQ || 0) + (salePrice - 10) * actualQty;  // MQ追跡
             market.currentStock += actualQty;
             remainingCapacity -= actualQty;
 

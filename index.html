@@ -6,27 +6,27 @@
     <title>MG (Management Game) - Ultimate Edition</title>
     <!-- 外部CSSファイル -->
     <link rel="stylesheet" href="css/styles.css">
-    <!-- 外部JSファイル (v=20260101d キャッシュバスター) -->
-    <script src="js/constants.js?v=20260101d"></script>
-    <script src="js/state.js?v=20260101d"></script>
-    <script src="js/game.js?v=20260101d"></script>
-    <script src="js/ui.js?v=20260101d"></script>
-    <script src="js/bidding.js?v=20260101d"></script>
-    <script src="js/accounting.js?v=20260101d"></script>
-    <script src="js/settlement.js?v=20260101d"></script>
-    <script src="js/loans.js?v=20260101d"></script>
-    <script src="js/chips.js?v=20260101d"></script>
-    <script src="js/save.js?v=20260101d"></script>
-    <script src="js/sales.js?v=20260101d"></script>
-    <script src="js/production.js?v=20260101d"></script>
-    <script src="js/assets.js?v=20260101d"></script>
-    <script src="js/ai-actions.js?v=20260101d"></script>
-    <script src="js/risk-effects.js?v=20260101d"></script>
-    <script src="js/cards.js?v=20260101d"></script>
-    <script src="js/ai-brain.js?v=20260101e"></script>
-    <script src="js/ai-strategies.js?v=20260101e"></script>
-    <script src="js/modals.js?v=20260101a"></script>
-    <script src="js/turns.js?v=20260101a"></script>
+    <!-- 外部JSファイル (v=20260101h キャッシュバスター - 120点戦略評価システム) -->
+    <script src="js/constants.js?v=20260101h"></script>
+    <script src="js/state.js?v=20260101h"></script>
+    <script src="js/game.js?v=20260101h"></script>
+    <script src="js/ui.js?v=20260101h"></script>
+    <script src="js/bidding.js?v=20260101h"></script>
+    <script src="js/accounting.js?v=20260101h"></script>
+    <script src="js/settlement.js?v=20260101h"></script>
+    <script src="js/loans.js?v=20260101h"></script>
+    <script src="js/chips.js?v=20260101h"></script>
+    <script src="js/save.js?v=20260101h"></script>
+    <script src="js/sales.js?v=20260101h"></script>
+    <script src="js/production.js?v=20260101h"></script>
+    <script src="js/assets.js?v=20260101h"></script>
+    <script src="js/ai-actions.js?v=20260101h"></script>
+    <script src="js/risk-effects.js?v=20260101h"></script>
+    <script src="js/cards.js?v=20260101h"></script>
+    <script src="js/ai-brain.js?v=20260101h"></script>
+    <script src="js/ai-strategies.js?v=20260101h"></script>
+    <script src="js/modals.js?v=20260101h"></script>
+    <script src="js/turns.js?v=20260101h"></script>
 </head>
 <body>
     <!-- トースト通知コンテナ -->
@@ -400,6 +400,13 @@ function processPeriodStart() {
     const selections = window.periodStartSelections || { loan: 0, warehouse: 0, computer: 1, insurance: 1 };
     let totalCost = 0;
 
+    // 120点評価システム用のカウンターをリセット
+    gameState.companies.forEach(c => {
+        c.periodSalesCount = 0;  // 販売回数リセット
+        c.periodMQ = 0;          // 期間MQリセット
+        c.scoreHistory = [];     // スコア履歴リセット
+    });
+
     // ① 既存借入の金利支払い（全社）
     gameState.companies.forEach(c => {
         const longInterest = Math.floor((c.loans || 0) * 0.1);
@@ -589,18 +596,29 @@ function viewGameState() {
         const salesCapacity = getSalesCapacity(company);
         const priceComp = getPriceCompetitiveness(company, idx);
 
-        // チップ情報
+        // チップ情報（ビジュアル表示）
         const chips = company.chips || {};
-        const chipInfo = [];
-        if (chips.research) chipInfo.push(`研${chips.research}`);
-        if (chips.education) chipInfo.push(`教${chips.education}`);
-        if (chips.advertising) chipInfo.push(`広${chips.advertising}`);
-        if (chips.computer) chipInfo.push(`PC${chips.computer}`);
-        if (chips.insurance) chipInfo.push(`保${chips.insurance}`);
+        const chipVisual = [];
+        if (chips.research) chipVisual.push('🔬'.repeat(chips.research));
+        if (chips.education) chipVisual.push('📚'.repeat(chips.education));
+        if (chips.advertising) chipVisual.push('📢'.repeat(chips.advertising));
+        if (chips.computer) chipVisual.push('💻'.repeat(chips.computer));
+        if (chips.insurance) chipVisual.push('🛡️'.repeat(chips.insurance));
 
-        // 機械情報
+        // 機械情報（ビジュアル）
         const smallMachines = company.machines.filter(m => m.type === 'small').length;
         const largeMachines = company.machines.filter(m => m.type === 'large').length;
+        const smallWithAttachment = company.machines.filter(m => m.type === 'small' && m.attachment).length;
+        const machineVisual = '⚙️'.repeat(smallMachines - smallWithAttachment) + '🔧'.repeat(smallWithAttachment) + '🏭'.repeat(largeMachines);
+
+        // 在庫ビジュアル（最大10個まで表示、それ以上は数字）
+        const materialsVisual = company.materials <= 10 ? '📦'.repeat(company.materials) : `📦×${company.materials}`;
+        const wipVisual = company.wip <= 10 ? '🔨'.repeat(company.wip) : `🔨×${company.wip}`;
+        const productsVisual = company.products <= 10 ? '📱'.repeat(company.products) : `📱×${company.products}`;
+
+        // 人員ビジュアル
+        const workersVisual = company.workers <= 8 ? '👷'.repeat(company.workers) : `👷×${company.workers}`;
+        const salesmenVisual = company.salesmen <= 8 ? '🧑‍💼'.repeat(company.salesmen) : `🧑‍💼×${company.salesmen}`;
 
         const bgColor = isPlayer ? 'linear-gradient(135deg, #166534 0%, #14532d 100%)' : 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)';
         const borderColor = isPlayer ? '#22c55e' : '#3b82f6';
@@ -609,10 +627,13 @@ function viewGameState() {
             <div style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div style="font-weight: bold; color: #fbbf24; font-size: 14px;">${isPlayer ? '★ ' : ''}${company.name}</div>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
                         <span style="color: #4ade80; font-weight: bold;">¥${company.cash}</span>
-                        <span style="background: ${(company.currentRow || 1) >= gameState.maxRows - 5 ? '#ef4444' : '#3b82f6'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">
-                            ${company.currentRow || 1}/${gameState.maxRows}行
+                        <span onclick="showCompanyActionHistory(${idx})"
+                              style="background: ${(company.currentRow || 1) >= gameState.maxRows - 5 ? '#ef4444' : '#3b82f6'};
+                                     color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; cursor: pointer;"
+                              title="クリックで行動履歴を表示">
+                            📋 ${company.currentRow || 1}/${gameState.maxRows}行
                         </span>
                     </div>
                 </div>
@@ -620,27 +641,27 @@ function viewGameState() {
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px;">
                     <div style="background: rgba(139, 92, 246, 0.3); padding: 6px; border-radius: 6px; text-align: center;">
                         <div style="color: #c4b5fd; font-size: 10px;">材料</div>
-                        <div style="color: white; font-weight: bold;">${company.materials}個</div>
+                        <div style="color: white; font-size: 14px; min-height: 20px;">${materialsVisual || '−'}</div>
                     </div>
                     <div style="background: rgba(168, 85, 247, 0.3); padding: 6px; border-radius: 6px; text-align: center;">
                         <div style="color: #d8b4fe; font-size: 10px;">仕掛品</div>
-                        <div style="color: white; font-weight: bold;">${company.wip}個</div>
+                        <div style="color: white; font-size: 14px; min-height: 20px;">${wipVisual || '−'}</div>
                     </div>
                     <div style="background: rgba(99, 102, 241, 0.3); padding: 6px; border-radius: 6px; text-align: center;">
                         <div style="color: #a5b4fc; font-size: 10px;">製品</div>
-                        <div style="color: white; font-weight: bold;">${company.products}個</div>
+                        <div style="color: white; font-size: 14px; min-height: 20px;">${productsVisual || '−'}</div>
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px;">
                     <div style="background: rgba(251, 191, 36, 0.2); padding: 4px; border-radius: 4px; text-align: center;">
-                        <span style="color: #fbbf24; font-size: 10px;">W:${company.workers}</span>
+                        <span style="font-size: 12px;">${workersVisual || '−'}</span>
                     </div>
                     <div style="background: rgba(148, 163, 184, 0.2); padding: 4px; border-radius: 4px; text-align: center;">
-                        <span style="color: #94a3b8; font-size: 10px;">機:${smallMachines}小${largeMachines}大</span>
+                        <span style="font-size: 12px;">${machineVisual || '−'}</span>
                     </div>
                     <div style="background: rgba(59, 130, 246, 0.2); padding: 4px; border-radius: 4px; text-align: center;">
-                        <span style="color: #60a5fa; font-size: 10px;">S:${company.salesmen}</span>
+                        <span style="font-size: 12px;">${salesmenVisual || '−'}</span>
                     </div>
                 </div>
 
@@ -649,7 +670,7 @@ function viewGameState() {
                     <span>F:¥${fixedCost}</span>
                 </div>
 
-                ${chipInfo.length > 0 ? `<div style="font-size: 10px; color: #a78bfa; margin-top: 4px;">チップ: ${chipInfo.join(' ')}</div>` : ''}
+                ${chipVisual.length > 0 ? `<div style="font-size: 14px; margin-top: 4px;">${chipVisual.join(' ')}</div>` : ''}
             </div>
         `;
     });
@@ -676,6 +697,91 @@ function viewGameState() {
     `;
 
     showModal('全体を見る', content);
+}
+
+// 会社の行動履歴を表示
+function showCompanyActionHistory(companyIndex) {
+    const company = gameState.companies[companyIndex];
+    const history = company.actionHistory || [];
+
+    let historyHtml = '';
+    if (history.length === 0) {
+        historyHtml = '<div style="text-align: center; color: #94a3b8; padding: 20px;">まだ行動履歴がありません</div>';
+    } else {
+        history.forEach((action, idx) => {
+            const actionIcon = getActionIcon(action.type);
+            const actionColor = getActionColor(action.type);
+            historyHtml += `
+                <div style="background: ${actionColor}; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 4px; font-weight: bold; min-width: 40px; text-align: center;">
+                        ${action.row}行
+                    </div>
+                    <div style="font-size: 20px;">${actionIcon}</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: white;">${action.name}</div>
+                        ${action.detail ? `<div style="font-size: 11px; color: rgba(255,255,255,0.7);">${action.detail}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    const content = `
+        <div style="max-height: 60vh; overflow-y: auto; padding: 10px;">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <span style="color: #fbbf24; font-weight: bold; font-size: 16px;">${company.name}</span>
+                <span style="color: #94a3b8;"> - 現在${company.currentRow || 1}行目</span>
+            </div>
+            ${historyHtml}
+        </div>
+        <button onclick="closeModal(); viewGameState();"
+                style="width: 100%; padding: 12px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                       color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+            全体を見るに戻る
+        </button>
+    `;
+
+    showModal(`${company.name}の行動履歴`, content);
+}
+
+// 行動タイプに応じたアイコン
+function getActionIcon(actionType) {
+    const icons = {
+        'SELL': '💰',
+        'BUY_MATERIALS': '📦',
+        'PRODUCE': '🔨',
+        'COMPLETE': '📱',
+        'BUY_CHIP': '💎',
+        'HIRE_WORKER': '👷',
+        'HIRE_SALESMAN': '🧑‍💼',
+        'BUY_SMALL_MACHINE': '⚙️',
+        'BUY_LARGE_MACHINE': '🏭',
+        'BUY_ATTACHMENT': '🔧',
+        'NOTHING': '💤',
+        'DECISION_CARD': '🎴',
+        'RISK_CARD': '⚠️'
+    };
+    return icons[actionType] || '❓';
+}
+
+// 行動タイプに応じた色
+function getActionColor(actionType) {
+    const colors = {
+        'SELL': 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        'BUY_MATERIALS': 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        'PRODUCE': 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+        'COMPLETE': 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+        'BUY_CHIP': 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+        'HIRE_WORKER': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        'HIRE_SALESMAN': 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+        'BUY_SMALL_MACHINE': 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+        'BUY_LARGE_MACHINE': 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+        'BUY_ATTACHMENT': 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        'NOTHING': 'linear-gradient(135deg, #374151 0%, #1f2937 100%)',
+        'DECISION_CARD': 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+        'RISK_CARD': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+    };
+    return colors[actionType] || 'linear-gradient(135deg, #374151 0%, #1f2937 100%)';
 }
 
 // initializeCardDeck は js/game.js に移動済み
@@ -1114,204 +1220,9 @@ function applyRiskCard(cardId) {
 // リスクカード特殊効果は js/risk-effects.js に移動しました
 // ============================================
 
-// Render markets
-function renderMarkets() {
-    const container = document.getElementById('marketsContainer');
-    let html = '';
-    
-    gameState.markets.forEach(market => {
-        html += `
-            <div class="market-card">
-                <div class="market-header">
-                    <span class="market-name">${market.name}</span>
-                    <div class="market-prices">
-                        <span class="price-tag buy">買¥${market.buyPrice}</span>
-                        <span class="price-tag sell">売¥${market.sellPrice}</span>
-                    </div>
-                </div>
-                <div class="market-stock-info">
-                    <div class="market-stock">
-                        ${Array(Math.min(market.currentStock, 20)).fill('<div class="stock-block"></div>').join('')}
-                        ${market.currentStock > 20 ? '...' : ''}
-                    </div>
-                    <span class="stock-count">${market.currentStock}/${market.maxStock}</span>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-// Render companies
-function renderCompanies() {
-    const container = document.getElementById('companiesContainer');
-    let html = '';
-    
-    gameState.companies.forEach((company, index) => {
-        const isCurrentTurn = index === gameState.currentPlayerIndex;
-        const isPlayer = company.type === 'player';
-        const mfgCapacity = getManufacturingCapacity(company);
-        const salesCapacity = getSalesCapacity(company);
-        
-        // Machine display
-        let machineDisplay = '';
-        company.machines.forEach((machine) => {
-            const machineName = machine.type === 'small' ? 
-                (machine.attachments > 0 ? '小型+A' : '小型') : '大型';
-            machineDisplay += `<span class="machine-item">${machineName}</span>`;
-        });
-        
-        // Warehouse display
-        let warehouseDisplay = '';
-        if (company.warehouses > 0) {
-            let locationText = '';
-            if (company.warehouses === 2 || company.warehouseLocation === 'both') {
-                locationText = '材+製';
-            } else if (company.warehouseLocation === 'materials') {
-                locationText = '材';
-            } else {
-                locationText = '製';
-            }
-            warehouseDisplay = `<span class="warehouse-item">倉庫(${locationText})</span>`;
-        }
-        
-        html += `
-            <div class="company-card ${isPlayer ? 'player' : ''} ${isCurrentTurn ? 'current-turn' : ''}">
-                <div class="company-header">
-                    <span class="company-name">${company.name}</span>
-                    <span class="company-cash">¥${company.cash}</span>
-                    <span style="font-size: 12px; background: ${(company.currentRow || 1) >= gameState.maxRows - 5 ? '#ef4444' : '#3b82f6'}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
-                        行:${company.currentRow || 1}/${gameState.maxRows}
-                    </span>
-                </div>
-                <div class="company-stats">
-                    <div class="stat-item">自己資本: ¥${company.equity}</div>
-                    <div class="stat-item">借入: ¥${company.loans + company.shortLoans}</div>
-                    <div class="stat-item capacity" onclick="showManufacturingCapacityDetail(${index})" style="cursor: pointer;">製造能力: ${mfgCapacity}</div>
-                    <div class="stat-item capacity" onclick="showSalesCapacityDetail(${index})" style="cursor: pointer;">販売能力: ${salesCapacity}</div>
-                </div>
-                <div class="machine-section">
-                    ${machineDisplay || '<span class="machine-item">機械なし</span>'}
-                </div>
-                ${warehouseDisplay ? `<div class="warehouse-section">${warehouseDisplay}</div>` : ''}
-                <div class="personnel-section">
-                    <div class="personnel-group">
-                        <span class="personnel-label">ワーカー:</span>
-                        <div class="personnel-dots">
-                            ${Array(company.workers).fill('<div class="personnel-dot"></div>').join('')}
-                        </div>
-                        <span>(${company.workers})</span>
-                    </div>
-                    <div class="personnel-group">
-                        <span class="personnel-label">セールス:</span>
-                        <div class="personnel-dots">
-                            ${Array(company.salesmen).fill('<div class="personnel-dot"></div>').join('')}
-                        </div>
-                        <span>(${company.salesmen})</span>
-                    </div>
-                </div>
-                <div class="inventory-section">
-                    <div class="inventory-box">
-                        <div class="inventory-label">材料</div>
-                        <div class="inventory-blocks">
-                            ${Array(Math.min(company.materials, 10)).fill('<div class="inventory-block material"></div>').join('')}
-                            ${company.materials > 10 ? `<small>+${company.materials - 10}</small>` : ''}
-                        </div>
-                    </div>
-                    <div class="inventory-box">
-                        <div class="inventory-label">仕掛品</div>
-                        <div class="inventory-blocks">
-                            ${Array(Math.min(company.wip, 10)).fill('<div class="inventory-block wip"></div>').join('')}
-                            ${company.wip > 10 ? `<small>+${company.wip - 10}</small>` : ''}
-                        </div>
-                    </div>
-                    <div class="inventory-box">
-                        <div class="inventory-label">製品</div>
-                        <div class="inventory-blocks">
-                            ${Array(Math.min(company.products, 10)).fill('<div class="inventory-block product"></div>').join('')}
-                            ${company.products > 10 ? `<small>+${company.products - 10}</small>` : ''}
-                        </div>
-                    </div>
-                </div>
-                <div class="chips-section">
-                    <div class="chip-row">
-                        <span class="chip-label">PC:</span>
-                        <div class="chip-dots">
-                            ${Array(3).fill(0).map((_, i) =>
-                                `<div class="chip-dot ${i < company.chips.computer ? 'filled computer' : ''}"></div>`
-                            ).join('')}
-                        </div>
-                        <span class="chip-count">${company.chips.computer}</span>
-                    </div>
-                    <div class="chip-row">
-                        <span class="chip-label">保険:</span>
-                        <div class="chip-dots">
-                            ${Array(3).fill(0).map((_, i) =>
-                                `<div class="chip-dot ${i < company.chips.insurance ? 'filled insurance' : ''}"></div>`
-                            ).join('')}
-                        </div>
-                        <span class="chip-count">${company.chips.insurance}</span>
-                    </div>
-                    <div class="chip-row">
-                        <span class="chip-label">研究:</span>
-                        <div class="chip-dots">
-                            ${Array(5).fill(0).map((_, i) =>
-                                `<div class="chip-dot ${i < (company.chips.research + (company.nextPeriodChips?.research || 0)) ? 'filled research' : ''}"></div>`
-                            ).join('')}
-                        </div>
-                        <span class="chip-count">${company.chips.research + (company.nextPeriodChips?.research || 0)}</span>
-                    </div>
-                    <div class="chip-row">
-                        <span class="chip-label">教育:</span>
-                        <div class="chip-dots">
-                            ${Array(gameState.currentPeriod === 2 ? 2 : 1).fill(0).map((_, i) =>
-                                `<div class="chip-dot ${i < (company.chips.education + (company.nextPeriodChips?.education || 0)) ? 'filled education' : ''}"></div>`
-                            ).join('')}
-                        </div>
-                        <span class="chip-count">${company.chips.education + (company.nextPeriodChips?.education || 0)}</span>
-                    </div>
-                    <div class="chip-row">
-                        <span class="chip-label">広告:</span>
-                        <div class="chip-dots">
-                            ${Array(5).fill(0).map((_, i) =>
-                                `<div class="chip-dot ${i < (company.chips.advertising + (company.nextPeriodChips?.advertising || 0)) ? 'filled advertising' : ''}"></div>`
-                            ).join('')}
-                        </div>
-                        <span class="chip-count">${company.chips.advertising + (company.nextPeriodChips?.advertising || 0)}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-// Render action buttons
-function renderActionButtons() {
-    const container = document.getElementById('actionButtons');
-    const isPlayerTurn = gameState.currentPlayerIndex === 0;
-    
-    let html = '';
-    
-    if (!gameState.periodStarted) {
-        html = `<button class="action-btn warning" onclick="startPeriod()">第${gameState.currentPeriod}期を開始</button>`;
-    } else if (isPlayerTurn) {
-        html = `
-            <button class="action-btn main mobile-card-btn" onclick="showTurnStartOptions()">カードを引く</button>
-        `;
-    } else {
-        html = `
-            <button class="action-btn secondary" disabled>AIのターン中...</button>
-        `;
-    }
-    
-    container.innerHTML = html;
-}
-
-// UI関数はjs/ui.jsに移行済み
-// renderCompanyBoard, renderMarketsBoard, renderFixedCostBreakdown,
+// UI/レンダー関数はjs/ui.jsに移行済み
+// renderMarkets, renderCompanies, renderActionButtons
+// renderCompanyBoard, renderMarketsBoard, renderFixedCostBreakdown
 // renderOtherCompanies, showAICompanyModal, showToast, showModal, closeModal
 // showInsuranceRepurchaseModal は js/modals.js に移動済み
 

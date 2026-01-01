@@ -143,7 +143,7 @@ function getPriceCompetitiveness(company, companyIndex = null) {
 // ============================================
 function logAction(companyIndex, action, details, cashChange = 0, rowUsed = false) {
     const company = gameState.companies[companyIndex];
-    gameState.actionLog.push({
+    const logEntry = {
         companyIndex: companyIndex,
         companyName: company.name,
         action: action,
@@ -152,6 +152,37 @@ function logAction(companyIndex, action, details, cashChange = 0, rowUsed = fals
         rowUsed: rowUsed,
         row: company.currentRow,
         timestamp: Date.now()
+    };
+    gameState.actionLog.push(logEntry);
+
+    // 会社別の行動履歴にも記録（ビジュアル表示用）
+    if (!company.actionHistory) {
+        company.actionHistory = [];
+    }
+
+    // 行動タイプをマッピング
+    const actionTypeMap = {
+        '販売': 'SELL', '材料購入': 'BUY_MATERIALS', '材料仕入れ': 'BUY_MATERIALS',
+        '生産': 'PRODUCE', '投入': 'PRODUCE', '完成': 'COMPLETE',
+        'チップ購入': 'BUY_CHIP', '採用': 'HIRE_WORKER', '人員採用': 'HIRE_WORKER',
+        '機械購入': 'BUY_SMALL_MACHINE', 'アタッチメント': 'BUY_ATTACHMENT',
+        '何もしない': 'NOTHING', '意思決定カード': 'DECISION_CARD', 'リスクカード': 'RISK_CARD'
+    };
+
+    let actionType = 'NOTHING';
+    for (const [key, value] of Object.entries(actionTypeMap)) {
+        if (action.includes(key)) {
+            actionType = value;
+            break;
+        }
+    }
+
+    company.actionHistory.push({
+        row: company.currentRow || 1,
+        type: actionType,
+        name: action,
+        detail: details,
+        cashChange: cashChange
     });
 }
 
