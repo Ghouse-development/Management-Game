@@ -259,8 +259,9 @@ function buyChips() {
         return;
     }
 
-    // Check max limits
-    const maxLimits = {research: 5, education: 1, advertising: 5};
+    // Check max limits（教育は2期2枚、3期以降1枚 - GAME_RULES.md 5.2節）
+    const educationMax = period === 2 ? 2 : 1;
+    const maxLimits = {research: 5, education: educationMax, advertising: 5};
     const nextPeriodCount = company.nextPeriodChips?.[chipType] || 0;
     const currentTotal = company.chips[chipType] + nextPeriodCount + quantity;
     if (currentTotal > maxLimits[chipType]) {
