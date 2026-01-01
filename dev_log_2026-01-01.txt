@@ -1,0 +1,132 @@
+# 開発記録 2026-01-01
+
+## 概要
+金利計算の正確な実装、AI待機行動の廃止
+
+---
+
+## 1. 金利計算システムの刷新
+
+### 問題
+- 金利が「期末の借入残高 × 利率」で計算されていた
+- 実際のルール: 期首に既存借入の金利を支払い、新規借入時にも金利を控除
+
+### 解決策
+2つのトラッキング変数を導入:
+- `periodStartInterest`: 期首に支払う既存借入の金利
+- `newLoanInterest`: 期中の新規借入時に控除される金利
+
+### 修正ファイル
+
+#### js/game.js - calculateFixedCost()
+```javascript
+// 旧: cost += (company.loans || 0) * 0.1 + (company.shortLoans || 0) * 0.2;
+// 新:
+cost += company.periodStartInterest || 0;
+cost += company.newLoanInterest || 0;
+```
+
+#### js/loans.js - 借入処理
+- processBorrowing(): プレイヤー長期借入時にnewLoanInterest追跡
+- processAILongTermBorrowing(): AI長期借入時にnewLoanInterest追跡
+- processPlayerLoanRepayment(): 返済時緊急短期借入のトラッキング
+
+#### js/ai-actions.js - AI緊急短期借入
+- 短期借入時のnewLoanInterestトラッキング追加
+
+#### js/state.js - 緊急借入
+- getEmergencyFunding()でnewLoanInterestトラッキング
+
+#### index.html - 期首処理
+- processPeriodStart(): 期首金利支払いとperiodStartInterest記録
+- 納税・配当支払い時の短期借入トラッキング
+- processSettlement(): fBreakdownに新変数を保存
+
+#### js/settlement.js
+- showFBreakdown(): 新形式の金利表示（期首 + 新規借入）
+- proceedToNextPeriod(): 金利トラッキングのリセット
+- 倉庫費用の表示追加
+
+---
+
+## 2. AI待機行動の廃止
+
+### 問題
+- AIが「待機」を選択すると行動しないように見える
+- 待機は戦略的判断ではなく単なるフォールバック
+
+### 解決策
+aiDoNothing()関数を完全リライト:
+
+#### 行動優先順位（必ず実行）
+1. 製品があれば販売
+2. 材料/仕掛があれば生産
+3. 現金があれば材料仕入れ
+4. チップ購入（研究→広告→次期用）
+5. 人員採用（ワーカー→セールス）
+6. 材料売却（資金確保）
+7. 戦略的様子見（理由を明示、行を消費）
+
+#### ポイント
+- 「待機」という表現を廃止
+- 最終手段の「様子見」も行を消費する意思決定として記録
+- 具体的な理由を表示（資金枯渇、在庫ゼロ等）
+- コンソールに[AI強制行動]ログを出力
+
+---
+
+## 3. 修正ファイル一覧
+
+| ファイル | 変更内容 |
+|---------|---------|
+| index.html | 期首金利処理、fBreakdown更新 |
+| js/game.js | calculateFixedCost()金利計算 |
+| js/settlement.js | F表示、倉庫費用、金利リセット |
+| js/loans.js | 全借入処理にnewLoanInterest追跡 |
+| js/ai-actions.js | AI短期借入トラッキング |
+| js/ai-strategies.js | aiDoNothing()→必ず行動するロジック |
+| js/state.js | 緊急借入トラッキング |
+| js/ai-brain.js | 短期借入回避ロジック強化 |
+
+---
+
+## 4. 未検証項目（テスト必要）
+
+1. サイコロ処理（3期以降）: 市場閉鎖・人件費倍率
+2. 金利計算の正確性: 期首金利 + 新規借入金利
+3. AI強制行動のバランス: 不自然な行動がないか
+4. 期首処理の順番: ①金利→②納税→③配当→④PC→⑤保険→⑥倉庫→⑦借入
+
+---
+
+## 5. 技術的詳細
+
+### 金利の流れ
+```
+期首:
+  既存借入残高 × 利率 → periodStartInterest → 現金から控除
+
+期中（新規借入時）:
+  借入額 × 利率 → newLoanInterest → 借入額から控除して入金
+
+期末:
+  元本返済のみ（金利なし）
+
+F計算:
+  F += periodStartInterest + newLoanInterest
+```
+
+### AI行動の流れ
+```
+executeAIStrategyByType()
+  ↓ G最大化アクション試行
+  ↓ 各戦略関数実行
+  ↓ aiDoNothing()（旧: 待機）
+    ↓ 販売可能？→ 販売
+    ↓ 生産可能？→ 生産
+    ↓ 仕入可能？→ 仕入
+    ↓ チップ購入可能？→ 購入
+    ↓ 採用可能？→ 採用
+    ↓ 材料売却可能？→ 売却
+    ↓ 戦略的様子見（行消費）
+```

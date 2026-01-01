@@ -6,14 +6,177 @@
  */
 
 // ============================================
-// AI「何もしない」行動（行は消費しない - お金の動きがないため）
+// 🛡️ 短期借入回避ヘルパー（全AI購入処理で使用）
 // ============================================
-function aiDoNothing(company, reason = '') {
+function aiCanAffordSafely(company, cost) {
+    const periodEndCost = calculatePeriodPayment(company);
+    const riskCardBuffer = (company.chips.insurance || 0) > 0 ? 15 : 40;
+    const safetyBuffer = 70;  // 安全マージン
+    const totalRequired = periodEndCost + riskCardBuffer + safetyBuffer;
+
+    // 購入後に期末支払いを賄えるか
+    const cashAfterPurchase = company.cash - cost;
+    const canAfford = cashAfterPurchase >= totalRequired;
+
+    if (!canAfford) {
+        console.log(`[AI安全] ${company.name}: ¥${cost}の支出は危険（残り¥${cashAfterPurchase} < 必要¥${totalRequired}）→ 見送り`);
+    }
+
+    return canAfford;
+}
+
+// ============================================
+// AI必ず行動する（待機禁止 - 常に最善のアクションを選択）
+// ============================================
+function aiDoNothing(company, originalReason = '') {
     const companyIndex = gameState.companies.indexOf(company);
-    // 行は消費しない（お金の動きがある時だけ行を消費）
-    const detail = reason || '行動条件なし';
-    logAction(companyIndex, '待機', detail, 0, false);  // rowUsed = false
-    showAIActionModal(company, '待機', '⏳', detail);
+    const period = gameState.currentPeriod;
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const periodEndCost = calculatePeriodPayment(company);
+
+    console.log(`[AI強制行動] ${company.name}: 元の理由「${originalReason}」→ 代替行動を探索`);
+
+    // === 優先順位1: 製品があれば売る（確実に収入を得る） ===
+    if (company.products > 0 && salesCapacity > 0) {
+        console.log(`[AI強制行動] ${company.name}: 製品${company.products}個あり → 販売実行`);
+        executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.75);
+        return;
+    }
+
+    // === 優先順位2: 仕掛品・材料があれば生産（製品を作る） ===
+    if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0 && company.workers > 0) {
+        const canProduce = Math.min(mfgCapacity, company.materials + company.wip);
+        if (canProduce > 0) {
+            console.log(`[AI強制行動] ${company.name}: 材料${company.materials}/仕掛${company.wip} → 生産実行`);
+            executeDefaultProduction(company, mfgCapacity);
+            return;
+        }
+    }
+
+    // === 優先順位3: 現金があれば材料仕入れ（サイクル開始） ===
+    const materialCapacity = getMaterialCapacity(company);
+    const canStoreMaterials = materialCapacity - company.materials;
+    if (canStoreMaterials > 0 && company.cash >= 10) {
+        const availableMarkets = gameState.markets.filter(m => m.currentStock > 0 && !m.closed);
+        if (availableMarkets.length > 0) {
+            const cheapest = availableMarkets.sort((a, b) => a.buyPrice - b.buyPrice)[0];
+            const affordQty = Math.floor(company.cash / cheapest.buyPrice);
+            const buyQty = Math.min(canStoreMaterials, cheapest.currentStock, affordQty, mfgCapacity || 1);
+            if (buyQty > 0) {
+                console.log(`[AI強制行動] ${company.name}: 材料仕入れ ${buyQty}個 @ ¥${cheapest.buyPrice}`);
+                executeDefaultMaterialPurchase(company, buyQty);
+                return;
+            }
+        }
+    }
+
+    // === 優先順位4: チップ購入（投資行動） ===
+    const chipCost = period === 2 ? 20 : 40;
+    if (company.cash >= chipCost + 20) {
+        // 研究チップを優先（価格競争力）
+        if ((company.chips.research || 0) < 3) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'research', chipCost);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ購入（代替行動：${originalReason}）`);
+            return;
+        }
+        // 広告チップ
+        if ((company.chips.advertising || 0) < 2) {
+            company.cash -= chipCost;
+            aiPurchaseChip(company, 'advertising', chipCost);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '📢', `広告チップ購入（代替行動：${originalReason}）`);
+            return;
+        }
+        // 次期チップ（3期以降）
+        if (period >= 3) {
+            const nextTotal = (company.nextPeriodChips?.research || 0) +
+                             (company.nextPeriodChips?.education || 0) +
+                             (company.nextPeriodChips?.advertising || 0);
+            if (nextTotal < 3) {
+                company.cash -= 20;  // 次期チップは20円
+                if ((company.nextPeriodChips?.education || 0) < 1) {
+                    company.nextPeriodChips.education++;
+                    incrementRow(companyIndex);
+                    showAIActionModal(company, 'チップ購入(次期)', '📚', `次期用教育チップ（代替行動）`);
+                } else {
+                    company.nextPeriodChips.research++;
+                    incrementRow(companyIndex);
+                    showAIActionModal(company, 'チップ購入(次期)', '🔬', `次期用研究チップ（代替行動）`);
+                }
+                return;
+            }
+        }
+    }
+
+    // === 優先順位5: 人員採用（能力向上） ===
+    if (company.cash >= 10) {
+        if (company.workers < company.machines.length) {
+            company.cash -= 5;
+            company.workers++;
+            company.maxPersonnel = Math.max(company.maxPersonnel || 2, company.workers + company.salesmen);
+            incrementRow(companyIndex);
+            showAIActionModal(company, '採用', '👷', `ワーカー採用（製造能力活用のため）`);
+            return;
+        }
+        if (company.salesmen < 2 && salesCapacity < mfgCapacity) {
+            company.cash -= 5;
+            company.salesmen++;
+            company.maxPersonnel = Math.max(company.maxPersonnel || 2, company.workers + company.salesmen);
+            incrementRow(companyIndex);
+            showAIActionModal(company, '採用', '🧑‍💼', `セールスマン採用（販売能力強化のため）`);
+            return;
+        }
+    }
+
+    // === 優先順位6: 材料を現金化（緊急時） ===
+    if (company.materials > 0 && company.cash < periodEndCost) {
+        const sellQty = Math.min(company.materials, 3);
+        const revenue = sellQty * 8;
+        company.materials -= sellQty;
+        company.cash += revenue;
+        incrementRow(companyIndex);
+        logAction(companyIndex, '材料売却', `材料${sellQty}個を¥${revenue}で売却（資金確保）`, revenue, true);
+        showAIActionModal(company, '材料売却', '📦', `材料${sellQty}個売却（資金確保：¥${revenue}）`);
+        return;
+    }
+
+    // === 最終手段: 意図的な様子見（理由を明確に） ===
+    // ここに到達するのは本当に行動不能な時のみ
+    const statusReport = `現金¥${company.cash}, 材料${company.materials}, 仕掛${company.wip}, 製品${company.products}`;
+    const strategicReason = determineStrategicWaitReason(company, originalReason);
+
+    console.log(`[AI様子見] ${company.name}: ${strategicReason} (${statusReport})`);
+
+    // 様子見でも行を消費する（意思決定として記録）
+    incrementRow(companyIndex);
+    logAction(companyIndex, '戦略的様子見', strategicReason, 0, true);
+    showAIActionModal(company, '戦略的様子見', '🎯', strategicReason);
+}
+
+// 様子見の戦略的理由を判定
+function determineStrategicWaitReason(company, originalReason) {
+    const period = gameState.currentPeriod;
+    const periodEndCost = calculatePeriodPayment(company);
+
+    if (company.cash < 5) {
+        return '資金枯渇：次の収入機会を待機';
+    }
+    if (company.materials === 0 && company.wip === 0 && company.products === 0) {
+        return '在庫ゼロ：市場状況を観察中';
+    }
+    if (company.cash < periodEndCost * 0.5) {
+        return '資金温存：期末支払いに備える';
+    }
+    if (period === 5 && company.currentRow > 20) {
+        return '期末間近：リスク回避のため温存';
+    }
+    if (originalReason) {
+        return `戦略判断：${originalReason}`;
+    }
+    return '市場分析中：最適なタイミングを計る';
 }
 
 // ============================================
@@ -57,11 +220,26 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
         targetEducationChips: strategyParams.targetEducationChips || 2,
         targetAdvertisingChips: strategyParams.targetAdvertisingChips || 1,
         aggressiveness: strategyParams.aggressiveness || 0.5, // 0-1
-        safetyMultiplier: strategyParams.safetyMultiplier || 1.0
+        safetyMultiplier: strategyParams.safetyMultiplier || 1.2  // 🛡️ 1.0→1.2に増加
     };
 
-    const safetyMargin = Math.floor(periodEndCost * params.safetyMultiplier) + 20;
+    // 🛡️ 強化された安全マージン計算（短期借入を絶対に避ける）
+    // リスクカード対応 + 安全バッファ + 期末コストの余裕
+    const riskCardBuffer = company.chips.insurance ? 15 : 40;
+    const minSafetyBuffer = 60;
+    const safetyMargin = Math.floor(periodEndCost * params.safetyMultiplier) + riskCardBuffer + minSafetyBuffer;
     const safeInvestment = Math.max(0, company.cash - safetyMargin);
+
+    // 🛡️ 短期借入が発生しそうな状態か確認
+    const willNeedShortTermLoan = company.cash < periodEndCost + 30;
+    if (willNeedShortTermLoan && company.products > 0) {
+        // 緊急売却モード - 短期借入回避のため製品を売る
+        return {
+            action: 'EMERGENCY_SELL',
+            params: { priceMultiplier: 0.65, aggressive: true, qty: Math.min(company.products, salesCapacity) },
+            reason: `⚠️ 短期借入回避: 現金¥${company.cash} < 期末必要¥${periodEndCost + 30}`
+        };
+    }
 
     // === 0. 在庫20個制限チェック（不良在庫発生リスク・既出カード考慮） ===
     // リスクカード「不良在庫発生」: 在庫20個超で全超過分没収
@@ -622,8 +800,13 @@ function getAIFinancialAnalysis(company) {
     const needsProduction = company.wip > 0 || company.materials > company.wip;
     const canSell = company.products > 0 && salesCapacity > 0;
 
+    // 🛡️ 短期借入回避のための強化されたセーフティ計算
+    // periodEndCost + リスクカード対応バッファ + 安全マージン
+    const riskCardBuffer = company.chips.insurance ? 15 : 40; // 保険なしは大きめのバッファ
+    const minSafetyBuffer = 60; // 最低安全マージン
+    const totalRequiredCash = periodEndCost + riskCardBuffer + minSafetyBuffer;
     const cashSafety = company.cash - periodEndCost;
-    const isCashTight = cashSafety < 50;
+    const isCashTight = company.cash < totalRequiredCash; // より厳しい判定
 
     const loanMultiplier = (period >= 4 && company.equity > 300) ? 1.0 : 0.5;
     const maxLongLoan = Math.round(company.equity * loanMultiplier);
@@ -712,6 +895,8 @@ function getAIFinancialAnalysis(company) {
         periodsRemaining,
         rowsRemaining,
         periodEndCost,
+        totalRequiredCash,  // 🛡️ 短期借入回避用の必要現金
+        riskCardBuffer,     // リスクカード対応バッファ
         fixedCost,
         avgRivalEquity,
         maxRivalEquity,
@@ -948,7 +1133,8 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
                 return;
             } else if (firstMoveAction.action === 'BUY_CHIP') {
                 const chipCost = 20;
-                if (company.cash >= chipCost + 50) {
+                // 🛡️ 短期借入回避チェック
+                if (aiCanAffordSafely(company, chipCost)) {
                     company.cash -= chipCost;
                     company.chips[firstMoveAction.chipType] = (company.chips[firstMoveAction.chipType] || 0) + 1;
                     incrementRow(companyIndex);
@@ -965,10 +1151,14 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     if (cheapMaterials.length > 0 && company.materials < getMaterialCapacity(company)) {
         const cheapest = cheapMaterials.sort((a, b) => a.buyPrice - b.buyPrice)[0];
         const canStore = getMaterialCapacity(company) - company.materials;
-        const canAfford = Math.floor((company.cash - periodEndCost - 20) / cheapest.buyPrice);
+        // 🛡️ 短期借入回避を考慮した購入可能数計算
+        const riskBuffer = (company.chips.insurance || 0) > 0 ? 15 : 40;
+        const safeBuffer = 70;
+        const safeSpend = Math.max(0, company.cash - periodEndCost - riskBuffer - safeBuffer);
+        const canAfford = Math.floor(safeSpend / cheapest.buyPrice);
         const buyQty = Math.min(canStore, cheapest.currentStock, canAfford, mfgCapacity * 2);
 
-        if (buyQty >= 2 && company.cash > periodEndCost + 30) {
+        if (buyQty >= 2 && aiCanAffordSafely(company, buyQty * cheapest.buyPrice)) {
             console.log(`[AI仕入れ] ${company.name}: 安い材料発見！ ${cheapest.name} ¥${cheapest.buyPrice} x ${buyQty}個`);
             executeDefaultMaterialPurchase(company, buyQty);
             return;
@@ -996,7 +1186,8 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
 
         if (riskRecommendation.action === 'BUY_RESEARCH_FOR_OPPORTUNITY') {
             const chipCost = period === 2 ? 20 : 40;
-            if (company.cash >= chipCost + periodEndCost + 30) {
+            // 🛡️ 短期借入回避チェック
+            if (aiCanAffordSafely(company, chipCost)) {
                 company.cash -= chipCost;
                 company.chips.research = (company.chips.research || 0) + 1;
                 incrementRow(companyIndex);
@@ -1007,7 +1198,8 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
 
         if (riskRecommendation.action === 'BUY_INSURANCE' && !company.chips.insurance) {
             const insuranceCost = 10;
-            if (company.cash >= insuranceCost + periodEndCost + 20) {
+            // 🛡️ 短期借入回避チェック
+            if (aiCanAffordSafely(company, insuranceCost)) {
                 company.cash -= insuranceCost;
                 company.chips.insurance = 1;
                 incrementRow(companyIndex);

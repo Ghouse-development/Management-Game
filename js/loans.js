@@ -160,7 +160,10 @@ function processInterestPayments() {
             if (company.cash < totalInterest) {
                 const needed = Math.ceil((totalInterest - company.cash) / 0.8 / 50) * 50;
                 company.shortLoans += needed;
-                company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
+                const shortInterestPaid = Math.floor(needed * 0.2);  // 短期借入: 20%金利
+                company.cash += needed - shortInterestPaid;
+                // 新規借入金利をトラッキング（F計算用）
+                company.newLoanInterest = (company.newLoanInterest || 0) + shortInterestPaid;
             }
 
             company.cash -= totalInterest;
@@ -537,9 +540,12 @@ function processBorrowing() {
 
     if (loanAmount > 0) {
         company.loans += loanAmount;
-        const netAmount = Math.floor(loanAmount * 0.9);  // 長期借入: 借入時10%金利控除
+        const interestPaid = Math.floor(loanAmount * 0.1);  // 長期借入: 10%金利
+        const netAmount = loanAmount - interestPaid;
         company.cash += netAmount;
-        alert(`長期借入¥${loanAmount}（利息控除後¥${netAmount}入金）`);
+        // 新規借入金利をトラッキング（F計算用）
+        company.newLoanInterest = (company.newLoanInterest || 0) + interestPaid;
+        alert(`長期借入¥${loanAmount}（利息¥${interestPaid}控除後¥${netAmount}入金）`);
     }
 
     closeModal();
@@ -627,9 +633,12 @@ function processAILongTermBorrowing() {
             const loanAmount = Math.floor(availableLoan * borrowRatio);  // 1円単位
             if (loanAmount >= 1) {
                 company.loans += loanAmount;
-                const netAmount = Math.floor(loanAmount * 0.9);  // 10%金利控除
+                const interestPaid = Math.floor(loanAmount * 0.1);  // 10%金利
+                const netAmount = loanAmount - interestPaid;
                 company.cash += netAmount;
-                console.log(`${company.name}が長期借入¥${loanAmount}（入金¥${netAmount}）を実行`);
+                // 新規借入金利をトラッキング（F計算用）
+                company.newLoanInterest = (company.newLoanInterest || 0) + interestPaid;
+                console.log(`${company.name}が長期借入¥${loanAmount}（金利¥${interestPaid}、入金¥${netAmount}）を実行`);
             }
         }
     });
@@ -834,8 +843,11 @@ function processPlayerLoanRepayment() {
     if (player.cash < totalRepayment) {
         const needed = Math.ceil((totalRepayment - player.cash) / 0.8 / 50) * 50;
         player.shortLoans += needed;
-        player.cash += needed * 0.8;
-        alert(`資金不足のため¥${needed}を短期借入しました`);
+        const shortInterestPaid = Math.floor(needed * 0.2);
+        player.cash += needed - shortInterestPaid;
+        // 新規借入金利をトラッキング（F計算用）
+        player.newLoanInterest = (player.newLoanInterest || 0) + shortInterestPaid;
+        alert(`資金不足のため¥${needed}を短期借入しました（金利¥${shortInterestPaid}）`);
     }
 
     // 返済処理

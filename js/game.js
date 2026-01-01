@@ -223,8 +223,11 @@ function calculateFixedCost(company) {
     const period = gameState.currentPeriod;
     let cost = calculateSalaryCost(company, period);
 
-    cost += Math.round((company.loans || 0) * INTEREST_RATES.longTerm);
-    cost += Math.round((company.shortLoans || 0) * INTEREST_RATES.shortTerm);
+    // 金利：期首に支払った金利 + 新規借入時の金利
+    // （旧: 残高×利率 → 新: 実際に支払った金利を使用）
+    cost += company.periodStartInterest || 0;  // 期首に支払った既存借入の金利
+    cost += company.newLoanInterest || 0;      // 期中に新規借入した際の金利
+
     cost += (company.chips.computer || 0) * CHIP_COSTS.computer;
     cost += (company.chips.insurance || 0) * CHIP_COSTS.insurance;
 

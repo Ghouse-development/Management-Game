@@ -98,10 +98,13 @@ function handleCashShortage(company, neededAmount) {
 
     // If still not enough, take short-term loan
     if (shortage > 0) {
-        // Short-term loan: receive 80% of loan amount
+        // Short-term loan: receive 80% of loan amount (20% is interest)
         loanAmount = Math.ceil(shortage / 0.8 / 50) * 50;
         company.shortLoans += loanAmount;
-        company.cash += loanAmount * 0.8;
+        const shortInterestPaid = Math.floor(loanAmount * 0.2);
+        company.cash += loanAmount - shortInterestPaid;
+        // Track new loan interest for F calculation
+        company.newLoanInterest = (company.newLoanInterest || 0) + shortInterestPaid;
     }
 
     return { materialsSold, materialRevenue, loanAmount };

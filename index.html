@@ -376,6 +376,123 @@ function showFixedCostBreakdown() {
 function startPeriod() {
     if (gameState.periodStarted) return;
 
+    // 3期以降はまずサイコロを振る
+    if (gameState.currentPeriod >= 3 && !gameState.diceRolled) {
+        showDiceRollModal();
+        return;
+    }
+
+    showPeriodStartOptions();
+}
+
+// 3期以降のサイコロモーダル
+function showDiceRollModal() {
+    // 前期PQトップを取得
+    const diceRollerName = gameState.previousPQTopName || 'システム';
+    const diceRollerPQ = gameState.previousPQTopAmount || 0;
+    const isPlayerRoller = (gameState.previousPQTopIndex === 0);
+
+    const content = `
+        <div style="text-align: center; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 16px; padding: 25px; color: white; margin-bottom: 20px;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 10px;">
+                    前期PQトップ: <strong>${diceRollerName}</strong>（¥${diceRollerPQ}）
+                </div>
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">
+                    ${isPlayerRoller ? 'あなたがサイコロを振ります！' : `${diceRollerName}がサイコロを振ります`}
+                </div>
+                <div id="dice-display" style="font-size: 72px; margin: 20px 0;">🎲</div>
+                <div id="dice-result" style="display: none; margin-top: 15px;">
+                    <div style="font-size: 48px; font-weight: bold;" id="dice-number"></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; font-size: 12px;">
+                        <div style="background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px;">
+                            <div style="opacity: 0.8;">市場閉鎖</div>
+                            <div style="font-weight: bold;" id="closed-markets"></div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px;">
+                            <div style="opacity: 0.8;">人件費倍率</div>
+                            <div style="font-weight: bold;" id="wage-multiplier"></div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px;">
+                            <div style="opacity: 0.8;">大阪上限</div>
+                            <div style="font-weight: bold;" id="osaka-max"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button id="roll-dice-btn" class="submit-btn" onclick="rollPeriodDice()" style="width: 100%; padding: 15px; font-size: 18px;">
+                🎲 サイコロを振る
+            </button>
+            <button id="proceed-btn" class="submit-btn" onclick="proceedAfterDice()" style="width: 100%; padding: 15px; font-size: 16px; display: none; margin-top: 10px;">
+                期首処理へ進む →
+            </button>
+        </div>
+    `;
+
+    showModal(`第${gameState.currentPeriod}期 サイコロ`, content);
+}
+
+// サイコロを振る
+function rollPeriodDice() {
+    const rollBtn = document.getElementById('roll-dice-btn');
+    const diceDisplay = document.getElementById('dice-display');
+    const diceResult = document.getElementById('dice-result');
+    const proceedBtn = document.getElementById('proceed-btn');
+
+    rollBtn.disabled = true;
+    rollBtn.textContent = '振っています...';
+
+    // サイコロアニメーション
+    let rollCount = 0;
+    const rollInterval = setInterval(() => {
+        const tempDice = Math.floor(Math.random() * 6) + 1;
+        diceDisplay.textContent = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][tempDice - 1];
+        rollCount++;
+        if (rollCount > 10) {
+            clearInterval(rollInterval);
+
+            // 最終結果
+            gameState.diceRoll = Math.floor(Math.random() * 6) + 1;
+            diceDisplay.textContent = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][gameState.diceRoll - 1];
+
+            // サイコロ結果を適用
+            if (gameState.diceRoll <= 3) {
+                gameState.wageMultiplier = 1.1;
+                gameState.markets[0].closed = true;  // 仙台
+                gameState.markets[1].closed = false; // 札幌
+            } else {
+                gameState.wageMultiplier = 1.2;
+                gameState.markets[0].closed = true;  // 仙台
+                gameState.markets[1].closed = true;  // 札幌
+            }
+
+            // 大阪上限価格
+            gameState.osakaMaxPrice = 20 + gameState.diceRoll;
+            gameState.markets[4].sellPrice = gameState.osakaMaxPrice;
+
+            // 結果表示
+            document.getElementById('dice-number').textContent = gameState.diceRoll;
+            document.getElementById('closed-markets').textContent = gameState.diceRoll <= 3 ? '仙台のみ' : '仙台・札幌';
+            document.getElementById('wage-multiplier').textContent = `×${gameState.wageMultiplier}`;
+            document.getElementById('osaka-max').textContent = `¥${gameState.osakaMaxPrice}`;
+
+            diceResult.style.display = 'block';
+            rollBtn.style.display = 'none';
+            proceedBtn.style.display = 'block';
+
+            gameState.diceRolled = true;
+        }
+    }, 100);
+}
+
+// サイコロ後に期首処理へ
+function proceedAfterDice() {
+    closeModal();
+    showPeriodStartOptions();
+}
+
+// 期首処理オプション表示
+function showPeriodStartOptions() {
     const company = gameState.companies[0];
 
     // 選択状態を初期化
@@ -390,6 +507,19 @@ function startPeriod() {
     const startPlayer = gameState.companies[gameState.periodStartPlayerIndex || 0];
     const isPlayerFirst = (gameState.periodStartPlayerIndex || 0) === 0;
 
+    // ① 既存借入の金利計算（期首に支払う）
+    const existingLongInterest = Math.floor((company.loans || 0) * 0.1);
+    const existingShortInterest = Math.floor((company.shortLoans || 0) * 0.2);
+    const totalExistingInterest = existingLongInterest + existingShortInterest;
+
+    // ② 納税・③ 配当の計算（前期決算分）
+    const playerTax = company.pendingTax || 0;
+    const playerDividend = company.pendingDividend || 0;
+    const taxDividendTotal = playerTax + playerDividend;
+
+    // 期首自動支払い合計
+    const totalAutoPay = totalExistingInterest + taxDividendTotal;
+
     let content = `
         <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
             <div style="font-size: 20px; font-weight: bold;">📅 第${gameState.currentPeriod}期開始</div>
@@ -397,46 +527,107 @@ function startPeriod() {
             <div style="font-size: 12px; margin-top: 8px; padding: 6px; background: rgba(255,255,255,0.2); border-radius: 6px;">
                 🎲 今期の最初: <strong>${startPlayer.name}</strong>${isPlayerFirst ? '（あなたから！）' : ''}
             </div>
+            ${gameState.currentPeriod >= 3 ? `
+            <div style="font-size: 11px; margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
+                <div style="background: rgba(0,0,0,0.2); padding: 4px; border-radius: 4px;">閉鎖: ${gameState.diceRoll <= 3 ? '仙台' : '仙台・札幌'}</div>
+                <div style="background: rgba(0,0,0,0.2); padding: 4px; border-radius: 4px;">人件費×${gameState.wageMultiplier}</div>
+                <div style="background: rgba(0,0,0,0.2); padding: 4px; border-radius: 4px;">大阪上限¥${gameState.osakaMaxPrice}</div>
+            </div>
+            ` : ''}
         </div>
     `;
 
-    // 3期以降は借入と無災害倉庫の選択
-    if (gameState.currentPeriod >= 3) {
-        // 借入上限：3期は0.5倍、4期以降で自己資本300超なら1倍
-        const loanMultiplier = (gameState.currentPeriod >= 4 && company.equity > 300) ? 1.0 : 0.5;
-        const maxLoanTotal = Math.round(company.equity * loanMultiplier);
-        const availableLoan = Math.max(0, maxLoanTotal - company.loans);
-        const loanRuleText = (gameState.currentPeriod >= 4 && company.equity > 300)
-            ? `自己資本の1倍まで`
-            : `自己資本の0.5倍まで`;
-
+    // 期首自動支払い表示（金利・納税・配当）
+    if (totalAutoPay > 0) {
         content += `
-            <div style="margin-bottom: 15px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">🏦 長期借入（${loanRuleText}）</div>
-                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
-                    上限¥${maxLoanTotal} - 既存¥${company.loans} = 追加可能¥${availableLoan}
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                    <div onclick="selectPeriodStart('loan', 0)" class="period-card" id="loan-0" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 2px solid #34d399; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; color: white;">
-                        <div style="font-size: 14px; font-weight: bold;">なし</div>
-                        <div style="font-size: 11px;">¥0</div>
-                    </div>
-                    ${availableLoan >= 50 ? `<div onclick="selectPeriodStart('loan', 50)" class="period-card" id="loan-50" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; color: white;">
-                        <div style="font-size: 14px; font-weight: bold;">¥50</div>
-                        <div style="font-size: 11px;">金利¥5</div>
-                    </div>` : ''}
-                    ${availableLoan >= 100 ? `<div onclick="selectPeriodStart('loan', 100)" class="period-card" id="loan-100" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; color: white;">
-                        <div style="font-size: 14px; font-weight: bold;">¥100</div>
-                        <div style="font-size: 11px;">金利¥10</div>
-                    </div>` : ''}
-                    ${availableLoan >= 150 ? `<div onclick="selectPeriodStart('loan', 150)" class="period-card" id="loan-150" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; color: white;">
-                        <div style="font-size: 14px; font-weight: bold;">¥150</div>
-                        <div style="font-size: 11px;">金利¥15</div>
-                    </div>` : ''}
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #dc2626; margin-bottom: 8px;">💸 期首支払い（自動）</div>
+                ${totalExistingInterest > 0 ? `
+                <div style="font-size: 11px; color: #666; margin-bottom: 4px;">① 既存借入の金利</div>
+                ${existingLongInterest > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; padding-left: 10px;">
+                    <span>長期借入¥${company.loans} × 10%</span><span>¥${existingLongInterest}</span>
+                </div>` : ''}
+                ${existingShortInterest > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; padding-left: 10px;">
+                    <span>短期借入¥${company.shortLoans} × 20%</span><span>¥${existingShortInterest}</span>
+                </div>` : ''}
+                ` : ''}
+                ${playerTax > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                    <span>② 納税</span><span>¥${playerTax}</span>
+                </div>` : ''}
+                ${playerDividend > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                    <span>③ 配当</span><span>¥${playerDividend}</span>
+                </div>` : ''}
+                <div style="display: flex; justify-content: space-between; font-weight: bold; border-top: 1px solid #fecaca; padding-top: 4px; margin-top: 4px;">
+                    <span>合計</span><span>¥${totalAutoPay}</span>
                 </div>
             </div>
+        `;
+    }
+
+    // 2期：PC・保険は自動購入（選択不可）、3期以降：選択式
+    if (gameState.currentPeriod === 2) {
+        // ②③④⑤ 2期はPC・保険自動購入
+        content += `
+            <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px; color: white;">
+                <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">自動購入（必須）</div>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px;">💻</div>
+                        <div style="font-size: 12px;">コンピュータ</div>
+                        <div style="font-size: 11px; opacity: 0.8;">¥20</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px;">🛡️</div>
+                        <div style="font-size: 12px;">保険</div>
+                        <div style="font-size: 11px; opacity: 0.8;">¥5</div>
+                    </div>
+                </div>
+                <div style="text-align: center; font-size: 13px; margin-top: 8px; font-weight: bold;">合計 ¥25</div>
+            </div>
+            <button class="submit-btn" onclick="processPeriodStart()" style="width: 100%; padding: 15px; font-size: 16px;">期首処理を完了（2行目スタート）</button>
+        `;
+    } else {
+        // 3期以降：順番通りに表示
+        // ④ PCチップ
+        content += `
             <div style="margin-bottom: 15px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">🏭 無災害倉庫（¥20/個、容量+12）</div>
+                <div style="font-weight: bold; margin-bottom: 8px;">④ 💻 コンピュータチップ（製造+1）¥20</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                    <div onclick="selectPeriodStart('computer', 0)" class="period-card" id="computer-0" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
+                        <div style="font-size: 18px;">🚫</div>
+                        <div style="font-size: 14px; font-weight: bold;">買わない</div>
+                    </div>
+                    <div onclick="selectPeriodStart('computer', 1)" class="period-card" id="computer-1" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 2px solid #34d399; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
+                        <div style="font-size: 18px;">💻</div>
+                        <div style="font-size: 14px; font-weight: bold;">1個購入</div>
+                        <div style="font-size: 11px;">¥20</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // ⑤ 保険チップ
+        content += `
+            <div style="margin-bottom: 15px;">
+                <div style="font-weight: bold; margin-bottom: 8px;">⑤ 🛡️ 保険チップ（災害対策）¥5</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                    <div onclick="selectPeriodStart('insurance', 0)" class="period-card" id="insurance-0" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
+                        <div style="font-size: 18px;">🚫</div>
+                        <div style="font-size: 14px; font-weight: bold;">買わない</div>
+                    </div>
+                    <div onclick="selectPeriodStart('insurance', 1)" class="period-card" id="insurance-1" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 2px solid #34d399; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
+                        <div style="font-size: 18px;">🛡️</div>
+                        <div style="font-size: 14px; font-weight: bold;">1個購入</div>
+                        <div style="font-size: 11px;">¥5</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // ⑥ 無災害倉庫
+        content += `
+            <div style="margin-bottom: 15px;">
+                <div style="font-weight: bold; margin-bottom: 8px;">⑥ 🏭 無災害倉庫（¥20/個、容量+12）</div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
                     <div onclick="selectPeriodStart('warehouse', 0)" class="period-card" id="warehouse-0" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 2px solid #34d399; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
                         <div style="font-size: 18px;">🚫</div>
@@ -455,41 +646,49 @@ function startPeriod() {
                 </div>
             </div>
         `;
+
+        // ⑦ 長期借入
+        const loanMultiplier = (gameState.currentPeriod >= 4 && company.equity > 300) ? 1.0 : 0.5;
+        const maxLoanTotal = Math.round(company.equity * loanMultiplier);
+        const availableLoan = Math.max(0, maxLoanTotal - company.loans);
+        const loanRuleText = (gameState.currentPeriod >= 4 && company.equity > 300)
+            ? `自己資本の1倍まで`
+            : `自己資本の0.5倍まで`;
+
+        content += `
+            <div style="margin-bottom: 15px;">
+                <div style="font-weight: bold; margin-bottom: 8px;">⑦ 🏦 長期借入（${loanRuleText}）</div>
+                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
+                    上限¥${maxLoanTotal} - 既存¥${company.loans} = 追加可能¥${availableLoan}
+                    <br>※借入時に金利10%を差し引いて入金
+                </div>
+                <!-- 1円単位入力 -->
+                <div style="background: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                    <div style="font-size: 11px; color: #666; margin-bottom: 6px; text-align: center;">金額を入力（1円単位）</div>
+                    <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                        <span style="font-size: 14px;">¥</span>
+                        <input type="number" id="loanAmountInput" value="0" min="0" max="${availableLoan}"
+                               onchange="updateLoanSelection()" oninput="updateLoanSelection()"
+                               style="width: 100px; padding: 8px; font-size: 16px; text-align: center; border: 2px solid #3b82f6; border-radius: 6px;">
+                        <span style="font-size: 12px; color: #666;">（金利: <span id="loanInterestDisplay">¥0</span>）</span>
+                    </div>
+                </div>
+            </div>
+            <button class="submit-btn" onclick="processPeriodStart()" style="width: 100%; padding: 15px; font-size: 16px;">期首処理を完了</button>
+        `;
     }
 
-    content += `
-        <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">💻 コンピュータチップ（製造+1）¥20</div>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                <div onclick="selectPeriodStart('computer', 0)" class="period-card" id="computer-0" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
-                    <div style="font-size: 18px;">🚫</div>
-                    <div style="font-size: 14px; font-weight: bold;">買わない</div>
-                </div>
-                <div onclick="selectPeriodStart('computer', 1)" class="period-card" id="computer-1" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 2px solid #34d399; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
-                    <div style="font-size: 18px;">💻</div>
-                    <div style="font-size: 14px; font-weight: bold;">1個購入</div>
-                    <div style="font-size: 11px;">¥20</div>
-                </div>
-            </div>
-        </div>
-        <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">🛡️ 保険チップ（災害対策）¥5</div>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                <div onclick="selectPeriodStart('insurance', 0)" class="period-card" id="insurance-0" style="background: #374151; border: 2px solid #6b7280; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
-                    <div style="font-size: 18px;">🚫</div>
-                    <div style="font-size: 14px; font-weight: bold;">買わない</div>
-                </div>
-                <div onclick="selectPeriodStart('insurance', 1)" class="period-card" id="insurance-1" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 2px solid #34d399; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; color: white;">
-                    <div style="font-size: 18px;">🛡️</div>
-                    <div style="font-size: 14px; font-weight: bold;">1個購入</div>
-                    <div style="font-size: 11px;">¥5</div>
-                </div>
-            </div>
-        </div>
-        <button class="submit-btn" onclick="processPeriodStart()" style="width: 100%; padding: 15px; font-size: 16px;">期首処理を完了</button>
-    `;
-
     showModal('期首処理', content);
+}
+
+// 借入金額入力の更新
+function updateLoanSelection() {
+    const input = document.getElementById('loanAmountInput');
+    const interestDisplay = document.getElementById('loanInterestDisplay');
+    const amount = parseInt(input.value) || 0;
+    const interest = Math.floor(amount * 0.1);
+    interestDisplay.textContent = `¥${interest}`;
+    window.periodStartSelections.loan = amount;
 }
 
 // 期首処理のカード選択
@@ -516,15 +715,35 @@ function processPeriodStart() {
     const selections = window.periodStartSelections || { loan: 0, warehouse: 0, computer: 1, insurance: 1 };
     let totalCost = 0;
 
-    // 納税・配当の支払い（前期決算分）
+    // ① 既存借入の金利支払い（全社）
+    gameState.companies.forEach(c => {
+        const longInterest = Math.floor((c.loans || 0) * 0.1);
+        const shortInterest = Math.floor((c.shortLoans || 0) * 0.2);
+        const totalInterest = longInterest + shortInterest;
+
+        if (totalInterest > 0) {
+            c.cash -= totalInterest;
+            // Fに計上（期首金利として追跡）
+            c.periodStartInterest = totalInterest;
+            console.log(`${c.name}: 期首金利支払い ¥${totalInterest} (長期¥${longInterest} + 短期¥${shortInterest})`);
+
+            // 現金不足の場合は短期借入
+            if (c.cash < 0) {
+                const needed = Math.ceil(Math.abs(c.cash) / 0.8 / 50) * 50;
+                c.shortLoans += needed;
+                const shortInterestPaid = Math.floor(needed * 0.2);
+                c.cash += needed - shortInterestPaid;
+                // 新規借入金利をトラッキング（F計算用）
+                c.newLoanInterest = (c.newLoanInterest || 0) + shortInterestPaid;
+                console.log(`${c.name}: 金利支払いで現金不足 → 短期借入¥${needed}（金利¥${shortInterestPaid}）`);
+            }
+        }
+    });
+
+    // ② 納税・③ 配当の支払い（前期決算分）
     const playerTax = company.pendingTax || 0;
     const playerDividend = company.pendingDividend || 0;
     const taxDividendTotal = playerTax + playerDividend;
-
-    if (taxDividendTotal > 0) {
-        // プレイヤーに通知
-        alert(`【納税・配当の支払い】\n税金: ¥${playerTax}\n配当: ¥${playerDividend}\n合計: ¥${taxDividendTotal}`);
-    }
 
     // 全社の納税・配当を処理
     gameState.companies.forEach(c => {
@@ -537,7 +756,10 @@ function processPeriodStart() {
             if (c.cash < 0) {
                 const needed = Math.ceil(Math.abs(c.cash) / 0.8 / 50) * 50;
                 c.shortLoans += needed;
-                c.cash += needed * 0.8;
+                const shortInterestPaid = Math.floor(needed * 0.2);
+                c.cash += needed - shortInterestPaid;
+                // 新規借入金利をトラッキング（F計算用）
+                c.newLoanInterest = (c.newLoanInterest || 0) + shortInterestPaid;
             }
 
             c.pendingTax = 0;
@@ -545,28 +767,38 @@ function processPeriodStart() {
         }
     });
 
-    // 借入処理（3期以降、カード選択から取得）
+    // ⑦ 長期借入処理（3期以降、カード選択から取得）
     if (gameState.currentPeriod >= 3) {
         const loanAmount = selections.loan || 0;
         if (loanAmount > 0) {
             const interest = Math.floor(loanAmount * 0.1);
             company.cash += loanAmount - interest;  // 利息を引いた額が入金
             company.loans += loanAmount;
+            // 新規借入の金利もFに計上
+            company.newLoanInterest = (company.newLoanInterest || 0) + interest;
             console.log(`長期借入: ¥${loanAmount} (利息¥${interest}支払い済み)`);
         }
 
-        // 無災害倉庫購入
+        // ⑥ 無災害倉庫購入
         const warehouseCount = selections.warehouse || 0;
         if (warehouseCount > 0) {
             totalCost += warehouseCount * WAREHOUSE_COST;
             company.warehouses += warehouseCount;
-            company.extraLaborCost = (company.extraLaborCost || 0) + (warehouseCount * WAREHOUSE_COST);
         }
     }
 
-    // コンピュータ・保険購入（カード選択から取得）
-    const computerQty = selections.computer || 0;
-    const insuranceQty = selections.insurance || 0;
+    // コンピュータ・保険購入
+    // 2期：強制購入（選択不可）、3期以降：選択式
+    let computerQty, insuranceQty;
+    if (gameState.currentPeriod === 2) {
+        // 2期は強制購入
+        computerQty = 1;
+        insuranceQty = 1;
+    } else {
+        // 3期以降は選択から取得
+        computerQty = selections.computer || 0;
+        insuranceQty = selections.insurance || 0;
+    }
 
     totalCost += (computerQty * CHIP_COSTS.computer) + (insuranceQty * CHIP_COSTS.insurance);
 
@@ -592,6 +824,38 @@ function processPeriodStart() {
     // AI companies also process period start with strategic planning
     for (let i = 1; i < gameState.companies.length; i++) {
         const aiCompany = gameState.companies[i];
+
+        // AI会社のPC・保険購入処理
+        if (gameState.currentPeriod === 2) {
+            // 2期：強制購入
+            const chipCost = CHIP_COSTS.computer + CHIP_COSTS.insurance;
+            if (aiCompany.cash >= chipCost) {
+                aiCompany.cash -= chipCost;
+                aiCompany.chips.computer = 1;
+                aiCompany.chips.insurance = 1;
+            }
+        } else {
+            // 3期以降：戦略的判断（AIは基本的にPC購入、保険は状況次第）
+            const pcCost = CHIP_COSTS.computer;
+            const insCost = CHIP_COSTS.insurance;
+            const periodEndCost = calculateSalaryCost(aiCompany, gameState.currentPeriod) +
+                                  Math.floor((aiCompany.loans || 0) * 0.1) +
+                                  Math.floor((aiCompany.shortLoans || 0) * 0.2);
+            const safetyBuffer = 60;
+
+            // PC購入判断（製造力+1は基本的に価値が高い）
+            if (aiCompany.cash >= pcCost + periodEndCost + safetyBuffer) {
+                aiCompany.cash -= pcCost;
+                aiCompany.chips.computer = 1;
+            }
+
+            // 保険購入判断（現金に余裕があれば購入）
+            if (aiCompany.cash >= insCost + periodEndCost + safetyBuffer) {
+                aiCompany.cash -= insCost;
+                aiCompany.chips.insurance = 1;
+            }
+        }
+
         planAIPeriodStrategy(aiCompany, i);
     }
 
@@ -2437,8 +2701,10 @@ function endPeriod() {
         const fMaxPersonnelCost = fMaxPersonnel * halfCostF;
         const fTotalSalary = fMachineSalary + fWorkerSalary + fSalesmenSalary + fMaxPersonnelCost;
         const fDepreciation = calculateDepreciation(company, calcPeriod);
-        const fLongInterest = Math.floor((company.loans || 0) * 0.1);
-        const fShortInterest = Math.floor((company.shortLoans || 0) * 0.2);
+        // 金利: 期首支払い + 新規借入時支払い
+        const fPeriodStartInterest = company.periodStartInterest || 0;
+        const fNewLoanInterest = company.newLoanInterest || 0;
+        const fTotalInterest = fPeriodStartInterest + fNewLoanInterest;
         const fPcCost = (company.chips.computer || 0) * 20;
         const fInsuranceCost = (company.chips.insurance || 0) * 5;
 
@@ -2467,6 +2733,7 @@ function endPeriod() {
         }
         const fExtraLabor = company.extraLaborCost || 0;
         const fAdditionalF = company.additionalFixedCost || 0;
+        const fWarehouseCost = (company.warehouses || 0) * (typeof WAREHOUSE_COST !== 'undefined' ? WAREHOUSE_COST : 20);
 
         financialData.push({
             name: company.name,
@@ -2509,13 +2776,14 @@ function endPeriod() {
                 maxPersonnelCost: fMaxPersonnelCost,
                 totalSalary: fTotalSalary,
                 depreciation: fDepreciation,
-                longInterest: fLongInterest,
-                shortInterest: fShortInterest,
+                periodStartInterest: fPeriodStartInterest,
+                newLoanInterest: fNewLoanInterest,
                 pcCost: fPcCost,
                 insuranceCost: fInsuranceCost,
                 chipCost: fChipCost,
                 extraLabor: fExtraLabor,
-                additionalF: fAdditionalF
+                additionalF: fAdditionalF,
+                warehouseCost: fWarehouseCost
             },
             // チップ返却情報
             chipsBefore: chipsBefore,
@@ -2558,7 +2826,10 @@ function endPeriod() {
         if (company.cash < 0) {
             const needed = Math.ceil(Math.abs(company.cash) / 0.8 / 50) * 50;
             company.shortLoans += needed;
-            company.cash += needed * 0.8;  // 短期借入: 借入時20%金利控除
+            const shortInterestPaid = Math.floor(needed * 0.2);
+            company.cash += needed - shortInterestPaid;  // 短期借入: 借入時20%金利控除
+            // 新規借入金利をトラッキング（F計算用）
+            company.newLoanInterest = (company.newLoanInterest || 0) + shortInterestPaid;
         }
         
         // Handle chip returns

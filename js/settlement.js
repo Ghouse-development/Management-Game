@@ -271,9 +271,10 @@ function showFBreakdown(companyIndex) {
     // 減価償却
     const depreciation = fb ? fb.depreciation : calculateDepreciation(company, period);
 
-    // 金利
-    const longInterest = fb ? fb.longInterest : Math.floor((company.loans || 0) * 0.1);
-    const shortInterest = fb ? fb.shortInterest : Math.floor((company.shortLoans || 0) * 0.2);
+    // 金利（期首支払い + 新規借入時支払い）
+    const periodStartInterest = fb ? fb.periodStartInterest : (company.periodStartInterest || 0);
+    const newLoanInterest = fb ? fb.newLoanInterest : (company.newLoanInterest || 0);
+    const totalInterest = periodStartInterest + newLoanInterest;
 
     // チップ費用
     const pcCost = fb ? fb.pcCost : ((company.chips.computer || 0) * 20);
@@ -307,7 +308,10 @@ function showFBreakdown(companyIndex) {
     const extraLabor = fb ? fb.extraLabor : (company.extraLaborCost || 0);
     const additionalF = fb ? fb.additionalF : (company.additionalFixedCost || 0);
 
-    const totalF = data ? data.f : (totalSalary + depreciation + longInterest + shortInterest + pcCost + insuranceCost + chipCost + extraLabor + additionalF);
+    // 倉庫費用
+    const warehouseCost = fb ? fb.warehouseCost : ((company.warehouses || 0) * (typeof WAREHOUSE_COST !== 'undefined' ? WAREHOUSE_COST : 20));
+
+    const totalF = data ? data.f : (totalSalary + depreciation + totalInterest + pcCost + insuranceCost + chipCost + extraLabor + additionalF + warehouseCost);
 
     let content = '<div style="max-height: 60vh; overflow-y: auto; padding: 10px;">';
     content += '<div style="font-size: 14px; color: #4f46e5; font-weight: bold; margin-bottom: 10px;">固定費明細（F）</div>';
@@ -335,10 +339,18 @@ function showFBreakdown(companyIndex) {
         <span>減価償却費</span><span>¥${depreciation}</span>
     </div>`;
 
-    // 金利
-    if (longInterest > 0 || shortInterest > 0) {
+    // 金利（期首支払い + 新規借入時支払い）
+    if (totalInterest > 0) {
+        let interestDetail = '';
+        if (periodStartInterest > 0 && newLoanInterest > 0) {
+            interestDetail = `期首¥${periodStartInterest} + 新規借入¥${newLoanInterest}`;
+        } else if (periodStartInterest > 0) {
+            interestDetail = `期首支払い`;
+        } else if (newLoanInterest > 0) {
+            interestDetail = `新規借入時`;
+        }
         content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
-            <span>借入金利（長期10%: ¥${longInterest} + 短期20%: ¥${shortInterest}）</span><span>¥${longInterest + shortInterest}</span>
+            <span>借入金利（${interestDetail}）</span><span>¥${totalInterest}</span>
         </div>`;
     }
 
@@ -361,6 +373,11 @@ function showFBreakdown(companyIndex) {
     if (additionalF > 0) {
         content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
             <span>追加費用（短期借入手数料等）</span><span>¥${additionalF}</span>
+        </div>`;
+    }
+    if (warehouseCost > 0) {
+        content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+            <span>倉庫費用（${company.warehouses || 0}個×¥20）</span><span>¥${warehouseCost}</span>
         </div>`;
     }
 
@@ -529,6 +546,48 @@ function showFinancialSummary(financialData) {
     `;
 
     showModal(`第${gameState.currentPeriod}期 決算結果`, html);
+}
+
+// ============================================
+// 次期へ進む
+// ============================================
+function proceedToNextPeriod() {
+    // 期を進める
+    gameState.currentPeriod++;
+
+    // 期首フラグをリセット
+    gameState.periodStarted = false;
+    gameState.diceRolled = false;
+
+    // 3期以降の設定をリセット
+    if (gameState.currentPeriod >= 3) {
+        gameState.wageMultiplier = 1.0;
+        gameState.osakaMaxPrice = null;
+        gameState.diceRoll = null;
+    }
+
+    // 全社の行と金利追跡をリセット
+    gameState.companies.forEach(company => {
+        company.currentRow = 1;
+        company.rowsUsed = 0;
+        // 金利追跡をリセット（次期のF計算用）
+        company.periodStartInterest = 0;
+        company.newLoanInterest = 0;
+    });
+    gameState.currentRow = 1;
+
+    // 行動ログをリセット
+    resetActionLog();
+
+    // UIを更新
+    updateDisplay();
+
+    // 5期まで続行、6期になったらゲーム終了
+    if (gameState.currentPeriod > 5) {
+        endGame();
+    } else {
+        showToast(`第${gameState.currentPeriod}期に進みました`, 'success', 3000);
+    }
 }
 
 // ============================================

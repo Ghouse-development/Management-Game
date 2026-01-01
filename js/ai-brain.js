@@ -1730,7 +1730,30 @@ const AIBrain = {
     },
 
     /**
+     * 🛡️ 投資が短期借入を引き起こすかチェック
+     * @returns {boolean} 安全に投資できるならtrue
+     */
+    canAffordWithoutShortLoan: function(company, investmentCost) {
+        const period = gameState.currentPeriod;
+        const periodEndCost = calculatePeriodPayment(company);
+        const riskCardBuffer = company.chips.insurance ? 15 : 40;
+        const safetyBuffer = 80; // 十分な安全マージン
+        const totalRequired = periodEndCost + riskCardBuffer + safetyBuffer;
+
+        // 投資後に期末コストを賄えるか
+        const cashAfterInvestment = company.cash - investmentCost;
+        const isSafe = cashAfterInvestment >= totalRequired;
+
+        if (!isSafe) {
+            console.log(`[AI短期借入回避] ${company.name}: 投資¥${investmentCost}は危険（残り¥${cashAfterInvestment} < 必要¥${totalRequired}）`);
+        }
+
+        return isSafe;
+    },
+
+    /**
      * 最適な投資戦略を決定（G最大化の観点）
+     * 🛡️ 短期借入回避を考慮
      */
     getOptimalInvestmentStrategy: function(company, companyIndex) {
         const investments = ['research', 'education', 'advertising', 'worker', 'salesman'];
@@ -1741,7 +1764,10 @@ const AIBrain = {
         // ROIでソート
         results.sort((a, b) => b.roi - a.roi);
 
-        const affordable = results.filter(r => company.cash > r.cost + 50);
+        // 🛡️ 強化: 短期借入を引き起こさない投資のみ
+        const affordable = results.filter(r =>
+            this.canAffordWithoutShortLoan(company, r.cost)
+        );
         const worthwhile = affordable.filter(r => r.isWorthIt);
 
         return {
@@ -1750,7 +1776,7 @@ const AIBrain = {
             affordable,
             recommendation: worthwhile.length > 0 ?
                 `${worthwhile[0].type}投資推奨（ROI:${worthwhile[0].roi}%）` :
-                '投資より販売サイクル優先'
+                '投資より販売サイクル優先（短期借入回避）'
         };
     },
 

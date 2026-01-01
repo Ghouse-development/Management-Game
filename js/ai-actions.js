@@ -154,10 +154,10 @@ function applyRiskCardToAI(company, card) {
                         // 短期借入: 借入額の80%を受け取る（20%は今期の金利）
                         const loanNeeded = Math.ceil(shortage / 0.8);
                         company.shortLoans += loanNeeded;
-                        company.cash += Math.floor(loanNeeded * 0.8);
-                        // 金利分を固定費に計上
-                        if (!company.additionalFixedCost) company.additionalFixedCost = 0;
-                        company.additionalFixedCost += loanNeeded - Math.floor(loanNeeded * 0.8);
+                        const shortInterestPaid = Math.floor(loanNeeded * 0.2);
+                        company.cash += loanNeeded - shortInterestPaid;
+                        // 新規借入金利をトラッキング（F計算用）
+                        company.newLoanInterest = (company.newLoanInterest || 0) + shortInterestPaid;
                     }
                 }
                 company.cash -= hireCost;
