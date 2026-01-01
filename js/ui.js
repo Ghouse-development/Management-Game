@@ -243,11 +243,45 @@ function renderFixedCostBreakdown(company) {
     const computerCost = (company.chips?.computer || 0) * CHIP_COSTS.computer;
     const insuranceCost = (company.chips?.insurance || 0) * CHIP_COSTS.insurance;
 
+    // 戦略チップ費用計算
     let chipCost = 0;
+    let chipBreakdownHtml = '';
+    const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
+    const nextChips = company.nextPeriodChips || {research: 0, education: 0, advertising: 0};
+
     if (period === 2) {
-        chipCost = Math.min(company.chips?.research || 0, 1) * CHIP_COSTS.normal +
-                   Math.min(company.chips?.education || 0, 1) * CHIP_COSTS.normal +
-                   Math.min(company.chips?.advertising || 0, 1) * CHIP_COSTS.normal;
+        // 2期は全て繰り越しチップ（各枚数×20円）
+        const researchCost = (company.chips?.research || 0) * CHIP_COSTS.normal;
+        const educationCost = (company.chips?.education || 0) * CHIP_COSTS.normal;
+        const advertisingCost = (company.chips?.advertising || 0) * CHIP_COSTS.normal;
+        chipCost = researchCost + educationCost + advertisingCost;
+        if (chipCost > 0) {
+            chipBreakdownHtml = '<div class="cost-item" style="font-size:11px;color:#666"><span>戦略チップ内訳:</span></div>';
+            if (researchCost > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px"><span>研究×${company.chips.research}(繰越20)</span><span>¥${researchCost}</span></div>`;
+            if (educationCost > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px"><span>教育×${company.chips.education}(繰越20)</span><span>¥${educationCost}</span></div>`;
+            if (advertisingCost > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px"><span>広告×${company.chips.advertising}(繰越20)</span><span>¥${advertisingCost}</span></div>`;
+        }
+    } else {
+        // 3期以降: 繰り越し + 特急 + 次期繰り越し
+        const carriedCost = (carriedOver.research + carriedOver.education + carriedOver.advertising) * CHIP_COSTS.normal;
+        const urgentR = Math.max(0, (company.chips?.research || 0) - carriedOver.research);
+        const urgentE = Math.max(0, (company.chips?.education || 0) - carriedOver.education);
+        const urgentA = Math.max(0, (company.chips?.advertising || 0) - carriedOver.advertising);
+        const urgentCost = (urgentR + urgentE + urgentA) * CHIP_COSTS.express;
+        const nextCost = (nextChips.research + nextChips.education + nextChips.advertising) * CHIP_COSTS.normal;
+        chipCost = carriedCost + urgentCost + nextCost;
+        if (chipCost > 0) {
+            chipBreakdownHtml = '<div class="cost-item" style="font-size:11px;color:#666"><span>戦略チップ内訳:</span></div>';
+            if (carriedOver.research > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px"><span>研究×${carriedOver.research}(繰越20)</span><span>¥${carriedOver.research * 20}</span></div>`;
+            if (carriedOver.education > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px"><span>教育×${carriedOver.education}(繰越20)</span><span>¥${carriedOver.education * 20}</span></div>`;
+            if (carriedOver.advertising > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px"><span>広告×${carriedOver.advertising}(繰越20)</span><span>¥${carriedOver.advertising * 20}</span></div>`;
+            if (urgentR > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px;color:#ef4444"><span>研究×${urgentR}(特急40)</span><span>¥${urgentR * 40}</span></div>`;
+            if (urgentE > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px;color:#ef4444"><span>教育×${urgentE}(特急40)</span><span>¥${urgentE * 40}</span></div>`;
+            if (urgentA > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px;color:#ef4444"><span>広告×${urgentA}(特急40)</span><span>¥${urgentA * 40}</span></div>`;
+            if (nextChips.research > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px;color:#3b82f6"><span>研究×${nextChips.research}(次期20)</span><span>¥${nextChips.research * 20}</span></div>`;
+            if (nextChips.education > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px;color:#3b82f6"><span>教育×${nextChips.education}(次期20)</span><span>¥${nextChips.education * 20}</span></div>`;
+            if (nextChips.advertising > 0) chipBreakdownHtml += `<div class="cost-item" style="padding-left:10px;font-size:11px;color:#3b82f6"><span>広告×${nextChips.advertising}(次期20)</span><span>¥${nextChips.advertising * 20}</span></div>`;
+        }
     }
 
     const totalFixed = salaryCost + depreciationCost + computerCost + insuranceCost + chipCost + extraLabor;
@@ -260,7 +294,8 @@ function renderFixedCostBreakdown(company) {
         <div class="cost-item"><span>減価償却</span><span>¥${depreciationCost}</span></div>
         ${computerCost > 0 ? `<div class="cost-item"><span>PC(${company.chips.computer}×20)</span><span>¥${computerCost}</span></div>` : ''}
         ${insuranceCost > 0 ? `<div class="cost-item"><span>保険(${company.chips.insurance}×5)</span><span>¥${insuranceCost}</span></div>` : ''}
-        ${chipCost > 0 ? `<div class="cost-item"><span>戦略チップ</span><span>¥${chipCost}</span></div>` : ''}
+        ${chipCost > 0 ? `<div class="cost-item"><span>戦略チップ計</span><span>¥${chipCost}</span></div>` : ''}
+        ${chipBreakdownHtml}
         ${extraLabor > 0 ? `<div class="cost-item"><span>その他人件費</span><span>¥${extraLabor}</span></div>` : ''}
         <div class="cost-item cost-total"><span>F合計</span><span>¥${totalFixed}</span></div>
     `;

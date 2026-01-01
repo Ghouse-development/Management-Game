@@ -1409,6 +1409,269 @@ const AIBrain = {
     canPayPeriodEnd: function(company) {
         const periodEndCost = calculatePeriodPayment(company);
         return company.cash >= periodEndCost;
+    },
+
+    // ============================================
+    // 🎯 G最大化アルゴリズム強化版
+    // G = MQ - F を最大化するための高度な意思決定
+    // ============================================
+
+    /**
+     * 期待Gを計算（現在の状態から期末までの予測利益）
+     */
+    calculateExpectedG: function(company, companyIndex) {
+        const period = gameState.currentPeriod;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+        const mfgCapacity = getManufacturingCapacity(company);
+        const salesCapacity = getSalesCapacity(company);
+
+        // === PQ（売上高）予測 ===
+        // 販売サイクル数 = 残り行数 ÷ 4（材料→投入→完成→販売）
+        const salesCycles = Math.floor(rowsRemaining / 4);
+        const avgQuantityPerSale = Math.min(salesCapacity, mfgCapacity, 4);
+        const avgPrice = this.getExpectedSalesPrice(company);
+        const expectedPQ = salesCycles * avgQuantityPerSale * avgPrice;
+
+        // === VQ（変動費）予測 ===
+        const totalUnits = salesCycles * avgQuantityPerSale;
+        const avgMaterialCost = 12; // 材料平均価格
+        const productionCostPerUnit = 2; // 投入+完成の製造費
+        const expectedVQ = totalUnits * (avgMaterialCost + productionCostPerUnit);
+
+        // === MQ（限界利益）予測 ===
+        const expectedMQ = expectedPQ - expectedVQ;
+
+        // === F（固定費）予測 ===
+        const expectedF = this.calculateExpectedF(company, period);
+
+        // === G（経常利益）予測 ===
+        const expectedG = expectedMQ - expectedF;
+
+        return {
+            expectedPQ,
+            expectedVQ,
+            expectedMQ,
+            expectedF,
+            expectedG,
+            salesCycles,
+            avgPrice,
+            mqPerCycle: avgQuantityPerSale * (avgPrice - avgMaterialCost - productionCostPerUnit),
+            isPositive: expectedG > 0
+        };
+    },
+
+    /**
+     * 予測販売価格を計算（研究チップと市場状況を考慮）
+     */
+    getExpectedSalesPrice: function(company) {
+        const researchBonus = (company.chips.research || 0) * 2;
+        const basePrice = 28; // 平均市場価格
+        const competitivenessBonus = Math.min(researchBonus, 6); // 最大+6
+        return basePrice + Math.floor(competitivenessBonus * 0.3);
+    },
+
+    /**
+     * 予測固定費を計算
+     */
+    calculateExpectedF: function(company, period) {
+        let f = 0;
+
+        // 給料（機械・ワーカー・セールスマン）
+        const unitCost = BASE_SALARY_BY_PERIOD[period] || 22;
+        f += company.machines.length * unitCost;
+        f += company.workers * unitCost;
+        f += company.salesmen * unitCost;
+
+        // 減価償却
+        company.machines.forEach(m => {
+            if (m.type === 'small') {
+                f += m.attachments > 0 ? 15 : 10;
+            } else {
+                f += 20;
+            }
+        });
+
+        // チップ維持費
+        f += (company.chips.computer || 0) * 5;
+        f += (company.chips.insurance || 0) * 5;
+        f += (company.chips.research || 0) * 20;
+        f += (company.chips.education || 0) * 20;
+        f += (company.chips.advertising || 0) * 20;
+
+        // 金利
+        f += Math.floor((company.loans || 0) * 0.04);
+        f += Math.floor((company.shortLoans || 0) * 0.08);
+
+        return f;
+    },
+
+    /**
+     * 投資判断：GへのROI（投資収益率）を計算
+     */
+    calculateGImpactROI: function(company, investmentType, companyIndex) {
+        const currentG = this.calculateExpectedG(company, companyIndex);
+        const period = gameState.currentPeriod;
+        const periodsRemaining = 5 - period;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+
+        let cost = 0;
+        let immediateGBoost = 0;
+        let longTermValue = 0;
+
+        switch (investmentType) {
+            case 'research':
+                cost = period === 2 ? 20 : 40;
+                // 価格競争力+2 → 販売価格が実質+1〜2円改善
+                immediateGBoost = Math.floor(rowsRemaining / 4) * 2 * 2;
+                longTermValue = periodsRemaining * 15; // 次期以降の価値
+                break;
+
+            case 'education':
+                cost = period === 2 ? 20 : 40;
+                // 製造+1、販売+1 → 1サイクルあたりMQ約+13
+                immediateGBoost = Math.floor(rowsRemaining / 4) * 13;
+                longTermValue = periodsRemaining * 25;
+                break;
+
+            case 'advertising':
+                cost = period === 2 ? 20 : 40;
+                // 販売能力+2 → ボトルネック解消効果
+                const salesBoost = Math.min(2, getManufacturingCapacity(company) - getSalesCapacity(company));
+                immediateGBoost = Math.floor(rowsRemaining / 4) * salesBoost * 13;
+                longTermValue = periodsRemaining * 15;
+                break;
+
+            case 'worker':
+                cost = 5 + (BASE_SALARY_BY_PERIOD[period] || 22) * 1.5;
+                // 製造能力+1（機械があれば）
+                immediateGBoost = company.machines.length > company.workers ?
+                    Math.floor(rowsRemaining / 4) * 13 : 0;
+                longTermValue = periodsRemaining * 20;
+                break;
+
+            case 'salesman':
+                cost = 5 + (BASE_SALARY_BY_PERIOD[period] || 22) * 1.5;
+                // 販売能力+2
+                immediateGBoost = Math.floor(rowsRemaining / 4) * 2 * 13;
+                longTermValue = periodsRemaining * 25;
+                break;
+        }
+
+        const totalValue = immediateGBoost + longTermValue;
+        const roi = cost > 0 ? ((totalValue - cost) / cost * 100) : 0;
+
+        return {
+            type: investmentType,
+            cost,
+            immediateGBoost,
+            longTermValue,
+            totalValue,
+            roi: Math.round(roi),
+            isWorthIt: roi > 20, // 20%以上のROIなら投資価値あり
+            netGImpact: totalValue - cost
+        };
+    },
+
+    /**
+     * 最適な投資戦略を決定（G最大化の観点）
+     */
+    getOptimalInvestmentStrategy: function(company, companyIndex) {
+        const investments = ['research', 'education', 'advertising', 'worker', 'salesman'];
+        const results = investments.map(type =>
+            this.calculateGImpactROI(company, type, companyIndex)
+        );
+
+        // ROIでソート
+        results.sort((a, b) => b.roi - a.roi);
+
+        const affordable = results.filter(r => company.cash > r.cost + 50);
+        const worthwhile = affordable.filter(r => r.isWorthIt);
+
+        return {
+            allOptions: results,
+            best: worthwhile[0] || null,
+            affordable,
+            recommendation: worthwhile.length > 0 ?
+                `${worthwhile[0].type}投資推奨（ROI:${worthwhile[0].roi}%）` :
+                '投資より販売サイクル優先'
+        };
+    },
+
+    /**
+     * 5期クリア条件チェック
+     */
+    checkPeriod5ClearConditions: function(company) {
+        const totalInventory = company.materials + company.wip + company.products;
+        const nextChips = (company.nextPeriodChips?.research || 0) +
+                          (company.nextPeriodChips?.education || 0) +
+                          (company.nextPeriodChips?.advertising || 0);
+
+        return {
+            inventoryTarget: 10,
+            currentInventory: totalInventory,
+            inventoryMet: totalInventory >= 10,
+            chipTarget: 3,
+            currentChips: nextChips,
+            chipsMet: nextChips >= 3,
+            allMet: totalInventory >= 10 && nextChips >= 3,
+            priority: nextChips < 3 ? 'chips' : (totalInventory < 10 ? 'inventory' : 'done')
+        };
+    },
+
+    /**
+     * MQ最大化のための販売タイミング判断
+     */
+    shouldSellNow: function(company, market, companyIndex) {
+        const period = gameState.currentPeriod;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+        const competitors = this.analyzeCompetitors(company, companyIndex);
+
+        // 5期は在庫調整が優先
+        if (period === 5) {
+            const clearCheck = this.checkPeriod5ClearConditions(company);
+            if (!clearCheck.inventoryMet) {
+                return {
+                    shouldSell: false,
+                    reason: '在庫10個未達のため販売控え'
+                };
+            }
+            if (company.materials + company.wip + company.products > 10) {
+                return {
+                    shouldSell: true,
+                    reason: '余剰在庫の売却',
+                    maxQuantity: company.products - (10 - company.materials - company.wip)
+                };
+            }
+        }
+
+        // 市場の空き具合をチェック
+        const marketCapacity = market.maxStock - market.currentStock;
+        if (marketCapacity <= 0) {
+            return { shouldSell: false, reason: '市場枠なし' };
+        }
+
+        // 期末が近い場合は積極的に売る
+        if (rowsRemaining <= 5 && company.products > 0) {
+            return { shouldSell: true, reason: '期末接近による在庫処分', aggressive: true };
+        }
+
+        // 現金が足りない場合は売る
+        const periodEndCost = calculatePeriodPayment(company);
+        if (company.cash < periodEndCost + 30) {
+            return { shouldSell: true, reason: '期末支払いのための緊急販売', aggressive: true };
+        }
+
+        // 競合が販売できない状態なら高値で売れる
+        const rivalsCanSell = competitors.rivals.filter(r => r.canSellNow).length;
+        if (rivalsCanSell === 0 && company.products > 0) {
+            return {
+                shouldSell: true,
+                reason: '競合不在のチャンス販売',
+                premiumPricing: true
+            };
+        }
+
+        return { shouldSell: true, reason: '通常の販売判断' };
     }
 };
 

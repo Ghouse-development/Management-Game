@@ -789,6 +789,26 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
     const periodEndCost = calculatePeriodPayment(company);
     const safetyMargin = periodEndCost + 10;
     const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+    const companyIndex = gameState.companies.indexOf(company);
+
+    // === 2期序盤：チップ投資を最優先（投資なくして成長なし） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 10 && company.cash > 50) {
+        // 攻撃型: 研究4枚、広告1枚を序盤で確保
+        if (company.chips.research < 4) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${(company.chips.research||0)+1}枚目（序盤投資）`);
+            return;
+        }
+        if (company.chips.advertising < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'advertising', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（序盤投資）');
+            return;
+        }
+    }
 
     // 5期は在庫10個＋次期チップ3枚を目指す
     if (analysis.isFinalPeriod) {
@@ -840,7 +860,26 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
         return;
     }
 
-    // === 基本サイクル優先: 販売→生産→仕入 ===
+    // === 2期中盤チップ投資（生産より優先） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 3 && company.cash > safetyMargin + 20) {
+        // 攻撃型: 研究4枚目標（入札で圧倒）、広告1枚
+        if (company.chips.research < 4) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${(company.chips.research||0)+1}枚目（入札支配）`);
+            return;
+        }
+        if (company.chips.advertising < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'advertising', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（販売強化）');
+            return;
+        }
+    }
+
+    // === 基本サイクル: 販売→生産→仕入 ===
     // 販売優先（製品があれば売る）
     if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
@@ -853,29 +892,12 @@ function executeAggressiveStrategy(company, mfgCapacity, salesCapacity, analysis
         return;
     }
 
-    // 材料購入（製品も材料もない時は仕入れる）
-    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+    // 材料購入（在庫ゼロ時は緊急仕入れ）
+    const totalInventory = company.materials + company.wip + company.products;
+    const materialCashReq = totalInventory === 0 ? safetyMargin + 10 : safetyMargin + 30;
+    if (company.materials < mfgCapacity && company.cash > materialCashReq) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
-    }
-
-    // === 基本サイクル後のチップ投資 ===
-    // 2期は投資も行う（余裕がある時のみ）
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
-        if (company.chips.education < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'education', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期攻め投資）');
-            return;
-        }
-        if (company.chips.research < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期攻め投資）');
-            return;
-        }
     }
 
     // 長期投資
@@ -937,6 +959,34 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
     const periodEndCost = calculatePeriodPayment(company);
     const safetyMargin = periodEndCost + 80;
     const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+    const companyIndex = gameState.companies.indexOf(company);
+
+    // === 2期序盤：チップ投資を最優先（投資なくして成長なし） ===
+    // 堅実型でも必要な投資はする（safetyMarginを緩和：現金50円以上あればOK）
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 10 && company.cash > 50) {
+        // 堅実型: 保険→教育2枚→研究1枚（守り重視だが投資は怠らない）
+        if (!company.chips.insurance) {
+            company.cash -= 5;
+            company.chips.insurance = 1;
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '🛡️', '保険チップ購入（序盤でリスク対策）');
+            return;
+        }
+        if (company.chips.education < 2) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '📚', `教育チップ${(company.chips.education||0)+1}枚目（序盤投資）`);
+            return;
+        }
+        if (company.chips.research < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（序盤投資）');
+            return;
+        }
+    }
 
     if (analysis.isFinalPeriod) {
         const totalInv = company.materials + company.wip + company.products;
@@ -986,7 +1036,41 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    // === 基本サイクル優先: 販売→生産→仕入 ===
+    // === 2期中盤チップ投資（生産より優先） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 3 && company.cash > 50) {
+        // 堅実型: 保険必須、教育2枚、研究1枚（守り重視）
+        if (!company.chips.insurance) {
+            company.cash -= 5;
+            company.chips.insurance = 1;
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🛡️', '保険チップ購入（リスク回避最優先）');
+            return;
+        }
+        if (company.chips.education < 2) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', `教育チップ${(company.chips.education||0)+1}枚目（採用コスト削減）`);
+            return;
+        }
+        if (company.chips.research < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（最低限の競争力）');
+            return;
+        }
+        // 余裕があれば教育追加（採用コストをさらに下げる）
+        if (company.chips.education < 3 && company.cash > safetyMargin + 40) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ3枚目（人件費最適化）');
+            return;
+        }
+    }
+
+    // === 基本サイクル: 販売→生産→仕入 ===
     if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.85);
         return;
@@ -997,34 +1081,12 @@ function executeConservativeStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+    // 材料購入（在庫ゼロ時は緊急仕入れ）
+    const totalInventory = company.materials + company.wip + company.products;
+    const materialCashReq = totalInventory === 0 ? safetyMargin + 10 : safetyMargin + 30;
+    if (company.materials < mfgCapacity && company.cash > materialCashReq) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
-    }
-
-    // === 基本サイクル後のチップ投資（2期） ===
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 50) {
-        if (!company.chips.insurance) {
-            company.cash -= 5;
-            company.chips.insurance = 1;
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🛡️', '保険チップ購入（2期リスク対策）');
-            return;
-        }
-        if (company.chips.education < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'education', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期堅実投資）');
-            return;
-        }
-        if (company.chips.research < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期堅実投資）');
-            return;
-        }
     }
 
     if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 8 && !analysis.isRecoveryPhase) {
@@ -1131,7 +1193,26 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    // === 基本サイクル優先: 販売→生産→仕入 ===
+    // === 2期中盤チップ投資（生産より優先） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 3 && company.cash > 50) {
+        // 価格重視型: 広告チップで販売能力+1、教育で採用コスト削減
+        if (company.chips.advertising < 2) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'advertising', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📢', `広告チップ${(company.chips.advertising||0)+1}枚目（販売強化）`);
+            return;
+        }
+        if (company.chips.education < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（コスト削減）');
+            return;
+        }
+    }
+
+    // === 基本サイクル: 販売→生産→仕入 ===
     if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.78);
         return;
@@ -1142,27 +1223,12 @@ function executePriceFocusedStrategy(company, mfgCapacity, salesCapacity, analys
         return;
     }
 
-    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+    // 材料購入（在庫ゼロ時は緊急仕入れ）
+    const totalInventory = company.materials + company.wip + company.products;
+    const materialCashReq = totalInventory === 0 ? safetyMargin + 10 : safetyMargin + 30;
+    if (company.materials < mfgCapacity && company.cash > materialCashReq) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
-    }
-
-    // === 基本サイクル後のチップ投資（2期） ===
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
-        if (company.chips.research < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期価格戦略）');
-            return;
-        }
-        if (company.chips.advertising < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'advertising', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（2期販売強化）');
-            return;
-        }
     }
 
     if (company.cash > safetyMargin + 50 && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
@@ -1222,6 +1288,19 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
     const periodEndCost = calculatePeriodPayment(company);
     const safetyMargin = periodEndCost + 40;
     const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+    const companyIndex = gameState.companies.indexOf(company);
+
+    // === 2期序盤：チップ投資を最優先（投資なくして成長なし） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 10 && company.cash > 50) {
+        // 技術特化: 研究5枚に全振り（コール価格-10を目指す）
+        if (company.chips.research < 5) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${(company.chips.research||0)+1}枚目（技術で圧倒）`);
+            return;
+        }
+    }
 
     if (analysis.isFinalPeriod) {
         const totalInv = company.materials + company.wip + company.products;
@@ -1271,7 +1350,25 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
         return;
     }
 
-    // === 基本サイクル優先: 販売→生産→仕入 ===
+    // === 2期中盤チップ投資（生産より優先） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > 50) {
+        if (company.chips.research < 5) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${(company.chips.research||0)+1}枚目（技術投資）`);
+            return;
+        }
+        if (company.chips.education < 2) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期技術投資）');
+            return;
+        }
+    }
+
+    // === 基本サイクル: 販売→生産→仕入 ===
     if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.80);
         return;
@@ -1282,27 +1379,12 @@ function executeTechFocusedStrategy(company, mfgCapacity, salesCapacity, analysi
         return;
     }
 
-    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+    // 材料購入（在庫ゼロ時は緊急仕入れ）
+    const totalInventory = company.materials + company.wip + company.products;
+    const materialCashReq = totalInventory === 0 ? safetyMargin + 10 : safetyMargin + 30;
+    if (company.materials < mfgCapacity && company.cash > materialCashReq) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
-    }
-
-    // === 基本サイクル後のチップ投資（2期） ===
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
-        if (company.chips.education < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'education', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期技術投資）');
-            return;
-        }
-        if (company.chips.research < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期技術投資）');
-            return;
-        }
     }
 
     if (company.cash > safetyMargin + chipCost && analysis.rowsRemaining > 5 && !analysis.isRecoveryPhase) {
@@ -1365,6 +1447,33 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
     const periodEndCost = calculatePeriodPayment(company);
     const safetyMargin = periodEndCost + 35;
     const chipCost = gameState.currentPeriod === 2 ? 20 : 40;
+    const companyIndex = gameState.companies.indexOf(company);
+
+    // === 2期序盤：チップ投資を最優先（投資なくして成長なし） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 10 && company.cash > 50) {
+        // バランス型: 研究2枚、教育1枚、広告1枚（均等投資）
+        if (company.chips.research < 2) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${(company.chips.research||0)+1}枚目（序盤投資）`);
+            return;
+        }
+        if (company.chips.education < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（序盤投資）');
+            return;
+        }
+        if (company.chips.advertising < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'advertising', 20);
+            incrementRow(companyIndex);
+            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（序盤投資）');
+            return;
+        }
+    }
 
     if (analysis.isFinalPeriod) {
         const totalInv = company.materials + company.wip + company.products;
@@ -1421,7 +1530,33 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
         return;
     }
 
-    // === 基本サイクル優先: 販売→生産→仕入 ===
+    // === 2期中盤チップ投資（生産より優先） ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 3 && company.cash > 50) {
+        // バランス型: 研究2枚、教育1枚、広告1枚（均等投資）
+        if (company.chips.research < 2) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${(company.chips.research||0)+1}枚目（バランス投資）`);
+            return;
+        }
+        if (company.chips.education < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'education', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（バランス投資）');
+            return;
+        }
+        if (company.chips.advertising < 1) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'advertising', 20);
+            incrementRow(gameState.companies.indexOf(company));
+            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（バランス投資）');
+            return;
+        }
+    }
+
+    // === 基本サイクル: 販売→生産→仕入 ===
     if (company.products > 0 && salesCapacity > 0) {
         executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.80);
         return;
@@ -1432,25 +1567,21 @@ function executeBalancedStrategy(company, mfgCapacity, salesCapacity, analysis) 
         return;
     }
 
-    if (company.materials < mfgCapacity && company.cash > safetyMargin + 30) {
+    // 材料購入（在庫ゼロ時は緊急仕入れ）
+    const totalInventory = company.materials + company.wip + company.products;
+    const materialCashReq = totalInventory === 0 ? safetyMargin + 10 : safetyMargin + 30;
+    if (company.materials < mfgCapacity && company.cash > materialCashReq) {
         executeDefaultMaterialPurchase(company, mfgCapacity);
         return;
     }
 
-    // === 基本サイクル後のチップ投資（2期） ===
-    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 5 && company.cash > safetyMargin + chipCost + 30) {
-        if (company.chips.education < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'education', chipCost);
+    // === 追加チップ投資 ===
+    if (gameState.currentPeriod === 2 && analysis.rowsRemaining > 3 && company.cash > safetyMargin + 20) {
+        if (company.chips.research < 3) {
+            company.cash -= 20;
+            aiPurchaseChip(company, 'research', 20);
             incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期投資）');
-            return;
-        }
-        if (company.chips.research < 2) {
-            company.cash -= chipCost;
-            aiPurchaseChip(company, 'research', chipCost);
-            incrementRow(gameState.companies.indexOf(company));
-            showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期投資）');
+            showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（バランス投資）');
             return;
         }
     }
@@ -1989,53 +2120,52 @@ function executeDefaultInvestment(company) {
         return;
     }
 
-    // 2期は必ずチップ投資
-    if (gameState.currentPeriod === 2 && rowsRemaining > 5) {
+    // 2期は積極的にチップ投資（3期への繰り越し用）
+    if (gameState.currentPeriod === 2 && rowsRemaining > 3) {
         const totalCurrentChips = (company.chips.research || 0) +
                                   (company.chips.education || 0) +
                                   (company.chips.advertising || 0);
-        if (totalCurrentChips < 2 && company.cash >= 20 + safetyMargin) {
-            if (company.chips.education === 0) {
+        const chipBudget = company.cash - safetyMargin - 20; // 20円余裕を持つ
+
+        // 目標: 研究2-3枚、教育1枚、広告1枚（計4-5枚を繰り越し）
+        if (chipBudget >= 20) {
+            // 優先1: 研究チップ（入札競争力）
+            if (company.chips.research < 3) {
+                company.cash -= 20;
+                aiPurchaseChip(company, 'research', 20);
+                incrementRow(companyIndex);
+                const msg = company.chips.research === 0 ? '研究チップ購入（入札競争力+2）' :
+                           `研究チップ${company.chips.research + 1}枚目（3期繰越用）`;
+                showAIActionModal(company, 'チップ購入', '🔬', msg);
+                return;
+            }
+            // 優先2: 教育チップ（採用コスト削減）
+            if (company.chips.education < 1) {
                 company.cash -= 20;
                 aiPurchaseChip(company, 'education', 20);
                 incrementRow(companyIndex);
-                showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（2期必須投資）');
+                showAIActionModal(company, 'チップ購入', '📚', '教育チップ購入（3期繰越用）');
                 return;
             }
-            if (company.chips.research === 0) {
-                company.cash -= 20;
-                aiPurchaseChip(company, 'research', 20);
-                incrementRow(companyIndex);
-                showAIActionModal(company, 'チップ購入', '🔬', '研究チップ購入（2期必須投資）');
-                return;
-            }
-            if (company.chips.advertising === 0) {
+            // 優先3: 広告チップ（販売能力+1）
+            if (company.chips.advertising < 1) {
                 company.cash -= 20;
                 aiPurchaseChip(company, 'advertising', 20);
                 incrementRow(companyIndex);
-                showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（2期必須投資）');
+                showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（3期繰越用）');
                 return;
             }
-        }
-        if (totalCurrentChips === 2 && company.cash >= 20 + safetyMargin + 20 && rowsRemaining > 8) {
-            if (company.chips.research < 2) {
-                company.cash -= 20;
-                aiPurchaseChip(company, 'research', 20);
-                incrementRow(companyIndex);
-                showAIActionModal(company, 'チップ購入', '🔬', '研究チップ追加（繰越2枚確保）');
-                return;
+            // 余裕があれば追加投資
+            if (rowsRemaining > 6 && chipBudget >= 40) {
+                if (company.chips.research < 4) {
+                    company.cash -= 20;
+                    aiPurchaseChip(company, 'research', 20);
+                    incrementRow(companyIndex);
+                    showAIActionModal(company, 'チップ購入', '🔬', `研究チップ${company.chips.research + 1}枚目（追加投資）`);
+                    return;
+                }
             }
         }
-    }
-
-    // 研究チップ投資
-    const maxResearchChips = gameState.currentPeriod === 2 ? 4 : AIBrain.getResearchChipTarget(company.strategy || 'balanced');
-    if (company.chips.research < maxResearchChips && company.cash >= chipCost + safetyMargin) {
-        company.cash -= chipCost;
-        aiPurchaseChip(company, 'research', chipCost);
-        incrementRow(companyIndex);
-        showAIActionModal(company, 'チップ購入', '🔬', '研究開発チップ購入（価格競争力+2）');
-        return;
     }
 
     // 能力バランス調整
@@ -2067,12 +2197,30 @@ function executeDefaultInvestment(company) {
         return;
     }
 
-    if (needMoreSales && company.chips.advertising < 3 && company.cash >= chipCost + safetyMargin) {
-        company.cash -= chipCost;
-        aiPurchaseChip(company, 'advertising', chipCost);
-        incrementRow(companyIndex);
-        showAIActionModal(company, 'チップ購入', '📢', '広告チップ購入（販売能力向上）');
-        return;
+    // 3期以降の特急チップは「どうしても必要な時」のみ
+    if (gameState.currentPeriod >= 3 && company.cash >= 40 + safetyMargin) {
+        const expressCost = 40;
+
+        // 研究チップ特急: 研究0枚で入札市場を狙いたい時
+        const hasNoResearch = (company.chips.research || 0) === 0;
+        const hasProducts = (company.products || 0) >= 2;
+        if (hasNoResearch && hasProducts && salesCapacity > 0) {
+            company.cash -= expressCost;
+            aiPurchaseChip(company, 'research', expressCost);
+            incrementRow(companyIndex);
+            showAIActionModal(company, '特急チップ', '🔬', '研究チップ特急購入（入札参入必須）');
+            return;
+        }
+
+        // 広告チップ特急: 製品が余っているのに売れない時
+        const productsStuck = (company.products || 0) >= 3 && salesCapacity < company.products;
+        if (productsStuck && (company.chips.advertising || 0) === 0) {
+            company.cash -= expressCost;
+            aiPurchaseChip(company, 'advertising', expressCost);
+            incrementRow(companyIndex);
+            showAIActionModal(company, '特急チップ', '📢', '広告チップ特急購入（在庫消化必須）');
+            return;
+        }
     }
 
     aiDoNothing(company, 'チップ投資見送り');
@@ -2087,7 +2235,7 @@ function startAIBidding(aiCompany, market, aiQty, strategicPrice) {
 
     // AI入札情報を保存
     const isAIParent = (gameState.currentPlayerIndex === companyIndex);
-    const aiCompetitiveness = getPriceCompetitiveness(aiCompany, isAIParent);
+    const aiCompetitiveness = getPriceCompetitiveness(aiCompany, companyIndex);
     const aiDisplayPrice = Math.min(Math.round(strategicPrice * market.sellPrice), market.sellPrice);
     const aiCallPrice = aiDisplayPrice - aiCompetitiveness;
 
@@ -2109,10 +2257,13 @@ function startAIBidding(aiCompany, market, aiQty, strategicPrice) {
 
     const content = `
         <div class="bid-display" style="text-align: center;">
-            <div style="font-size: 14px; color: #6366f1; margin-bottom: 10px;">📢 ${aiCompany.name}が入札を開始</div>
+            <div style="font-size: 14px; color: #6366f1; margin-bottom: 10px;">📢 ${aiCompany.name}が<strong>${aiQty}個</strong>を入札開始</div>
             <div style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: white; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
                 <div style="font-size: 18px; font-weight: bold;">${market.name}市場</div>
                 <div style="font-size: 14px; opacity: 0.9;">基準価格: ¥${market.sellPrice}</div>
+                <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
+                    ${aiCompany.name}: 表示¥${aiDisplayPrice} → コール¥${aiCallPrice}
+                </div>
             </div>
             ${canPlayerBid ? `
                 <div style="background: #e0f2fe; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
@@ -2128,10 +2279,10 @@ function startAIBidding(aiCompany, market, aiQty, strategicPrice) {
                     </div>
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <label style="font-size: 12px; color: #374151;">入札価格 (¥26〜¥${market.sellPrice}):</label>
+                    <label style="font-size: 12px; color: #374151;">入札価格 (¥20〜¥${market.sellPrice}):</label>
                     <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px;">
                         <button onclick="adjustAIBidPrice(-1)" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #6366f1; color: white; font-size: 20px; cursor: pointer;">−</button>
-                        <input type="number" id="aiBidPrice" value="${market.sellPrice}" min="26" max="${market.sellPrice}" readonly style="width: 70px; height: 40px; text-align: center; font-size: 18px; border: 2px solid #6366f1; border-radius: 8px;">
+                        <input type="number" id="aiBidPrice" value="30" min="20" max="${market.sellPrice}" readonly style="width: 70px; height: 40px; text-align: center; font-size: 18px; border: 2px solid #6366f1; border-radius: 8px;">
                         <button onclick="adjustAIBidPrice(1)" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #6366f1; color: white; font-size: 20px; cursor: pointer;">+</button>
                     </div>
                 </div>
@@ -2165,8 +2316,8 @@ function adjustAIBidPrice(delta) {
     const input = document.getElementById('aiBidPrice');
     if (!input) return;
     const max = parseInt(input.max) || 32;
-    const min = parseInt(input.min) || 26;
-    const current = parseInt(input.value) || 32;
+    const min = parseInt(input.min) || 20;
+    const current = parseInt(input.value) || 30;
     input.value = Math.max(min, Math.min(max, current + delta));
 }
 
@@ -2178,7 +2329,7 @@ function playerJoinAIBid(marketIndex) {
     const playerDisplayPrice = parseInt(document.getElementById('aiBidPrice').value) || market.sellPrice;
 
     const isPlayerParent = (gameState.currentPlayerIndex === 0);
-    const playerCompetitiveness = getPriceCompetitiveness(playerCompany, isPlayerParent);
+    const playerCompetitiveness = getPriceCompetitiveness(playerCompany, 0); // プレイヤーは常にindex 0
     const playerCallPrice = playerDisplayPrice - playerCompetitiveness;
 
     // 全入札を集める
@@ -2203,8 +2354,12 @@ function playerJoinAIBid(marketIndex) {
             const otherQty = Math.min(otherSalesCapacity, otherAI.products);
             if (otherQty > 0) {
                 const isOtherParent = (gameState.currentPlayerIndex === i);
-                const otherCompetitiveness = getPriceCompetitiveness(otherAI, isOtherParent);
-                const otherDisplayPrice = Math.max(26, Math.floor(market.sellPrice * (0.85 + Math.random() * 0.10)));
+                const otherCompetitiveness = getPriceCompetitiveness(otherAI, i); // 正しくcompanyIndexを渡す
+                // 戦略的価格設定：研究チップが多いほど高い価格で入札（利益最大化）
+                const baseRate = 0.85 + Math.random() * 0.10;
+                const competitiveBonus = otherCompetitiveness * 0.02; // 競争力1につき+2%
+                const strategicRate = Math.min(baseRate + competitiveBonus, 1.0);
+                const otherDisplayPrice = Math.max(26, Math.floor(market.sellPrice * strategicRate)); // AIは26円以上
                 const otherCallPrice = otherDisplayPrice - otherCompetitiveness;
                 allBids.push({
                     company: i,
@@ -2243,8 +2398,12 @@ function skipAIBid() {
             const otherQty = Math.min(otherSalesCapacity, otherAI.products);
             if (otherQty > 0) {
                 const isOtherParent = (gameState.currentPlayerIndex === i);
-                const otherCompetitiveness = getPriceCompetitiveness(otherAI, isOtherParent);
-                const otherDisplayPrice = Math.max(26, Math.floor(market.sellPrice * (0.85 + Math.random() * 0.10)));
+                const otherCompetitiveness = getPriceCompetitiveness(otherAI, i); // 正しくcompanyIndexを渡す
+                // 戦略的価格設定：研究チップが多いほど高い価格で入札（利益最大化）
+                const baseRate = 0.85 + Math.random() * 0.10;
+                const competitiveBonus = otherCompetitiveness * 0.02; // 競争力1につき+2%
+                const strategicRate = Math.min(baseRate + competitiveBonus, 1.0);
+                const otherDisplayPrice = Math.max(26, Math.floor(market.sellPrice * strategicRate)); // AIは26円以上
                 const otherCallPrice = otherDisplayPrice - otherCompetitiveness;
                 allBids.push({
                     company: i,
@@ -2316,6 +2475,25 @@ function processAIBidResults(marketIndex, allBids) {
         <div style="font-size: 14px; color: #666;">📍 ${market.name}市場の入札結果</div>
     </div>`;
 
+    // 全入札者の価格を表示（④対応）
+    resultHtml += `<div style="background: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 12px;">
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">📊 入札一覧（コール価格順）</div>`;
+    allBids.forEach((bid, idx) => {
+        const bidCompany = gameState.companies[bid.company];
+        const isPlayer = bid.company === 0;
+        const isParent = bid.company === gameState.pendingAIBid?.company;
+        const parentMark = isParent ? ' 👑親' : '';
+        const soldResult = salesResults.find(r => gameState.companies.indexOf(r.company) === bid.company);
+        const soldMark = soldResult ? ` → ${soldResult.quantity}個販売` : ' → 落札なし';
+        resultHtml += `
+            <div style="display: flex; justify-content: space-between; padding: 4px 8px; border-radius: 4px; ${isPlayer ? 'background: #dbeafe;' : ''}">
+                <span style="${isPlayer ? 'color: #1d4ed8; font-weight: bold;' : 'color: #374151;'}">${idx + 1}. ${bidCompany.name}${parentMark}</span>
+                <span style="font-size: 12px;">表示¥${bid.displayPrice} → コール¥${bid.price}${soldMark}</span>
+            </div>`;
+    });
+    resultHtml += `</div>`;
+
+    // 落札結果を表示
     salesResults.forEach((result, idx) => {
         const isPlayer = (gameState.companies.indexOf(result.company) === 0);
         const rankStyle = idx === 0 ? 'background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white;' :

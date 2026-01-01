@@ -2851,6 +2851,13 @@ function startNewGame() {
     // スタート順を通知
     const startPlayer = gameState.companies[randomStartIndex];
     showToast(`🎲 ${startPlayer.name}からスタート！`, 'info', 3000);
+
+    // AIが最初のプレイヤーの場合、AIターンを開始
+    if (randomStartIndex !== 0) {
+        setTimeout(executeAITurn, 1500);
+    } else {
+        showTurnStartOptions();
+    }
 }
 
 function confirmDeleteSave() {

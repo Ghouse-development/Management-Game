@@ -191,7 +191,7 @@ function processBidsWithAllCompanies(marketIndex) {
                 const isAIParent = (gameState.currentPlayerIndex === i);
                 const basePrice = Math.max(26, Math.floor(market.sellPrice * (0.85 + Math.random() * 0.10)));
                 const aiDisplayPrice = Math.min(basePrice, market.sellPrice);
-                const aiPrice = aiDisplayPrice - getPriceCompetitiveness(aiCompany, isAIParent);
+                const aiPrice = aiDisplayPrice - getPriceCompetitiveness(aiCompany, i); // 正しくcompanyIndexを渡す
                 allBids.push({
                     company: i,
                     price: aiPrice,
@@ -370,7 +370,7 @@ function processBidsWithAllCompaniesTwoMarket() {
             if (aiQuantity >= 2) {
                 const isAIParent = (gameState.currentPlayerIndex === i);
                 const aiDisplayPrice = Math.max(26, Math.floor(maxPrice * (0.80 + Math.random() * 0.15)));
-                const aiPrice = aiDisplayPrice - getPriceCompetitiveness(aiCompany, isAIParent);
+                const aiPrice = aiDisplayPrice - getPriceCompetitiveness(aiCompany, i); // 正しくcompanyIndexを渡す
                 allBids.push({
                     company: i,
                     price: aiPrice,

@@ -112,9 +112,10 @@ const AccountingSystem = {
         const carriedOver = company.carriedOverChips || {research: 0, education: 0, advertising: 0};
 
         if (period === 2) {
-            if (company.chips.research > 0) cost += CHIP_COSTS.normal;
-            if (company.chips.education > 0) cost += CHIP_COSTS.normal;
-            if (company.chips.advertising > 0) cost += CHIP_COSTS.normal;
+            // 2期は全て繰り越しチップ（各枚数×20円）
+            cost += (company.chips.research || 0) * CHIP_COSTS.normal;
+            cost += (company.chips.education || 0) * CHIP_COSTS.normal;
+            cost += (company.chips.advertising || 0) * CHIP_COSTS.normal;
         } else {
             // 繰り越しチップ
             cost += (carriedOver.research || 0) * CHIP_COSTS.normal;
