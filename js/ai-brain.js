@@ -83,6 +83,159 @@ const AIBrain = {
         }
     },
 
+    // ============================================
+    // 🔥 AI感情システム - 入札負けの悔しさ、勝利への執着
+    // ============================================
+    emotions: {},  // companyIndex => emotionState
+
+    // 感情状態を初期化
+    initEmotions: function(companyIndex) {
+        if (!this.emotions[companyIndex]) {
+            this.emotions[companyIndex] = {
+                frustration: 0,        // 悔しさ（0-100）入札負けで増加
+                competitiveDrive: 50,  // 競争心（0-100）基本値50
+                revengeTargets: {},    // 復讐対象 {companyIndex: intensity}
+                consecutiveLosses: 0,  // 連続入札負け数
+                lastBidResult: null,   // 前回入札結果 'won' | 'lost' | null
+                victoryHunger: 50,     // 勝利への渇望（0-100）
+                mood: 'neutral'        // 'frustrated' | 'confident' | 'desperate' | 'neutral'
+            };
+        }
+        return this.emotions[companyIndex];
+    },
+
+    // 入札結果から感情を更新
+    updateEmotionsFromBidResult: function(companyIndex, won, winnerIndex, bidPrice, winningPrice) {
+        const e = this.initEmotions(companyIndex);
+        const company = gameState.companies[companyIndex];
+
+        if (won) {
+            // 勝利！悔しさリセット、自信UP
+            e.consecutiveLosses = 0;
+            e.frustration = Math.max(0, e.frustration - 30);
+            e.competitiveDrive = Math.min(100, e.competitiveDrive + 5);
+            e.lastBidResult = 'won';
+            e.mood = 'confident';
+            console.log(`[感情] ${company.name}「やった！落札成功！」(自信UP)`);
+        } else {
+            // 負け...悔しさ増加
+            e.consecutiveLosses++;
+            e.frustration = Math.min(100, e.frustration + 15 + e.consecutiveLosses * 5);
+            e.lastBidResult = 'lost';
+
+            // 勝者への復讐心
+            if (winnerIndex !== undefined && winnerIndex !== companyIndex) {
+                e.revengeTargets[winnerIndex] = (e.revengeTargets[winnerIndex] || 0) + 20;
+                const winner = gameState.companies[winnerIndex];
+                console.log(`[感情] ${company.name}「くっ...${winner?.name || '奴'}に負けた...次は絶対勝つ！」(復讐心+20)`);
+            }
+
+            // 連続負けで気分変化
+            if (e.consecutiveLosses >= 3) {
+                e.mood = 'desperate';
+                e.victoryHunger = Math.min(100, e.victoryHunger + 20);
+                console.log(`[感情] ${company.name}「もう後がない...なんとしても次は！」(必死モード)`);
+            } else {
+                e.mood = 'frustrated';
+            }
+
+            // 僅差で負けた場合は特に悔しい
+            if (winningPrice && bidPrice && (winningPrice - bidPrice) <= 2) {
+                e.frustration = Math.min(100, e.frustration + 10);
+                console.log(`[感情] ${company.name}「あと${winningPrice - bidPrice}円だったのに...！」(激悔)`);
+            }
+        }
+
+        // 勝利への渇望を更新
+        const rankings = this.getRankings();
+        const myRank = rankings.findIndex(r => r.index === companyIndex) + 1;
+        if (myRank > 1) {
+            e.victoryHunger = Math.min(100, 50 + (myRank - 1) * 10 + e.consecutiveLosses * 5);
+        }
+    },
+
+    // 現在の順位を取得
+    getRankings: function() {
+        return gameState.companies
+            .map((c, i) => ({ index: i, equity: c.equity, name: c.name }))
+            .sort((a, b) => b.equity - a.equity);
+    },
+
+    // 感情に基づく入札価格調整
+    getEmotionalBidAdjustment: function(companyIndex, baseBidPrice, targetCompanyIndex) {
+        const e = this.initEmotions(companyIndex);
+        let adjustment = 0;
+
+        // 悔しさによる上乗せ（負けたくない！）
+        adjustment += Math.floor(e.frustration / 20);  // 最大+5
+
+        // 復讐対象への対抗心
+        if (targetCompanyIndex !== undefined && e.revengeTargets[targetCompanyIndex]) {
+            const revengeIntensity = e.revengeTargets[targetCompanyIndex];
+            adjustment += Math.floor(revengeIntensity / 25);  // 最大+4
+        }
+
+        // 勝利への渇望
+        if (e.victoryHunger > 70) {
+            adjustment += Math.floor((e.victoryHunger - 70) / 15);  // 最大+2
+        }
+
+        // 必死モードなら更に上乗せ
+        if (e.mood === 'desperate') {
+            adjustment += 2;
+        }
+
+        // 自信がある時は少し節約
+        if (e.mood === 'confident' && e.consecutiveLosses === 0) {
+            adjustment -= 1;
+        }
+
+        const company = gameState.companies[companyIndex];
+        if (adjustment > 0) {
+            console.log(`[感情入札] ${company.name}: 基準${baseBidPrice} + 感情${adjustment} = ${baseBidPrice + adjustment}円 (悔${e.frustration} 渇${e.victoryHunger} ${e.mood})`);
+        }
+
+        return adjustment;
+    },
+
+    // 感情を考慮した攻撃性を取得
+    getEmotionalAggressiveness: function(companyIndex) {
+        const e = this.initEmotions(companyIndex);
+        let aggro = 0.5;  // 基本値
+
+        // 悔しさで攻撃的に
+        aggro += e.frustration / 200;  // 最大+0.5
+
+        // 必死モードで更に攻撃的
+        if (e.mood === 'desperate') {
+            aggro += 0.2;
+        }
+
+        // 勝利渇望で攻撃的
+        aggro += (e.victoryHunger - 50) / 200;  // ±0.25
+
+        return Math.max(0.2, Math.min(1.0, aggro));
+    },
+
+    // 期末に感情をリセット（少し残す）
+    coolDownEmotions: function(companyIndex) {
+        const e = this.emotions[companyIndex];
+        if (!e) return;
+
+        e.frustration = Math.floor(e.frustration * 0.5);  // 半減
+        e.victoryHunger = Math.max(50, e.victoryHunger - 10);
+        e.consecutiveLosses = 0;
+        e.mood = 'neutral';
+
+        // 復讐心も少し冷める
+        for (const target in e.revengeTargets) {
+            e.revengeTargets[target] = Math.floor(e.revengeTargets[target] * 0.7);
+            if (e.revengeTargets[target] < 5) {
+                delete e.revengeTargets[target];
+            }
+        }
+    },
+
     // ゲーム終了時に学習（決算後に呼び出す）
     learnFromGameResult: function(gameResults) {
         const data = this.loadLearningData();
@@ -1168,6 +1321,10 @@ const AIBrain = {
                 targetPrice -= 2;  // 価格重視：さらに安く
                 break;
         }
+
+        // === 6. 🔥 感情による調整（悔しさ・復讐心・勝利渇望） ===
+        const emotionalAdj = this.getEmotionalBidAdjustment(companyIndex, targetPrice);
+        targetPrice += emotionalAdj;
 
         // 最終チェック
         return Math.max(minProfitablePrice, Math.min(Math.round(targetPrice), basePrice));

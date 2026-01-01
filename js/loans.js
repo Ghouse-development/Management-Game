@@ -5,6 +5,111 @@
  */
 
 // ============================================
+// 期首倉庫購入オプション（3期以降）
+// ============================================
+window.periodStartWarehousePurchase = false;  // 期首倉庫購入フラグ
+
+function getWarehousePeriodStartOption() {
+    const player = gameState.companies[0];
+    const currentWarehouses = player.warehouses || 0;
+
+    if (currentWarehouses >= 2) {
+        return ''; // 既に2個持っている
+    }
+
+    const canAfford = player.cash >= WAREHOUSE_COST;
+    const warehouseCount = 2 - currentWarehouses; // 購入可能数
+
+    return `
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 12px; padding: 12px; margin-bottom: 15px; color: white;">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">🏪 無災害倉庫購入（期首）</div>
+            <div style="font-size: 12px; margin-bottom: 8px;">
+                容量+12個、火災/盗難回避、F+20円<br>
+                <span style="opacity: 0.8;">※期首購入は2行目にまとめられます（追加行なし）</span>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: center;">
+                <button onclick="togglePeriodStartWarehouse(false)" id="wh-no" style="background: ${!window.periodStartWarehousePurchase ? '#fff' : 'rgba(255,255,255,0.3)'}; color: ${!window.periodStartWarehousePurchase ? '#059669' : '#fff'}; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    買わない
+                </button>
+                ${canAfford ? `
+                <button onclick="togglePeriodStartWarehouse(true)" id="wh-yes" style="background: ${window.periodStartWarehousePurchase ? '#fff' : 'rgba(255,255,255,0.3)'}; color: ${window.periodStartWarehousePurchase ? '#059669' : '#fff'}; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    購入する（¥${WAREHOUSE_COST}）
+                </button>
+                ` : `<span style="font-size: 11px; opacity: 0.7;">資金不足</span>`}
+            </div>
+            ${currentWarehouses === 0 && canAfford ? `
+            <div id="wh-location-select" style="margin-top: 10px; display: ${window.periodStartWarehousePurchase ? 'block' : 'none'};">
+                <div style="font-size: 11px; margin-bottom: 5px;">設置場所:</div>
+                <div style="display: flex; gap: 8px; justify-content: center;">
+                    <button onclick="selectPeriodStartWarehouseLocation('materials')" id="wh-loc-mat" style="background: rgba(255,255,255,0.9); color: #7c3aed; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px;">
+                        📦 材料置場
+                    </button>
+                    <button onclick="selectPeriodStartWarehouseLocation('products')" id="wh-loc-prod" style="background: rgba(255,255,255,0.3); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px;">
+                        📦 製品置場
+                    </button>
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+window.periodStartWarehouseLocation = 'materials';
+
+function togglePeriodStartWarehouse(purchase) {
+    window.periodStartWarehousePurchase = purchase;
+    const noBtn = document.getElementById('wh-no');
+    const yesBtn = document.getElementById('wh-yes');
+    const locSelect = document.getElementById('wh-location-select');
+
+    if (noBtn) {
+        noBtn.style.background = !purchase ? '#fff' : 'rgba(255,255,255,0.3)';
+        noBtn.style.color = !purchase ? '#059669' : '#fff';
+    }
+    if (yesBtn) {
+        yesBtn.style.background = purchase ? '#fff' : 'rgba(255,255,255,0.3)';
+        yesBtn.style.color = purchase ? '#059669' : '#fff';
+    }
+    if (locSelect) {
+        locSelect.style.display = purchase ? 'block' : 'none';
+    }
+}
+
+function selectPeriodStartWarehouseLocation(location) {
+    window.periodStartWarehouseLocation = location;
+    const matBtn = document.getElementById('wh-loc-mat');
+    const prodBtn = document.getElementById('wh-loc-prod');
+
+    if (matBtn) {
+        matBtn.style.background = location === 'materials' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
+        matBtn.style.color = location === 'materials' ? '#7c3aed' : '#fff';
+    }
+    if (prodBtn) {
+        prodBtn.style.background = location === 'products' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)';
+        prodBtn.style.color = location === 'products' ? '#22c55e' : '#fff';
+    }
+}
+
+function processPeriodStartWarehousePurchase() {
+    if (!window.periodStartWarehousePurchase) return;
+
+    const player = gameState.companies[0];
+    if (player.warehouses >= 2 || player.cash < WAREHOUSE_COST) return;
+
+    player.cash -= WAREHOUSE_COST;
+    player.warehouses++;
+    if (player.warehouses === 1) {
+        player.warehouseLocation = window.periodStartWarehouseLocation;
+    }
+
+    const locationName = window.periodStartWarehouseLocation === 'materials' ? '材料置場' : '製品置場';
+    console.log(`[期首] ${player.name}が無災害倉庫を${locationName}に購入（¥${WAREHOUSE_COST}）`);
+
+    // リセット
+    window.periodStartWarehousePurchase = false;
+}
+
+// ============================================
 // 期首金利支払い
 // ============================================
 function processInterestPayments() {
@@ -136,6 +241,8 @@ function showBorrowingChoice() {
                 </div>
             </div>
 
+            ${getWarehousePeriodStartOption()}
+
             <p style="margin-bottom: 15px;">借入を行いますか？</p>
             <button class="action-btn primary" onclick="startPeriodWithBorrowing()" style="margin: 10px;">借入を行う（3行目からスタート）</button>
             <button class="action-btn secondary" onclick="startPeriodWithoutBorrowing()" style="margin: 10px;">借入を行わない（2行目からスタート）</button>
@@ -185,6 +292,10 @@ function startPeriodWithBorrowing() {
         gameState.maxRows = gameState.maxRowsByPeriod[5];
     }
     gameState.periodStarted = true;
+
+    // プレイヤーの期首倉庫購入処理
+    processPeriodStartWarehousePurchase();
+
     // AI会社の長期借入処理（プレイヤーの借入モーダル表示前に処理）
     processAILongTermBorrowing();
 
@@ -243,6 +354,9 @@ function startPeriodWithoutBorrowing() {
         gameState.maxRows = gameState.maxRowsByPeriod[5];
     }
     gameState.periodStarted = true;
+
+    // プレイヤーの期首倉庫購入処理
+    processPeriodStartWarehousePurchase();
 
     // AI会社の長期借入処理
     processAILongTermBorrowing();

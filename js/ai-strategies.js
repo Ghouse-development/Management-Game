@@ -1104,17 +1104,16 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         }
     }
 
-    // 倉庫購入
-    if (analysis.needsWarehouse && company.warehouses < 2 && company.cash >= 50 + analysis.periodEndCost && analysis.rowsRemaining >= 20) {
-        const warehouseCost = 50;
-        company.cash -= warehouseCost;
+    // 倉庫購入（20円、容量+12、F+20）
+    if (analysis.needsWarehouse && company.warehouses < 2 && company.cash >= WAREHOUSE_COST + analysis.periodEndCost && analysis.rowsRemaining >= 20) {
+        company.cash -= WAREHOUSE_COST;
         company.warehouses++;
         if (company.warehouses === 1) {
             company.warehouseLocation = analysis.warehouseLocation;
         }
         incrementRow(companyIndex);
         const protection = company.warehouseLocation === 'materials' ? '火災保護' : '盗難保護';
-        showAIActionModal(company, '倉庫購入', '🏪', `倉庫購入（在庫+5、${protection}）`);
+        showAIActionModal(company, '倉庫購入', '🏪', `倉庫購入（容量+12、${protection}）`);
         return;
     }
 

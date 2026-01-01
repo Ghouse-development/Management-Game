@@ -264,6 +264,9 @@ function calculateFixedCost(company) {
     cost += company.additionalFixedCost || 0;
     cost += company.extraLaborCost || 0;
 
+    // 倉庫費用（1個につき20円）
+    cost += (company.warehouses || 0) * WAREHOUSE_COST;
+
     return cost;
 }
 

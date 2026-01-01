@@ -243,6 +243,16 @@ function processBidsWithAllCompanies(marketIndex) {
         }
     }
 
+    // 🔥 AI感情更新（入札結果に基づく）
+    const winnerIndex = salesResults.length > 0 ? salesResults[0].bid.company : -1;
+    const winningPrice = salesResults.length > 0 ? salesResults[0].price : 0;
+    allBids.forEach(bid => {
+        if (bid.company > 0) {  // AIのみ
+            const won = salesResults.some(r => r.bid.company === bid.company);
+            AIBrain.updateEmotionsFromBidResult(bid.company, won, winnerIndex, bid.price, winningPrice);
+        }
+    });
+
     let bidResultHtml = `<div style="text-align: center; margin-bottom: 10px;">
         <div style="font-size: 14px; color: #666;">📍 ${market.name}市場</div>
     </div>`;
@@ -650,6 +660,15 @@ function processAIBidWithPlayer() {
     }
 
     const resultSalePrice = winner.displayPrice || winner.price;
+
+    // 🔥 AI感情更新（入札結果に基づく）
+    const winnerIndex = winner.company;
+    allBids.forEach(b => {
+        if (b.company > 0) {  // AIのみ
+            const won = (b.company === winnerIndex);
+            AIBrain.updateEmotionsFromBidResult(b.company, won, winnerIndex, b.price, resultSalePrice);
+        }
+    });
 
     let resultHtml = `
         <div class="bid-display">
