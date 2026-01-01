@@ -63,9 +63,16 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
     const safetyMargin = Math.floor(periodEndCost * params.safetyMultiplier) + 20;
     const safeInvestment = Math.max(0, company.cash - safetyMargin);
 
-    // === 0. 在庫20個制限チェック（不良在庫発生リスク） ===
+    // === 0. 在庫20個制限チェック（不良在庫発生リスク・既出カード考慮） ===
     // リスクカード「不良在庫発生」: 在庫20個超で全超過分没収
-    if (totalInventory > 20 && company.products > 0) {
+    // ただし、不良在庫発生カードが2回とも既出なら制限不要
+    const inventoryCheck = (typeof AIBrain !== 'undefined' && AIBrain.checkInventoryRiskWithHistory)
+        ? AIBrain.checkInventoryRiskWithHistory(company)
+        : { totalInventory, canExceedLimit: false };
+
+    const canExceedInventoryLimit = inventoryCheck.canExceedLimit;
+
+    if (!canExceedInventoryLimit && totalInventory > 20 && company.products > 0) {
         const excessAmount = totalInventory - 20;
         const sellQty = Math.min(company.products, excessAmount, salesCapacity);
         if (sellQty > 0) {
@@ -76,8 +83,8 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
             };
         }
     }
-    // 在庫18以上で警告（余裕を持って売却）
-    if (totalInventory >= 18 && company.products > 2 && salesCapacity > 0) {
+    // 在庫18以上で警告（余裕を持って売却）- ただしカード出尽くしなら不要
+    if (!canExceedInventoryLimit && totalInventory >= 18 && company.products > 2 && salesCapacity > 0) {
         const preventiveSellQty = Math.min(company.products - 2, totalInventory - 15, salesCapacity);
         if (preventiveSellQty > 0) {
             return {
@@ -86,6 +93,10 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
                 reason: `在庫警告: ${totalInventory}個 → 20個超過防止で${preventiveSellQty}個売却`
             };
         }
+    }
+    // 不良在庫発生が出尽くした場合のログ出力
+    if (canExceedInventoryLimit && totalInventory > 20) {
+        console.log(`[G最大化] 在庫${totalInventory}個だが、不良在庫発生は既出のため制限なし`);
     }
 
     // === 1. 緊急モード: 期末支払い不可能 ===
@@ -857,6 +868,26 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     // === 複数ターン先読み ===
     const futureSim = AIBrain.simulateFutureTurns(company, companyIndex, 3);
     console.log(`[先読み] ${company.name}: ${futureSim.reasoning}`);
+
+    // === リスクカード観察 ===
+    if (AIBrain.analyzeDrawnRiskCards) {
+        const riskAnalysis = AIBrain.analyzeDrawnRiskCards();
+        console.log(`[リスク観察] 既出${riskAnalysis.totalDrawn}枚/残り${riskAnalysis.remainingCards}枚`);
+
+        // 出尽くしカードがあれば表示
+        const exhaustedCards = Object.entries(riskAnalysis.cardAnalysis)
+            .filter(([name, info]) => info.isExhausted)
+            .map(([name]) => name);
+        if (exhaustedCards.length > 0) {
+            console.log(`  ★出尽くし: ${exhaustedCards.join(', ')}`);
+        }
+
+        // 戦略推奨を取得して表示
+        const riskRecs = AIBrain.getRiskBasedRecommendations(company);
+        for (const rec of riskRecs.recommendations) {
+            console.log(`  ★推奨: ${rec.message}`);
+        }
+    }
 
     // === G最大化マスター戦略 ===
     const strategyParams = STRATEGY_PARAMS[company.strategy] || STRATEGY_PARAMS.balanced;

@@ -2989,8 +2989,225 @@ const AIBrain = {
         return recommendations.join('、') || 'チップバランス良好';
     },
 
+    // ========================================
+    // === リスクカード履歴観察システム ===
+    // ========================================
+
     /**
-     * 期待リスク/リターンを計算
+     * 既出リスクカードを分析
+     * 誰が何のカードを引いたかを観察し、残りカードの確率を更新
+     */
+    analyzeDrawnRiskCards: function() {
+        const usedCardIds = gameState.usedRiskCards || [];
+        const totalCards = 64;
+        const remainingCards = totalCards - usedCardIds.length;
+
+        // カード名ごとの既出枚数をカウント
+        const drawnCounts = {};
+        for (const id of usedCardIds) {
+            const card = RISK_CARDS.find(c => c.id === id);
+            if (card) {
+                drawnCounts[card.name] = (drawnCounts[card.name] || 0) + 1;
+            }
+        }
+
+        // 残り枚数と更新された確率を計算
+        const cardAnalysis = {};
+        for (const [cardName, baseData] of Object.entries(this.RISK_CARD_PROBABILITIES)) {
+            const drawn = drawnCounts[cardName] || 0;
+            const remaining = baseData.count - drawn;
+            const updatedProbability = remainingCards > 0 ? remaining / remainingCards : 0;
+
+            cardAnalysis[cardName] = {
+                ...baseData,
+                originalCount: baseData.count,
+                drawnCount: drawn,
+                remainingCount: remaining,
+                originalProbability: baseData.probability,
+                currentProbability: updatedProbability,
+                isExhausted: remaining <= 0
+            };
+        }
+
+        return {
+            totalDrawn: usedCardIds.length,
+            remainingCards,
+            cardAnalysis,
+            exhaustedCards: Object.entries(cardAnalysis)
+                .filter(([_, data]) => data.isExhausted)
+                .map(([name, _]) => name),
+            highRiskCards: Object.entries(cardAnalysis)
+                .filter(([_, data]) => data.currentProbability > data.originalProbability * 1.5 && data.type === 'cost')
+                .map(([name, data]) => ({ name, probability: data.currentProbability }))
+        };
+    },
+
+    /**
+     * 更新された確率に基づくリスク評価
+     */
+    getUpdatedRiskProbability: function(cardName) {
+        const analysis = this.analyzeDrawnRiskCards();
+        const cardData = analysis.cardAnalysis[cardName];
+
+        if (!cardData) return 0;
+        return cardData.currentProbability;
+    },
+
+    /**
+     * リスクカード履歴に基づく戦略推奨
+     */
+    getRiskBasedRecommendations: function(company) {
+        const analysis = this.analyzeDrawnRiskCards();
+        const recommendations = [];
+
+        // 不良在庫発生が既に2回出ていれば、在庫制限を緩和できる
+        const inventoryRiskCard = analysis.cardAnalysis['不良在庫発生'];
+        if (inventoryRiskCard && inventoryRiskCard.isExhausted) {
+            recommendations.push({
+                type: 'inventory_safe',
+                message: '★不良在庫発生は既に2回出た → 在庫20個超えてもOK！',
+                priority: 'high'
+            });
+        }
+
+        // 倉庫火災が既に2回出ていれば、材料を溜め込んでも安全
+        const fireCard = analysis.cardAnalysis['倉庫火災'];
+        if (fireCard && fireCard.isExhausted) {
+            recommendations.push({
+                type: 'materials_safe',
+                message: '★倉庫火災は既に2回出た → 材料を溜め込んでも安全',
+                priority: 'high'
+            });
+        }
+
+        // 盗難発見が既に2回出ていれば、製品を溜め込んでも安全
+        const theftCard = analysis.cardAnalysis['盗難発見'];
+        if (theftCard && theftCard.isExhausted) {
+            recommendations.push({
+                type: 'products_safe',
+                message: '★盗難発見は既に2回出た → 製品を溜め込んでも安全',
+                priority: 'high'
+            });
+        }
+
+        // 研究開発成功がまだ残っていれば、研究チップの価値UP
+        const researchSuccessCard = analysis.cardAnalysis['研究開発成功'];
+        if (researchSuccessCard && researchSuccessCard.remainingCount >= 3) {
+            recommendations.push({
+                type: 'research_valuable',
+                message: `研究開発成功まだ${researchSuccessCard.remainingCount}枚 → 研究チップ投資価値高`,
+                priority: 'medium'
+            });
+        }
+
+        // 研究開発失敗が既に3回出ていれば、研究チップ返却リスクなし
+        const researchFailCard = analysis.cardAnalysis['研究開発失敗'];
+        if (researchFailCard && researchFailCard.isExhausted) {
+            recommendations.push({
+                type: 'research_safe',
+                message: '★研究開発失敗は既に3回出た → 研究チップ返却リスクなし！',
+                priority: 'high'
+            });
+        }
+
+        // 消費者運動が既に2回出ていれば、製品を安心して持てる
+        const consumerCard = analysis.cardAnalysis['消費者運動発生'];
+        if (consumerCard && consumerCard.isExhausted) {
+            recommendations.push({
+                type: 'sales_safe',
+                message: '★消費者運動は既に2回出た → 販売停止リスクなし',
+                priority: 'medium'
+            });
+        }
+
+        // 労災発生が既に2回出ていれば、生産を安心して行える
+        const accidentCard = analysis.cardAnalysis['労災発生'];
+        if (accidentCard && accidentCard.isExhausted) {
+            recommendations.push({
+                type: 'production_safe',
+                message: '★労災発生は既に2回出た → 生産停止リスクなし',
+                priority: 'medium'
+            });
+        }
+
+        // 長期労務紛争が既に2回出ていれば、2回休みリスクなし
+        const disputeCard = analysis.cardAnalysis['長期労務紛争'];
+        if (disputeCard && disputeCard.isExhausted) {
+            recommendations.push({
+                type: 'dispute_safe',
+                message: '★長期労務紛争は既に2回出た → 2回休みリスクなし！',
+                priority: 'high'
+            });
+        }
+
+        return {
+            recommendations,
+            summary: this.summarizeRiskStatus(analysis),
+            analysis
+        };
+    },
+
+    /**
+     * リスク状況の要約
+     */
+    summarizeRiskStatus: function(analysis) {
+        const exhausted = analysis.exhaustedCards.length;
+        const remaining = analysis.remainingCards;
+
+        let riskLevel = 'normal';
+        if (exhausted >= 5) {
+            riskLevel = 'low'; // 多くのカードが出尽くした
+        }
+
+        // 危険なカードがまだ残っているか
+        const dangerousRemaining = [];
+        const dangerCards = ['不良在庫発生', '倉庫火災', '盗難発見', '長期労務紛争'];
+        for (const cardName of dangerCards) {
+            const card = analysis.cardAnalysis[cardName];
+            if (card && card.remainingCount > 0) {
+                dangerousRemaining.push(`${cardName}(残${card.remainingCount}枚)`);
+            }
+        }
+
+        return {
+            drawnCount: analysis.totalDrawn,
+            remainingCards: remaining,
+            exhaustedCount: exhausted,
+            riskLevel,
+            dangerousRemaining,
+            message: exhausted >= 5 ?
+                `${exhausted}種類のカードが出尽くし。リスク低下中` :
+                `残り${remaining}枚。注意: ${dangerousRemaining.join(', ')}`
+        };
+    },
+
+    /**
+     * 在庫制限チェック（既出カード考慮版）
+     */
+    checkInventoryRiskWithHistory: function(company) {
+        const basicCheck = this.checkInventoryRisk(company);
+        const riskRecommendations = this.getRiskBasedRecommendations(company);
+
+        // 不良在庫発生が出尽くしていれば、制限を緩和
+        const inventorySafe = riskRecommendations.recommendations.some(r => r.type === 'inventory_safe');
+
+        if (inventorySafe) {
+            return {
+                ...basicCheck,
+                riskLevel: 'safe',
+                recommendation: `在庫${basicCheck.totalInventory}個。不良在庫発生は出尽くしたので20個超えても安全！`,
+                canExceedLimit: true
+            };
+        }
+
+        return {
+            ...basicCheck,
+            canExceedLimit: false
+        };
+    },
+
+    /**
+     * 期待リスク/リターンを計算（既出カード考慮版）
      */
     calculateExpectedRisk: function(company) {
         let expectedBenefit = 0;
