@@ -282,8 +282,25 @@ function optimizeCycleAction(company, plan) {
         }
     }
 
-    // 通常サイクル
+    // ============================================
+    // 最適サイクル判断（材料・仕掛品0を避ける）
+    // ============================================
+    // 重要: 材料と仕掛品が両方0になると、生産に2行必要になり非効率
+    // 理想: 常に材料 or 仕掛品のどちらかを保持
+
+    // パターン1: 製品あり → 販売（ただし在庫パイプラインを考慮）
     if (hasProducts && currentState.salesCapacity > 0) {
+        // 販売後に材料・仕掛品が0になる場合、先に仕入れを検討
+        const wouldBreakPipeline = !hasMaterials && !hasWIP;
+        if (wouldBreakPipeline && company.cash > 50) {
+            // パイプライン維持のため先に仕入れ
+            return {
+                phase: 'BUY',
+                priority: 'HIGH',
+                reason: 'パイプライン維持：先に材料仕入れ',
+                qty: currentState.mfgCapacity
+            };
+        }
         return {
             phase: 'SELL',
             priority: 'HIGH',
@@ -292,18 +309,32 @@ function optimizeCycleAction(company, plan) {
         };
     }
 
-    if ((hasWIP || hasMaterials) && currentState.mfgCapacity > 0) {
+    // パターン2: 材料 AND 仕掛品あり → 生産（同時に完成・投入）
+    if (hasMaterials && hasWIP && currentState.mfgCapacity > 0) {
         return {
             phase: 'PRODUCE',
-            priority: 'HIGH',
-            reason: 'サイクル中：生産実行',
+            priority: 'CRITICAL',
+            reason: '最適生産：完成＋投入同時実行',
             qty: currentState.mfgCapacity
         };
     }
 
-    // 仕入れフェーズ（投資判断含む）
+    // パターン3: 材料のみ or 仕掛品のみ → 生産
+    if ((hasWIP || hasMaterials) && currentState.mfgCapacity > 0) {
+        // 生産後に材料0になる場合、次ターンで仕入れが必要
+        const willNeedBuyNext = hasMaterials && company.materials <= currentState.mfgCapacity;
+        return {
+            phase: 'PRODUCE',
+            priority: 'HIGH',
+            reason: hasWIP ? 'サイクル：仕掛品完成' : 'サイクル：材料投入',
+            qty: currentState.mfgCapacity,
+            nextAction: willNeedBuyNext ? 'BUY' : null
+        };
+    }
+
+    // パターン4: 在庫なし → 材料仕入れ
     if (!hasInventory) {
-        // 投資が必要な場合
+        // 投資判断（行数に余裕がある場合のみ）
         if (recommendation.action.startsWith('INVEST') && currentState.rowsRemaining > 6) {
             return {
                 phase: 'INVEST',
