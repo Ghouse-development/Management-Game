@@ -64,7 +64,7 @@ function showActionLogModal() {
 
     content += `
         </div>
-        <button class="submit-btn" onclick="closeModal()">閉じる</button>
+        <button class="submit-btn" onclick="closeModal(); if(window.lastFinancialData) showFinancialSummary(window.lastFinancialData);">閉じる</button>
     `;
 
     showModal('行動ログ', content);
