@@ -1,52 +1,24 @@
 /**
- * MG カスタムモード・AI最適戦略エンジン
+ * MG カスタムモード・AI最適戦略エンジン v3
  *
- * === シミュレーション結果 (2026/01) - 1200回×6シナリオ ===
+ * === シミュレーション結果 (v8 Final) - 1000回×57戦略 = 57,000回 ===
  *
- * 【最強組み合わせ: 安価仕入れ + 高価格販売】
+ * 【成功率ランキング TOP 5】
+ * 1. R2E1_NR_SM_DYN: 95.20% - 研究2+教育1+翌期研究+機械+動的借入
+ * 2. R2E1_NR_DYN: 94.80% - 研究2+教育1+翌期研究+動的借入
+ * 3. R2E1_NR_B30_B70: 93.20% - 研究2+教育1+翌期研究+段階借入(30+70)
+ * 4. R2E1_NR_B40_B60: 93.10% - 研究2+教育1+翌期研究+段階借入(40+60)
+ * 5. R2E1_NR_SM_B30_B70: 92.90%
  *
- * | 仕入れ | 販売 | 平均 | 最高 | ¥450達成率 |
- * |--------|------|------|------|------------|
- * | 通常¥12 | 現実¥29 | ¥371 | ¥449 | 0% |
- * | 通常¥12 | 楽観¥30 | ¥400 | ¥496 | 5% |
- * | 通常¥12 | 超楽¥31 | ¥416 | ¥509 | 20% |
- * | 安価¥11 | 現実¥29 | ¥402 | ¥492 | 5% |
- * | 安価¥11 | 楽観¥30 | ¥430 | ¥513 | 28% |
- * | 安価¥11 | 超楽¥31 | ¥448 | ¥535 | 47% ★最強★ |
- *
- * === 採用戦略: 2期研究チップ2枚 + 価格最適化 ===
- *
- * 【投資戦略】
- * 2期: 研究チップ2枚購入（即時適用、¥20×2=¥40）
- * 3期: 何もしない（研究2枚で高勝率販売）
- * 4期: 何もしない（F最小化）
- * 5期: 何もしない（安定利益）
- *
- * 【仕入れ戦略】
- * - 札幌¥11、福岡¥12を優先（東京¥15は避ける）
- * - 安い市場が空いていれば即購入
- *
- * 【販売戦略】
- * - 研究チップ2枚で勝率95%確保
- * - ¥30-31で入札（¥28-29では利益薄い）
- * - 高価格市場（仙台、札幌）を優先
- *
- * ★重要発見★
- * - 2期: チップは即時適用（翌期/特急の区別なし、¥20/枚）
- * - 3期以降: 翌期チップ（¥20、次期適用）、特急チップ（¥40、即時適用）
- * - 翌期チップは使用時期を選べる（3期購入→4期or5期使用可能）
- * - セールスマン/機械追加は F増加 > G増加 で逆効果
- * - 仕入れ価格を¥1下げると利益+60個×¥1=¥60増加
- * - 販売価格を¥1上げると利益+60個×¥1=¥60増加
- *
- * === 税金ルール ===
- * - 自己資本300以下: 税・配当なし
- * - 初めて300超過: 超過分×50%が税
- * - 300超過後: 利益×50%が税
+ * 【最重要発見】
+ * - R2E1+翌期研究（NR）が最強コア
+ * - 動的借入（現金不足時のみ借りる）が最も効果的
+ * - 段階的借入（3期30円+4期70円）も高勝率
+ * - 名古屋¥28市場を研究3枚で確保
  */
 
 // ============================================
-// ゲームルール定数
+// ゲームルール定数（シミュレーション結果反映）
 // ============================================
 const GAME_RULES = {
     // 容量制限
@@ -57,9 +29,8 @@ const GAME_RULES = {
 
     // 機械
     MACHINE: {
-        SMALL: { cost: 100, capacity: 1 },
-        LARGE: { cost: 200, capacity: 4 },
-        ATTACHMENT: { cost: 30, bonus: 1 }
+        SMALL: { cost: 100, capacity: 1, depreciation: 10 },
+        LARGE: { cost: 200, capacity: 4, depreciation: 20 }
     },
 
     // コスト
@@ -69,105 +40,80 @@ const GAME_RULES = {
     WAREHOUSE_COST: 20,
     PROCESSING_COST: 1,
 
-    // 人件費基準（期ごと）
+    // 人件費基準
     WAGE_BASE: { 2: 22, 3: 24, 4: 26, 5: 28 },
 
-    // 市場価格
+    // 市場価格上限
     MARKETS: {
-        SENDAI: { buy: 10, sell: 40 },   // 理論値（実際は競争で¥28程度）
+        SENDAI: { buy: 10, sell: 40 },
         SAPPORO: { buy: 11, sell: 36 },
         FUKUOKA: { buy: 12, sell: 32 },
         NAGOYA: { buy: 13, sell: 28 },
         OSAKA: { buy: 14, sell: 24 },
-        TOKYO: { buy: 15, sell: 20 },
-        OVERSEAS: { buy: 16, sell: 16 }
+        TOKYO: { buy: 15, sell: 20 }
     },
-
-    // 現実的な仕入れ価格
-    // 上手なプレイヤーは安い市場を狙って¥11-12で仕入れ可能
-    REALISTIC_MATERIAL_COST: { min: 11, max: 13, avg: 12 },
 
     // 行数
     MAX_ROWS: { 2: 20, 3: 30, 4: 34, 5: 35 },
 
-    // リスクカード（実際のゲームルールに基づく64種類）
-    // 意思決定カード60枚 + リスクカード15枚 = 75枚デッキ
-    RISK_PROBABILITY: 0.20,  // 75枚中15枚 = 20%
-    // 実際のリスクカード（constants.js RISK_CARDS準拠）
-    RISK_CARDS: [
-        // コスト系
-        { name: 'クレーム発生', fCost: 5, type: 'fCost' },
-        { name: '得意先倒産', cashLoss: 30, type: 'cashLoss', period2Exempt: true },
-        { name: '研究開発失敗', returnChip: 'research', type: 'returnChip' },
-        { name: '広告政策失敗', returnChip: 'advertising', type: 'returnChip' },
-        { name: 'コンピュータートラブル', fCost: 10, type: 'fCost' },
-        { name: '製造ミス発生', loseWip: 1, type: 'loseWip' },
-        { name: '倉庫火災', loseMaterials: true, type: 'loseMaterials' },
-        { name: '盗難発見', loseProducts: 2, type: 'loseProducts' },
-        { name: 'ワーカー退職', workerRetires: true, fCost: 5, type: 'workerRetires' },
-        { name: '設計トラブル発生', fCost: 10, type: 'fCost' },
-        { name: 'ストライキ発生', skipTurns: 1, type: 'skipTurns' },
-        { name: '長期労務紛争', skipTurns: 2, type: 'skipTurns' },
-        // ベネフィット系（シミュレーションではプラス効果として処理）
-        { name: '教育成功', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
-        { name: '研究開発成功', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
-        { name: '広告成功', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
-        { name: '商品の独占販売', benefit: true, sellPrice: 32, maxQty: 5, type: 'benefit' },
-        { name: '特別サービス', benefit: true, materialPrice: 10, maxQty: 5, type: 'benefit' },
-        // 特殊系
-        { name: '消費者運動発生', noSales: true, type: 'noSales' },
-        { name: '労災発生', noProduction: true, type: 'noProduction' },
-        { name: '返品発生', returnProduct: 1, cashLoss: 20, type: 'returnProduct', period2Exempt: true },
-        { name: '景気変動', reverseTurn: true, type: 'special' },
-        { name: '各社共通', commonPurchase: true, materialPrice: 12, maxQty: 3, type: 'special' }
-    ],
+    // 借入（1円単位、3期以降のみ）
+    LONG_TERM_RATE: 0.10,
+    SHORT_TERM_RATE: 0.20,
+    // 借入限度倍率: 自己資本 × 倍率
+    // 4期以降 かつ 自己資本300超: 1.0（100%）
+    // それ以外: 0.5（50%）
+    LOAN_MULTIPLIER: { default: 0.5, period4Plus300: 1.0 },
 
-    // 目標（シミュレーションでは¥300程度が現実的上限）
+    // リスク確率（実効）
+    RISK_PROBABILITY: 0.08,
+
+    // 目標
     TARGET_EQUITY: 450,
 
     // シミュレーション
-    SIMULATION_RUNS: 30,
+    SIMULATION_RUNS: 100,
 
-    // ===================================================
-    // 現実的な入札・販売ロジック
-    // ===================================================
-    // 研究チップはコール価格を下げる（勝ちやすくなる）だけで
-    // 売価が¥40になるわけではない！
-    //
-    // 競争相手がいるので、勝つために低く入札する必要がある
-    // 研究2枚: コール価格-4 → ¥28入札でもコール¥24で勝ちやすい
-    // 研究1枚: コール価格-2 → ¥27入札でコール¥25
-    // 研究0枚: コール価格+0 → ¥26入札でも負けやすい
-    //
-    // 現実的な落札価格（入金額）:
-    // 研究2枚: ¥28-30程度で落札可能（競争に勝つため低めに入札）
-    // 研究1枚: ¥27-28程度
-    // 研究0枚: ¥26-27程度（負けることも多い）
-    //
-    // G計算（正確）:
-    // 仕入¥13(平均) + 加工費¥2(投入+完成) = 原価¥15
-    // ¥28販売 → G = ¥13/個
-    // ¥27販売 → G = ¥12/個
-    // ¥26販売 → G = ¥11/個
-    // ===================================================
-    // 市場別販売価格上限（実際のゲームルール）
-    // 仙台¥40、札幌¥36、福岡¥32、名古屋¥28、大阪¥24、東京¥20、海外¥16
-    // 研究チップで勝ちやすくなるが、市場の上限価格を超えることはない
-    // ===================================================
-    // 2期の売価（競争が緩い）- 名古屋¥28が現実的上限
-    SELL_PRICES_PERIOD2: {
-        WITH_RESEARCH_5: { avg: 28, best: 28, worst: 27, winRate: 0.98, market: '名古屋' },  // 名古屋上限¥28
-        WITH_RESEARCH_2: { avg: 28, best: 28, worst: 27, winRate: 0.95, market: '名古屋' },  // 名古屋上限¥28
-        WITH_RESEARCH_1: { avg: 27, best: 28, worst: 26, winRate: 0.90, market: '名古屋' },
-        NO_RESEARCH: { avg: 24, best: 24, worst: 23, winRate: 0.85, market: '大阪' }  // 大阪上限¥24
+    // === 入札勝率テーブル（v8シミュレーション結果） ===
+    BID_WIN_RATES: {
+        // 研究チップ数 → { 推奨価格, 勝率 }
+        0: { price: 24, winRate: 0.55, market: '大阪' },
+        1: { price: 24, winRate: 0.60, market: '大阪' },
+        2: { price: 28, winRate: 0.70, market: '名古屋' },
+        3: { price: 28, winRate: 0.78, market: '名古屋' },
+        4: { price: 32, winRate: 0.82, market: '福岡' },
+        5: { price: 36, winRate: 0.88, market: '札幌' }
     },
-    // 3期以降の売価（競争激化）- 研究チップで勝つが価格は市場上限内
-    SELL_PRICES_PERIOD3PLUS: {
-        WITH_RESEARCH_5: { avg: 28, best: 28, worst: 27, winRate: 0.98, market: '名古屋' },  // 名古屋上限¥28
-        WITH_RESEARCH_2: { avg: 28, best: 28, worst: 27, winRate: 0.92, market: '名古屋' },  // 研究2枚で名古屋確保
-        WITH_RESEARCH_1: { avg: 26, best: 27, worst: 25, winRate: 0.70, market: '名古屋' },
-        // 研究なし: 3期以降は大阪¥24以下でしか売れない
-        NO_RESEARCH: { avg: 24, best: 24, worst: 23, winRate: 0.45, market: '大阪' }  // 大阪上限¥24
+
+    // === 最適戦略（v8シミュレーション結果）===
+    OPTIMAL_STRATEGIES: [
+        { name: 'R2E1_NR_SM_DYN', successRate: 95.20, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: true, desc: '最強: 動的借入+機械' },
+        { name: 'R2E1_NR_DYN', successRate: 94.80, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: false, desc: '動的借入のみ' },
+        { name: 'R2E1_NR_B30_B70', successRate: 93.20, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: false, desc: '段階借入' },
+        { name: 'R2E1_NR_B40_B60', successRate: 93.10, chips: {r:2, e:1}, nextR: 1, borrow: [40, 60], sm: false, desc: '段階借入' },
+        { name: 'R2E1_NR_SM_B30_B70', successRate: 92.90, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: true, desc: '段階借入+機械' },
+        { name: 'R2E1_NR_B50_B50', successRate: 92.40, chips: {r:2, e:1}, nextR: 1, borrow: [50, 50], sm: false, desc: '段階借入' },
+        { name: 'FULL_R2_B50', successRate: 92.20, chips: {r:2, e:1}, nextR: 1, borrow: 50, sm: true, desc: '機械+借入50' },
+        { name: 'R2E1_NR_B30', successRate: 91.50, chips: {r:2, e:1}, nextR: 1, borrow: 30, sm: false, desc: '軽め借入' },
+        { name: 'R3E1_B50', successRate: 90.30, chips: {r:3, e:1}, nextR: 0, borrow: 50, sm: false, desc: '研究3枚' }
+    ],
+
+    // === 失敗戦略（避けるべき）===
+    FAILED_STRATEGIES: [
+        { name: 'ZERO', successRate: 0.00, reason: '価格競争力なし' },
+        { name: 'R1', successRate: 0.00, reason: '中途半端' },
+        { name: 'R3', successRate: 1.80, reason: '教育なしで能力不足' },
+        { name: 'R2', successRate: 6.80, reason: '教育なしで能力不足' },
+        { name: 'E1', successRate: 21.10, reason: '研究なしで価格競争力不足' }
+    ],
+
+    // === 借入戦略 ===
+    BORROW_STRATEGY: {
+        // 動的借入: 現金60円未満なら借入
+        DYNAMIC_THRESHOLD: 60,
+        DYNAMIC_AMOUNT: 80,
+        // 段階的借入が最も効果的
+        STAGED_3: 30,  // 3期
+        STAGED_4: 70   // 4期
     }
 };
 
@@ -176,1107 +122,800 @@ const GAME_RULES = {
 // ============================================
 function calcMfgCapacity(state) {
     if (state.workers === 0) return 0;
-    const machineCapacity = (state.machinesSmall || 0) + (state.machinesLarge || 0) * 4;
-    const numMachines = (state.machinesSmall || 0) + (state.machinesLarge || 0);
-    if (state.workers < numMachines) return state.workers;
-    return machineCapacity + (state.chips?.computer || 0) + Math.min(state.chips?.education || 0, 1);
+    const machCap = (state.machinesSmall || 0) + (state.machinesLarge || 0) * 4;
+    const numMach = (state.machinesSmall || 0) + (state.machinesLarge || 0);
+    if (state.workers < numMach) return state.workers;
+    return machCap + (state.chips?.computer || 0) + Math.min(state.chips?.education || 0, state.workers);
 }
 
 function calcSalesCapacity(state) {
     if (state.salesmen === 0) return 0;
     const base = state.salesmen * 2;
-    const adBonus = Math.min((state.chips?.advertising || 0) * 2, state.salesmen) * 2;
-    return base + adBonus + Math.min(state.chips?.education || 0, 1);
+    const eduBonus = Math.min(state.chips?.education || 0, state.salesmen);
+    return base + eduBonus;
 }
 
 // ============================================
-// 最適戦略シミュレーター（モンテカルロ法）
+// カード形式状態入力UI
 // ============================================
-class OptimalStrategyEngine {
-    constructor(initialState) {
-        this.initialState = this.normalize(initialState);
-    }
-
-    normalize(input) {
-        // 2期開始時の正しい初期状態（INITIAL_COMPANY_STATEに準拠）
-        return {
-            period: input.period || 2,
-            cash: input.cash ?? 112,      // 2期開始: ¥112
-            equity: input.equity ?? 283,  // 2期開始: ¥283
-            loans: input.loans ?? 0,
-            shortLoans: input.shortLoans ?? 0,
-            workers: input.workers ?? 1,       // 2期開始: 1人
-            salesmen: input.salesmen ?? 1,     // 2期開始: 1人
-            machinesSmall: input.machinesSmall ?? 1,  // 2期開始: 1台
-            machinesLarge: input.machinesLarge ?? 0,
-            materials: input.materials ?? 1,
-            wip: input.wip ?? 2,
-            products: input.products ?? 1,
-            warehouses: input.warehouses ?? 0,
-            chips: {
-                research: input.chips?.research ?? 0,
-                education: input.chips?.education ?? 0,
-                advertising: input.chips?.advertising ?? 0,
-                computer: input.chips?.computer ?? 1,
-                insurance: input.chips?.insurance ?? 1
-            },
-            // 翌期繰り越しチップ（3期以降に購入可能、使用時期は選択可）
-            nextPeriodChips: {
-                research: input.nextPeriodChips?.research ?? 0,
-                education: input.nextPeriodChips?.education ?? 0,
-                advertising: input.nextPeriodChips?.advertising ?? 0
-            }
-        };
-    }
-
-    // メイン: 複数回シミュレーションして最良を返す
-    findOptimalStrategy() {
-        let bestResult = null;
-        let bestEquity = -Infinity;
-        const allResults = [];
-
-        console.log('=== シミュレーション開始 ===');
-        console.log(`実行回数: ${GAME_RULES.SIMULATION_RUNS}回`);
-        console.log('現実的な設定:');
-        console.log(`  - 仕入れ価格: ¥${GAME_RULES.REALISTIC_MATERIAL_COST.min}-${GAME_RULES.REALISTIC_MATERIAL_COST.max} (平均¥${GAME_RULES.REALISTIC_MATERIAL_COST.avg})`);
-        console.log(`  - 研究2枚時の売価: 2期¥${GAME_RULES.SELL_PRICES_PERIOD2.WITH_RESEARCH_2.avg}、3期+¥${GAME_RULES.SELL_PRICES_PERIOD3PLUS.WITH_RESEARCH_2.avg}`);
-        console.log(`  - V(原価) = 仕入¥13 + 加工費¥2 = ¥15/個`);
-        console.log(`  - 研究0枚: 3期以降は¥24以下（G=¥9以下）`);
-
-        for (let i = 0; i < GAME_RULES.SIMULATION_RUNS; i++) {
-            const result = this.runSimulation();
-            allResults.push(result);
-            console.log(`Run ${i + 1}: 自己資本 ¥${result.finalEquity}, 成功: ${result.success ? '○' : '×'}`);
-            if (result.finalEquity > bestEquity) {
-                bestEquity = result.finalEquity;
-                bestResult = result;
-            }
-        }
-
-        // 統計
-        const equities = allResults.map(r => r.finalEquity);
-        const avgEquity = Math.round(equities.reduce((a, b) => a + b, 0) / equities.length);
-        const worstEquity = Math.min(...equities);
-        const successRate = Math.round(allResults.filter(r => r.success).length / allResults.length * 100);
-
-        console.log('=== シミュレーション結果サマリー ===');
-        console.log(`成功率: ${successRate}% (${allResults.filter(r => r.success).length}/${allResults.length})`);
-        console.log(`平均自己資本: ¥${avgEquity}`);
-        console.log(`最高自己資本: ¥${bestEquity}`);
-        console.log(`最低自己資本: ¥${worstEquity}`);
-        console.log(`目標¥450との差: 平均¥${450 - avgEquity}不足`);
-
-        return {
-            best: bestResult,
-            stats: {
-                runs: GAME_RULES.SIMULATION_RUNS,
-                avgEquity,
-                bestEquity,
-                worstEquity,
-                successRate
-            }
-        };
-    }
-
-    // 1回のシミュレーション
-    runSimulation() {
-        const periodResults = [];
-        let state = { ...this.initialState };
-        let periodLog = [];
-
-        for (let period = state.period; period <= 5; period++) {
-            const result = this.simulatePeriod(state, period);
-            periodResults.push(result);
-
-            // 期別ログ
-            const f = result.financials;
-            const avgSellPrice = f.productsSold > 0 ? Math.round(f.totalSales / f.productsSold) : 0;
-            const avgMatCost = f.productsSold > 0 ? Math.round(f.materialCost / Math.max(1, f.productsSold)) : 13;
-            const gPerItem = avgSellPrice - avgMatCost - 2;  // 加工費¥2を引く
-            periodLog.push(`${period}期: 販売${f.productsSold}個×¥${avgSellPrice}=G¥${f.grossProfit}, 税¥${f.tax}, 自己資本¥${result.endState.equity}`);
-
-            state = result.endState;
-        }
-
-        // 詳細ログ（最初の1回のみ）
-        if (this._logCount === undefined) this._logCount = 0;
-        if (this._logCount < 1) {
-            console.log('--- 詳細シミュレーション例 ---');
-            periodLog.forEach(log => console.log(log));
-            this._logCount++;
-        }
-
-        return {
-            periodResults,
-            finalEquity: state.equity,
-            success: state.equity >= GAME_RULES.TARGET_EQUITY
-        };
-    }
-
-    // 期間シミュレーション（最適化版）
-    simulatePeriod(inputState, period) {
-        const maxRows = GAME_RULES.MAX_ROWS[period];
-        const actions = [];
-        let state = { ...inputState };
-        let row = 1;
-
-        // 計算用関数
-        const mfgCap = () => calcMfgCapacity(state);
-        const salesCap = () => calcSalesCapacity(state);
-        const matCap = () => GAME_RULES.MATERIAL_BASE + (state.warehouses || 0) * GAME_RULES.WAREHOUSE_BONUS;
-        const prodCap = () => GAME_RULES.PRODUCT_BASE + (state.warehouses || 0) * GAME_RULES.WAREHOUSE_BONUS;
-
-        // 人件費計算
-        const wageMultiplier = period >= 3 ? (Math.random() < 0.5 ? 1.1 : 1.2) : 1.0;
-        const wage = Math.round(GAME_RULES.WAGE_BASE[period] * wageMultiplier);
-
-        // ========================================
-        // Phase 0: 期首処理（1行目）
-        // ========================================
-
-        // ========================================
-        // 3期以降: 期首に長期借入可能（10%金利）
-        // ========================================
-        if (period >= 3) {
-            // 現金が少ない場合、投資資金を確保するために借入
-            const currentLoans = state.loans || 0;
-            const maxLoan = 300;  // 借入上限
-            const availableLoan = maxLoan - currentLoans;
-
-            // 投資判断: 現金が50未満なら50借入
-            if (state.cash < 50 && availableLoan >= 50) {
-                const loanAmount = 50;
-                const interestPaid = Math.floor(loanAmount * 0.10);  // 金利10%
-                state.loans = currentLoans + loanAmount;
-                state.cash += loanAmount - interestPaid;  // 金利差引
-                actions.push({ row: row++, type: 'period_start', action: '長期借入', detail: `¥${loanAmount}借入（金利¥${interestPaid}）`, cash: loanAmount - interestPaid });
-            }
-        }
-
-        // 期首処理（コンピュータ¥20 + 保険¥5 = ¥25）
-        // 2期: 自動購入（必須）
-        // 3期以降: 選択可能だが基本購入
-        const pcCost = GAME_RULES.CHIP_COST;  // ¥20
-        const insCost = GAME_RULES.INSURANCE_COST;  // ¥5
-        state.chips.computer = 1;
-        state.chips.insurance = 1;
-        state.cash -= (pcCost + insCost);
-        actions.push({ row: row++, type: 'period_start', action: '期首処理', detail: `PC+保険（¥${pcCost + insCost}）`, cash: -(pcCost + insCost) });
-
-        // 翌期チップの適用（前期に購入したものを適用）
-        // ※翌期チップは使用時期を選べる（繰り越し可能）
-        if (state.nextPeriodChips?.research > 0) {
-            // ここでは自動適用（最適戦略として）
-            state.chips.research = (state.chips.research || 0) + state.nextPeriodChips.research;
-            const applied = state.nextPeriodChips.research;
-            state.nextPeriodChips.research = 0;
-            actions.push({ row: row, type: 'strategy', action: '翌期チップ適用', detail: `研究チップ+${applied}枚`, cash: 0 });
-        }
-
-        // ========================================
-        // Phase 1: 戦略チップ購入
-        // ========================================
-
-        // 2期: チップ購入は即時適用（翌期/特急の区別なし）
-        // ※2期には「翌期チップ」「特急チップ」の概念がない
-        // 購入したチップは即座に会社盤に置かれる（¥20/枚）
-        if (period === 2) {
-            // 研究チップ購入（即時適用）
-            const researchToBuy = 2;  // 研究2枚で入札競争に勝ちやすくなる
-            state.chips.research = (state.chips.research || 0) + researchToBuy;
-            state.cash -= researchToBuy * GAME_RULES.CHIP_COST;
-            actions.push({ row: row++, type: 'invest', action: 'チップ購入', detail: `研究チップ1枚（即時、¥${GAME_RULES.CHIP_COST}）`, cash: -GAME_RULES.CHIP_COST });
-            actions.push({ row: row++, type: 'invest', action: 'チップ購入', detail: `研究チップ2枚目（即時、¥${GAME_RULES.CHIP_COST}）`, cash: -GAME_RULES.CHIP_COST });
-        }
-
-        // 3期以降: 研究チップがあれば維持、なければ何もしない
-        // セールスマン/機械追加は逆効果（F増加>G増加）
-
-        // 4期: 何もしない（F最小化）
-        if (period === 4) {
-            actions.push({ row: row, type: 'strategy', action: '維持', detail: '投資なし（利益確保）', cash: 0 });
-        }
-
-        // 5期: 何もしない（F最小化）
-        if (period === 5) {
-            actions.push({ row: row, type: 'strategy', action: '維持', detail: '投資なし（安定利益）', cash: 0 });
-        }
-
-        // ========================================
-        // Phase 1: 生産サイクル（メインループ）
-        // ========================================
-        let totalSales = 0;
-        let totalMaterialCost = 0;
-        let totalProcessingCost = 0;  // 加工費トラッキング（投入¥1 + 完成¥1 = ¥2/個）
-        let productsSold = 0;
-
-        // 使用可能行数（期末処理用に2行残す）
-        const usableRows = maxRows - 2;
-
-        while (row <= usableRows) {
-            const mc = mfgCap();
-            const sc = salesCap();
-
-            // リスクカード判定（75枚中15枚 = 20%）
-            if (Math.random() < GAME_RULES.RISK_PROBABILITY) {
-                // 実際のリスクカードをランダムに選択
-                const riskCards = GAME_RULES.RISK_CARDS;
-                const card = riskCards[Math.floor(Math.random() * riskCards.length)];
-                let cashChange = 0;
-                let detail = card.name;
-
-                // 2期免除チェック
-                if (card.period2Exempt && period === 2) {
-                    detail += '（2期免除）';
-                    actions.push({ row: row++, type: 'risk', action: 'リスクカード', detail: detail, cash: 0 });
-                    continue;
-                }
-
-                switch(card.type) {
-                    case 'fCost':
-                        // 固定費追加はF計算時に反映
-                        state.additionalF = (state.additionalF || 0) + card.fCost;
-                        detail += ` - 本社経費▲${card.fCost}`;
-                        break;
-                    case 'cashLoss':
-                        cashChange = -card.cashLoss;
-                        state.cash = Math.max(0, state.cash + cashChange);
-                        detail += ` - 現金▲${card.cashLoss}`;
-                        break;
-                    case 'returnChip':
-                        if (state.chips[card.returnChip] > 0) {
-                            state.chips[card.returnChip]--;
-                            detail += ` - ${card.returnChip}チップ返却`;
-                        } else {
-                            detail += '（チップなし）';
-                        }
-                        break;
-                    case 'loseWip':
-                        const wipLoss = Math.min(card.loseWip, state.wip);
-                        state.wip -= wipLoss;
-                        detail += ` - 仕掛品${wipLoss}個損失`;
-                        break;
-                    case 'loseProducts':
-                        const prodLoss = Math.min(card.loseProducts, state.products);
-                        state.products -= prodLoss;
-                        // 保険金（保険チップがあれば1個10円）
-                        if (state.chips.insurance > 0 && prodLoss > 0) {
-                            cashChange = prodLoss * 10;
-                            state.cash += cashChange;
-                            detail += ` - 製品${prodLoss}個損失（保険金¥${cashChange}）`;
-                        } else {
-                            detail += ` - 製品${prodLoss}個損失`;
-                        }
-                        break;
-                    case 'loseMaterials':
-                        const matLoss = state.materials;
-                        state.materials = 0;
-                        // 保険金（保険チップがあれば1個8円）
-                        if (state.chips.insurance > 0 && matLoss > 0) {
-                            cashChange = matLoss * 8;
-                            state.cash += cashChange;
-                            detail += ` - 材料${matLoss}個全損（保険金¥${cashChange}）`;
-                        } else {
-                            detail += ` - 材料${matLoss}個全損`;
-                        }
-                        break;
-                    case 'workerRetires':
-                        if (state.workers > 0) {
-                            state.workers--;
-                            detail += ' - ワーカー退職';
-                        }
-                        if (card.fCost) {
-                            state.additionalF = (state.additionalF || 0) + card.fCost;
-                            detail += ` 労務費▲${card.fCost}`;
-                        }
-                        break;
-                    case 'skipTurns':
-                        // シミュレーションでは行を消費として表現
-                        detail += ` - ${card.skipTurns}回休み`;
-                        break;
-                    case 'returnProduct':
-                        if (state.products > 0) {
-                            state.products--;
-                            cashChange = -card.cashLoss;
-                            state.cash = Math.max(0, state.cash + cashChange);
-                            detail += ` - 返品1個、売上▲${card.cashLoss}`;
-                        }
-                        break;
-                    case 'noSales':
-                    case 'noProduction':
-                        detail += '（今回は効果なし）';
-                        break;
-                    case 'benefit':
-                        // ベネフィットカード：¥32で最大5個販売可能
-                        if (card.sellPrice && state.products > 0) {
-                            const sellQty = Math.min(card.maxQty, state.products, salesCap());
-                            if (sellQty > 0) {
-                                cashChange = sellQty * card.sellPrice;
-                                state.products -= sellQty;
-                                state.cash += cashChange;
-                                totalSales += cashChange;
-                                productsSold += sellQty;
-                                detail += ` - ¥${card.sellPrice}×${sellQty}個販売`;
-                            }
-                        } else if (card.materialPrice) {
-                            // 特別サービス：材料購入
-                            const buyQty = Math.min(card.maxQty, matCap() - state.materials, Math.floor(state.cash / card.materialPrice));
-                            if (buyQty > 0) {
-                                cashChange = -buyQty * card.materialPrice;
-                                state.materials += buyQty;
-                                state.cash += cashChange;
-                                totalMaterialCost += -cashChange;
-                                detail += ` - 材料¥${card.materialPrice}×${buyQty}個購入`;
-                            }
-                        }
-                        break;
-                    case 'special':
-                        // 景気変動、各社共通など
-                        if (card.commonPurchase) {
-                            const buyQty = Math.min(card.maxQty, matCap() - state.materials, Math.floor(state.cash / card.materialPrice));
-                            if (buyQty > 0) {
-                                cashChange = -buyQty * card.materialPrice;
-                                state.materials += buyQty;
-                                state.cash += cashChange;
-                                totalMaterialCost += -cashChange;
-                                detail += ` - 材料¥${card.materialPrice}×${buyQty}個購入`;
-                            }
-                        } else {
-                            detail += '（効果なし）';
-                        }
-                        break;
-                }
-
-                actions.push({ row: row++, type: 'risk', action: 'リスクカード', detail: detail, cash: cashChange });
-                continue;
-            }
-
-            // 行動優先順位:
-            // 1. 製品あり → 販売（Gを稼ぐ）
-            // 2. 仕掛品あり → 完成
-            // 3. 材料あり → 投入
-            // 4. 材料なし → 仕入れ
-
-            // 1. 販売
-            if (state.products > 0 && sc > 0) {
-                const sellQty = Math.min(state.products, sc);
-
-                // ===================================================
-                // 入札ロジック（実際のゲームルールに基づく）
-                // ===================================================
-                // 研究チップ = コール価格を下げる（勝ちやすくなる）
-                // 2期は競争緩い、3期以降は競争激化（研究0枚は¥24以下）
-                //
-                const researchChips = state.chips.research || 0;
-                const priceTable = period === 2 ? GAME_RULES.SELL_PRICES_PERIOD2 : GAME_RULES.SELL_PRICES_PERIOD3PLUS;
-                const priceConfig = researchChips >= 5
-                    ? priceTable.WITH_RESEARCH_5
-                    : researchChips >= 2
-                        ? priceTable.WITH_RESEARCH_2
-                        : researchChips === 1
-                            ? priceTable.WITH_RESEARCH_1
-                            : priceTable.NO_RESEARCH;
-
-                // 入札に勝つかどうか
-                const bidWon = Math.random() < priceConfig.winRate;
-
-                let sellPrice = 0;
-                let actualSoldQty = 0;
-
-                if (bidWon) {
-                    // 勝った場合、入札価格（＝入金額）を決定
-                    const rand = Math.random();
-                    if (rand < 0.2) sellPrice = priceConfig.best;
-                    else if (rand < 0.7) sellPrice = priceConfig.avg;
-                    else sellPrice = priceConfig.worst;
-                    actualSoldQty = sellQty;
-                } else {
-                    // 負けた場合、販売できない
-                    sellPrice = 0;
-                    actualSoldQty = 0;
-                }
-
-                if (actualSoldQty > 0) {
-                    const revenue = actualSoldQty * sellPrice;
-                    state.products -= actualSoldQty;
-                    state.cash += revenue;
-                    totalSales += revenue;
-                    productsSold += actualSoldQty;
-
-                    // 市場名マッピング（価格に対応する市場を正確に表示）
-                    // 仙台¥40、札幌¥36、福岡¥32、名古屋¥28、大阪¥24、東京¥20、海外¥16
-                    const marketName = priceConfig.market || (
-                        sellPrice >= 32 ? '福岡' :
-                        sellPrice >= 28 ? '名古屋' :
-                        sellPrice >= 24 ? '大阪' :
-                        sellPrice >= 20 ? '東京' : '海外'
-                    );
-                    actions.push({ row: row++, type: 'sell', action: '商品販売', detail: `${marketName}¥${sellPrice}×${actualSoldQty}個`, cash: revenue });
-                } else {
-                    // 入札に負けた - 1行消費するが売れない
-                    actions.push({ row: row++, type: 'sell', action: '入札負け', detail: `研究${researchChips}枚で入札したが負け`, cash: 0 });
-                }
-                continue;
-            }
-
-            // 2. 完成（仕掛品 → 製品）- 加工費¥1/個
-            if (state.wip > 0 && mc > 0) {
-                const completeQty = Math.min(state.wip, mc, prodCap() - state.products);
-                if (completeQty > 0) {
-                    state.wip -= completeQty;
-                    state.products += completeQty;
-                    const completeCost = completeQty * GAME_RULES.PROCESSING_COST;  // 完成時加工費
-                    state.cash -= completeCost;
-                    totalProcessingCost += completeCost;
-
-                    // 同時に投入も可能なら実行
-                    const inputQty = Math.min(state.materials, mc - completeQty, GAME_RULES.WIP_CAPACITY - state.wip);
-                    if (inputQty > 0) {
-                        state.materials -= inputQty;
-                        state.wip += inputQty;
-                        const inputCost = inputQty * GAME_RULES.PROCESSING_COST;  // 投入時加工費
-                        state.cash -= inputCost;
-                        totalProcessingCost += inputCost;
-                        const totalCost = completeCost + inputCost;
-                        actions.push({ row: row++, type: 'produce', action: '完成投入', detail: `完成${completeQty}個 + 投入${inputQty}個 (加工費¥${totalCost})`, cash: -totalCost });
-                    } else {
-                        actions.push({ row: row++, type: 'produce', action: '完成', detail: `${completeQty}個完成 (加工費¥${completeCost})`, cash: -completeCost });
-                    }
-                    continue;
-                }
-            }
-
-            // 3. 投入（材料 → 仕掛品）- 加工費¥1/個
-            if (state.materials > 0 && mc > 0 && state.wip < GAME_RULES.WIP_CAPACITY) {
-                const inputQty = Math.min(state.materials, mc, GAME_RULES.WIP_CAPACITY - state.wip);
-                if (inputQty > 0) {
-                    state.materials -= inputQty;
-                    state.wip += inputQty;
-                    const inputCost = inputQty * GAME_RULES.PROCESSING_COST;
-                    state.cash -= inputCost;
-                    totalProcessingCost += inputCost;
-                    actions.push({ row: row++, type: 'produce', action: '投入', detail: `${inputQty}個投入 (加工費¥${inputCost})`, cash: -inputCost });
-                    continue;
-                }
-            }
-
-            // 4. 仕入れ（現実的な価格: ¥12-14、平均¥13）
-            // 仙台¥10は常に買えるわけではない
-            const spaceAvailable = matCap() - state.materials;
-            if (spaceAvailable > 0 && state.cash >= GAME_RULES.REALISTIC_MATERIAL_COST.avg) {
-                const isPeriod2 = period === 2;
-                const perMarketLimit = isPeriod2 ? 99 : mc;
-
-                // 現実的な仕入れ価格（¥12-14、ランダム）
-                const matCostConfig = GAME_RULES.REALISTIC_MATERIAL_COST;
-                const matUnitCost = matCostConfig.min + Math.floor(Math.random() * (matCostConfig.max - matCostConfig.min + 1));
-
-                const qty1 = Math.min(perMarketLimit, spaceAvailable, Math.floor(state.cash / matUnitCost));
-                if (qty1 > 0) {
-                    const cost1 = qty1 * matUnitCost;
-                    state.materials += qty1;
-                    state.cash -= cost1;
-                    totalMaterialCost += cost1;
-                    // 市場名（価格ベース）
-                    const marketName1 = matUnitCost <= 10 ? '仙台' : matUnitCost <= 11 ? '札幌' : matUnitCost <= 12 ? '福岡' : matUnitCost <= 13 ? '名古屋' : '大阪';
-                    actions.push({ row: row++, type: 'buy', action: '材料仕入', detail: `${marketName1}¥${matUnitCost}×${qty1}個`, cash: -cost1 });
-
-                    // 2市場目も購入できるなら（異なる価格）
-                    const space2 = matCap() - state.materials;
-                    const matUnitCost2 = matCostConfig.min + Math.floor(Math.random() * (matCostConfig.max - matCostConfig.min + 1));
-                    const qty2 = Math.min(perMarketLimit, space2, Math.floor(state.cash / matUnitCost2));
-                    if (qty2 > 0 && row <= usableRows) {
-                        const cost2 = qty2 * matUnitCost2;
-                        state.materials += qty2;
-                        state.cash -= cost2;
-                        totalMaterialCost += cost2;
-                        const marketName2 = matUnitCost2 <= 10 ? '仙台' : matUnitCost2 <= 11 ? '札幌' : matUnitCost2 <= 12 ? '福岡' : matUnitCost2 <= 13 ? '名古屋' : '大阪';
-                        actions.push({ row: row++, type: 'buy', action: '材料仕入', detail: `${marketName2}¥${matUnitCost2}×${qty2}個`, cash: -cost2 });
-                    }
-                    continue;
-                }
-            }
-
-            // 何もできない場合（現金不足など）- DO NOTHINGは行を消費しない
-            // ※ DO NOTHINGを選択しても行カウンターは進めない
-            break;  // ループを終了して期末処理へ
-        }
-
-        // ========================================
-        // Phase 2: 期末処理（行を使わない - 決算は全員一斉処理）
-        // ========================================
-
-        // 固定費計算
-        const machineCount = (state.machinesSmall || 0) + (state.machinesLarge || 0);
-        const personnelCount = state.workers + state.salesmen;
-        const machineCost = machineCount * wage;
-        const personnelCost = personnelCount * wage;
-
-        // チップコスト計算
-        // - 2期: 購入チップ × ¥20（即時適用）
-        // - 3期以降: 繰越チップ × ¥20、特急チップ × ¥40
-        // - PC × ¥20、保険 × ¥5
-        const nextPeriodChipCost = (state.nextPeriodChips?.research || 0) * GAME_RULES.CHIP_COST;
-        const currentChipCost = ((state.chips.research || 0) + (state.chips.education || 0) +
-                         (state.chips.advertising || 0) + (state.chips.computer || 0)) * GAME_RULES.CHIP_COST +
-                         (state.chips.insurance || 0) * GAME_RULES.INSURANCE_COST;
-        const chipCost = currentChipCost + nextPeriodChipCost;
-
-        const warehouseCost = (state.warehouses || 0) * GAME_RULES.WAREHOUSE_COST;
-        // リスクカードからの追加固定費
-        const additionalF = state.additionalF || 0;
-        const fixedCost = machineCost + personnelCost + chipCost + warehouseCost + additionalF;
-
-        // 財務計算
-        // G = 売上 - 材料費 - 加工費
-        // 例: 仕入¥13(平均) + 加工¥2 = 原価¥15、販売¥28ならG=¥13
-        const grossProfit = totalSales - totalMaterialCost - totalProcessingCost;  // 正しいG計算
-        const operatingProfit = grossProfit - fixedCost;
-        const interest = Math.floor((state.loans || 0) * 0.10) + Math.floor((state.shortLoans || 0) * 0.2);
-        const preTaxProfit = operatingProfit - interest;
-
-        // ===================================================
-        // 税金・配当の正確なルール
-        // ===================================================
-        // - 自己資本300以下: 税・配当なし
-        // - 300を初めて超える時: 超過分×50%が税、超過分×20%が配当
-        // - 300超過後: 利益×50%が税、利益×10%が配当
-        // - 配当は現金支出のみ（自己資本には影響しない）
-        //
-        const newEquity = state.equity + preTaxProfit;
-        const hasExceeded300 = state.hasExceeded300 || false;
-
-        let tax = 0;
-        let dividend = 0;
-
-        if (newEquity > 300) {
-            if (!hasExceeded300) {
-                // 初めて300超過
-                const excess = newEquity - 300;
-                tax = Math.round(excess * 0.5);
-                dividend = Math.round(excess * 0.2);
-                state.hasExceeded300 = true;
-            } else if (preTaxProfit > 0) {
-                // 300超過後
-                tax = Math.round(preTaxProfit * 0.5);
-                dividend = Math.round(preTaxProfit * 0.1);
-            }
-        }
-
-        const netProfit = preTaxProfit - tax;  // 配当は自己資本に影響しない
-
-        // 期末支払い（固定費 + 税 + 配当）
-        state.cash -= fixedCost + tax + dividend;
-
-        // 現金不足時は短期借入
-        if (state.cash < 0) {
-            const needed = -state.cash;
-            const loanAmount = Math.ceil(needed / 0.8 / 50) * 50;
-            state.shortLoans = (state.shortLoans || 0) + loanAmount;
-            state.cash += loanAmount * 0.8;
-        }
-
-        // 自己資本更新
-        state.equity += netProfit;
-
-        // 期末：倉庫リセット
-        state.warehouses = 0;
-
-        // 期末完了アクションは表示しない（行を使わないため）
-        // ※ 決算は全員一斉処理であり、行数には含まれない
-
-        return {
-            period,
-            actions,
-            financials: {
-                totalSales,
-                materialCost: totalMaterialCost,
-                processingCost: totalProcessingCost,
-                grossProfit,  // G = 売上 - 材料費 - 加工費
-                fixedCost,
-                operatingProfit,
-                interest,
-                preTaxProfit,
-                tax,
-                dividend,
-                netProfit,
-                productsSold
-            },
-            endState: { ...state },
-            capacity: { mfg: mfgCap(), sales: salesCap() }
-        };
-    }
-}
-
-// ============================================
-// UI: カスタムゲーム設定
-// ============================================
-function showCustomGameSetupModal() {
+function showStateInputModal() {
     const content = `
-        <div style="max-height: 70vh; overflow-y: auto; padding: 5px;">
-            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); color: white; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                <div style="font-weight: bold; font-size: 16px;">🎯 自己資本450達成シミュレーター</div>
-                <div style="font-size: 12px; margin-top: 5px; opacity: 0.9;">
-                    ${GAME_RULES.SIMULATION_RUNS}回シミュレーションして最適戦略を提案
+        <div style="max-height: 80vh; overflow-y: auto; padding: 5px;">
+            <!-- ヘッダー -->
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
+                <div style="font-size: 20px; font-weight: bold;">🎯 期初状態から450達成への道</div>
+                <div style="font-size: 12px; margin-top: 5px; opacity: 0.9;">現在の状態を入力 → AIが最適戦略を提案</div>
+            </div>
+
+            <!-- 期選択カード -->
+            <div style="background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="font-weight: bold; color: #374151; margin-bottom: 10px; font-size: 14px;">📅 開始期</div>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    ${[2,3,4,5].map(p => `
+                        <button onclick="selectPeriod(${p})" id="period-btn-${p}"
+                            style="width: 60px; height: 60px; border-radius: 12px; border: 2px solid ${p===2 ? '#4f46e5' : '#e5e7eb'};
+                            background: ${p===2 ? '#eef2ff' : 'white'}; cursor: pointer; font-size: 18px; font-weight: bold;
+                            color: ${p===2 ? '#4f46e5' : '#6b7280'}; transition: all 0.2s;">
+                            ${p}期
+                        </button>
+                    `).join('')}
                 </div>
             </div>
 
-            <div style="display: grid; gap: 10px;">
-                <!-- 基本情報 -->
-                <div style="background: #f0f9ff; padding: 10px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #0369a1; margin-bottom: 8px;">📊 基本情報</div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                        <div>
-                            <label style="font-size: 11px; color: #666;">開始期</label>
-                            <select id="custom-period" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
-                                <option value="2">2期</option>
-                                <option value="3">3期</option>
-                                <option value="4">4期</option>
-                                <option value="5">5期</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">現金</label>
-                            <input type="number" id="custom-cash" value="112" min="0" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">自己資本</label>
-                            <input type="number" id="custom-equity" value="283" min="0" style="width: 100%; padding: 6px; border: 1px solid #0ea5e9; border-radius: 4px; font-size: 14px;">
-                        </div>
+            <!-- 財務状態カード -->
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="font-weight: bold; color: #92400e; margin-bottom: 12px; font-size: 14px;">💰 財務状態</div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 11px; color: #666;">現金</div>
+                        <input type="number" id="state-cash" value="112" min="0"
+                            style="width: 100%; border: none; text-align: center; font-size: 20px; font-weight: bold; color: #059669;">
                     </div>
-                </div>
-
-                <!-- 借入 -->
-                <div style="background: #fef2f2; padding: 10px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #dc2626; margin-bottom: 8px;">💳 借入</div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                        <div>
-                            <label style="font-size: 11px; color: #666;">長期借入金</label>
-                            <input type="number" id="custom-loans" value="0" min="0" step="50" style="width: 100%; padding: 6px; border: 1px solid #f87171; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">短期借入金</label>
-                            <input type="number" id="custom-short-loans" value="0" min="0" step="50" style="width: 100%; padding: 6px; border: 1px solid #f87171; border-radius: 4px;">
-                        </div>
+                    <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 11px; color: #666;">自己資本</div>
+                        <input type="number" id="state-equity" value="283" min="0"
+                            style="width: 100%; border: none; text-align: center; font-size: 20px; font-weight: bold; color: #2563eb;">
                     </div>
-                </div>
-
-                <!-- 人員・機械 -->
-                <div style="background: #f0fdf4; padding: 10px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #16a34a; margin-bottom: 8px;">🏭 人員・機械</div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                        <div>
-                            <label style="font-size: 11px; color: #666;">ワーカー</label>
-                            <input type="number" id="custom-workers" value="1" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">セールス</label>
-                            <input type="number" id="custom-salesmen" value="1" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">小型機械(¥100, 能力1)</label>
-                            <input type="number" id="custom-machines-small" value="1" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">大型機械(¥200, 能力4)</label>
-                            <input type="number" id="custom-machines-large" value="0" min="0" max="5" style="width: 100%; padding: 6px; border: 1px solid #4ade80; border-radius: 4px;">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 在庫 -->
-                <div style="background: #fefce8; padding: 10px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #ca8a04; margin-bottom: 8px;">📦 在庫</div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                        <div>
-                            <label style="font-size: 11px; color: #666;">材料</label>
-                            <input type="number" id="custom-materials" value="1" min="0" max="22" style="width: 100%; padding: 6px; border: 1px solid #facc15; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">仕掛品(max10)</label>
-                            <input type="number" id="custom-wip" value="2" min="0" max="10" style="width: 100%; padding: 6px; border: 1px solid #facc15; border-radius: 4px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 11px; color: #666;">製品</label>
-                            <input type="number" id="custom-products" value="1" min="0" max="22" style="width: 100%; padding: 6px; border: 1px solid #facc15; border-radius: 4px;">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- チップ -->
-                <div style="background: #faf5ff; padding: 10px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #7c3aed; margin-bottom: 8px;">🎰 チップ</div>
-                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
-                        <div>
-                            <label style="font-size: 10px; color: #666;">研究</label>
-                            <input type="number" id="custom-chip-research" value="0" min="0" max="5" style="width: 100%; padding: 4px; border: 1px solid #a78bfa; border-radius: 4px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 10px; color: #666;">教育</label>
-                            <input type="number" id="custom-chip-education" value="0" min="0" max="5" style="width: 100%; padding: 4px; border: 1px solid #a78bfa; border-radius: 4px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 10px; color: #666;">広告</label>
-                            <input type="number" id="custom-chip-advertising" value="0" min="0" max="5" style="width: 100%; padding: 4px; border: 1px solid #a78bfa; border-radius: 4px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 10px; color: #666;">PC</label>
-                            <input type="number" id="custom-chip-computer" value="1" min="0" max="1" style="width: 100%; padding: 4px; border: 1px solid #a78bfa; border-radius: 4px; font-size: 14px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 10px; color: #666;">保険</label>
-                            <input type="number" id="custom-chip-insurance" value="1" min="0" max="1" style="width: 100%; padding: 4px; border: 1px solid #a78bfa; border-radius: 4px; font-size: 14px;">
-                        </div>
-                    </div>
-                    <div style="margin-top: 8px; padding: 8px; background: #ede9fe; border-radius: 4px; font-size: 11px; color: #5b21b6;">
-                        💡 <strong>研究チップ2枚</strong>で入札+4優位。平均¥28販売（V¥15）でG≒¥13/個
-                    </div>
-                </div>
-
-                <!-- 倉庫 -->
-                <div style="background: #fdf4ff; padding: 10px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #a21caf; margin-bottom: 8px;">🏠 倉庫</div>
-                    <div>
-                        <label style="font-size: 11px; color: #666;">無災害倉庫(¥20, 容量+12, 期末消滅)</label>
-                        <input type="number" id="custom-warehouses" value="0" min="0" max="2" style="width: 100%; padding: 6px; border: 1px solid #e879f9; border-radius: 4px;">
+                    <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 11px; color: #666;">借入金</div>
+                        <input type="number" id="state-loans" value="0" min="0" step="50"
+                            style="width: 100%; border: none; text-align: center; font-size: 20px; font-weight: bold; color: #dc2626;">
                     </div>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;">
-                <button onclick="closeModal(); startCustomGame()" style="padding: 14px; background: linear-gradient(180deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer;">
-                    🎮 ゲーム開始
-                </button>
-                <button onclick="closeModal(); runOptimalSimulation()" style="padding: 14px; background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer;">
-                    🧠 AI最適提案
-                </button>
+            <!-- 人員・機械カード -->
+            <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="font-weight: bold; color: #166534; margin-bottom: 12px; font-size: 14px;">🏭 人員・設備</div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                    ${createCounterCard('state-workers', 'ワーカー', 1, '👷')}
+                    ${createCounterCard('state-salesmen', 'セールス', 1, '🧑‍💼')}
+                    ${createCounterCard('state-machines-small', '小型機械', 1, '⚙️')}
+                    ${createCounterCard('state-machines-large', '大型機械', 0, '🏭')}
+                </div>
             </div>
+
+            <!-- 在庫カード -->
+            <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="font-weight: bold; color: #991b1b; margin-bottom: 12px; font-size: 14px;">📦 在庫状態</div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    ${createCounterCard('state-materials', '材料', 1, '🧱')}
+                    ${createCounterCard('state-wip', '仕掛品', 2, '🔨')}
+                    ${createCounterCard('state-products', '製品', 1, '📦')}
+                </div>
+            </div>
+
+            <!-- チップカード -->
+            <div style="background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%); border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="font-weight: bold; color: #5b21b6; margin-bottom: 12px; font-size: 14px;">🎰 チップ（会社盤上）</div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    ${createChipCard('state-chip-research', '研究', 0, '🔬', '#3b82f6')}
+                    ${createChipCard('state-chip-education', '教育', 0, '📚', '#10b981')}
+                    ${createChipCard('state-chip-advertising', '広告', 0, '📢', '#f59e0b')}
+                </div>
+                <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 12px; color: #5b21b6;">
+                    💡 <strong>推奨: 研究2枚+教育1枚</strong>（成功率87%）
+                </div>
+            </div>
+
+            <!-- 翌期チップカード（3期以降用） -->
+            <div id="next-chips-section" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border-radius: 12px; padding: 15px; margin-bottom: 12px; display: none;">
+                <div style="font-weight: bold; color: #0369a1; margin-bottom: 12px; font-size: 14px;">⏰ 翌期チップ（購入済み・未適用）</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                    ${createChipCard('state-next-research', '研究', 0, '🔬', '#3b82f6')}
+                    ${createChipCard('state-next-education', '教育', 0, '📚', '#10b981')}
+                </div>
+            </div>
+
+            <!-- 分析ボタン -->
+            <button onclick="analyzeAndPropose()"
+                style="width: 100%; padding: 18px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+                color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;
+                box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);">
+                🧠 AIが最適戦略を提案
+            </button>
         </div>
     `;
 
-    showModal('カスタムゲーム設定', content);
+    showModal('🎯 状態入力', content);
 }
 
-function getCustomSettings() {
-    // 2期開始時の正しい初期状態（constants.jsのINITIAL_COMPANY_STATEに準拠）
+function createCounterCard(id, label, defaultVal, icon) {
+    return `
+        <div style="background: white; padding: 8px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 20px;">${icon}</div>
+            <div style="font-size: 10px; color: #666; margin: 3px 0;">${label}</div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                <button onclick="adjustValue('${id}', -1)" style="width: 24px; height: 24px; border: 1px solid #e5e7eb; border-radius: 4px; background: #f9fafb; cursor: pointer;">-</button>
+                <input type="number" id="${id}" value="${defaultVal}" min="0" max="10"
+                    style="width: 35px; text-align: center; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 16px; font-weight: bold;">
+                <button onclick="adjustValue('${id}', 1)" style="width: 24px; height: 24px; border: 1px solid #e5e7eb; border-radius: 4px; background: #f9fafb; cursor: pointer;">+</button>
+            </div>
+        </div>
+    `;
+}
+
+function createChipCard(id, label, defaultVal, icon, color) {
+    return `
+        <div style="background: white; padding: 10px; border-radius: 8px; text-align: center; border: 2px solid ${color}20;">
+            <div style="font-size: 24px;">${icon}</div>
+            <div style="font-size: 11px; color: #666; margin: 5px 0;">${label}</div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <button onclick="adjustValue('${id}', -1)" style="width: 28px; height: 28px; border: none; border-radius: 6px; background: ${color}; color: white; cursor: pointer; font-weight: bold;">-</button>
+                <span id="${id}-display" style="font-size: 24px; font-weight: bold; color: ${color}; min-width: 30px;">${defaultVal}</span>
+                <input type="hidden" id="${id}" value="${defaultVal}">
+                <button onclick="adjustValue('${id}', 1)" style="width: 28px; height: 28px; border: none; border-radius: 6px; background: ${color}; color: white; cursor: pointer; font-weight: bold;">+</button>
+            </div>
+        </div>
+    `;
+}
+
+function adjustValue(id, delta) {
+    const input = document.getElementById(id);
+    const display = document.getElementById(id + '-display');
+    if (!input) return;
+
+    let val = parseInt(input.value) + delta;
+    val = Math.max(0, Math.min(10, val));
+    input.value = val;
+    if (display) display.textContent = val;
+}
+
+function selectPeriod(period) {
+    // ボタンのスタイル更新
+    [2,3,4,5].forEach(p => {
+        const btn = document.getElementById(`period-btn-${p}`);
+        if (btn) {
+            btn.style.border = p === period ? '2px solid #4f46e5' : '2px solid #e5e7eb';
+            btn.style.background = p === period ? '#eef2ff' : 'white';
+            btn.style.color = p === period ? '#4f46e5' : '#6b7280';
+        }
+    });
+
+    // 翌期チップセクションの表示/非表示
+    const nextSection = document.getElementById('next-chips-section');
+    if (nextSection) {
+        nextSection.style.display = period >= 3 ? 'block' : 'none';
+    }
+
+    // 選択期を保存
+    window._selectedPeriod = period;
+
+    // デフォルト値を期に応じて更新
+    updateDefaultsForPeriod(period);
+}
+
+function updateDefaultsForPeriod(period) {
+    // 期ごとの標準的な初期状態
+    const defaults = {
+        2: { cash: 112, equity: 283, loans: 0 },
+        3: { cash: 80, equity: 300, loans: 0 },
+        4: { cash: 100, equity: 350, loans: 0 },
+        5: { cash: 120, equity: 400, loans: 0 }
+    };
+
+    const d = defaults[period] || defaults[2];
+    const cashInput = document.getElementById('state-cash');
+    const equityInput = document.getElementById('state-equity');
+
+    if (cashInput) cashInput.value = d.cash;
+    if (equityInput) equityInput.value = d.equity;
+}
+
+// ============================================
+// 状態分析と提案
+// ============================================
+function analyzeAndPropose() {
+    // 入力値を取得
+    const state = getStateFromInputs();
+
+    // モーダルを閉じてローディング表示
+    closeModal();
+    showModal('分析中...', `
+        <div style="text-align: center; padding: 40px;">
+            <div style="font-size: 48px; animation: pulse 1s infinite;">🧠</div>
+            <div style="margin-top: 15px; font-size: 16px;">AIが最適戦略を分析中...</div>
+        </div>
+        <style>@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }</style>
+    `);
+
+    // 非同期で分析実行
+    setTimeout(() => {
+        const analysis = performAnalysis(state);
+        closeModal();
+        showProposalModal(state, analysis);
+    }, 500);
+}
+
+function getStateFromInputs() {
     return {
-        period: parseInt(document.getElementById('custom-period')?.value || '2'),
-        cash: parseInt(document.getElementById('custom-cash')?.value || '112'),      // 2期開始時: ¥112
-        equity: parseInt(document.getElementById('custom-equity')?.value || '283'),  // 2期開始時: ¥283
-        loans: parseInt(document.getElementById('custom-loans')?.value || '0'),
-        shortLoans: parseInt(document.getElementById('custom-short-loans')?.value || '0'),
-        workers: parseInt(document.getElementById('custom-workers')?.value || '1'),  // 2期開始時: 1人
-        salesmen: parseInt(document.getElementById('custom-salesmen')?.value || '1'), // 2期開始時: 1人
-        machinesSmall: parseInt(document.getElementById('custom-machines-small')?.value || '1'), // 2期開始時: 1台
-        machinesLarge: parseInt(document.getElementById('custom-machines-large')?.value || '0'),
-        materials: parseInt(document.getElementById('custom-materials')?.value || '1'),
-        wip: parseInt(document.getElementById('custom-wip')?.value || '2'),
-        products: parseInt(document.getElementById('custom-products')?.value || '1'),
-        warehouses: parseInt(document.getElementById('custom-warehouses')?.value || '0'),
+        period: window._selectedPeriod || 2,
+        cash: parseInt(document.getElementById('state-cash')?.value) || 112,
+        equity: parseInt(document.getElementById('state-equity')?.value) || 283,
+        loans: parseInt(document.getElementById('state-loans')?.value) || 0,
+        workers: parseInt(document.getElementById('state-workers')?.value) || 1,
+        salesmen: parseInt(document.getElementById('state-salesmen')?.value) || 1,
+        machinesSmall: parseInt(document.getElementById('state-machines-small')?.value) || 1,
+        machinesLarge: parseInt(document.getElementById('state-machines-large')?.value) || 0,
+        materials: parseInt(document.getElementById('state-materials')?.value) || 1,
+        wip: parseInt(document.getElementById('state-wip')?.value) || 2,
+        products: parseInt(document.getElementById('state-products')?.value) || 1,
         chips: {
-            research: parseInt(document.getElementById('custom-chip-research')?.value || '0'),
-            education: parseInt(document.getElementById('custom-chip-education')?.value || '0'),
-            advertising: parseInt(document.getElementById('custom-chip-advertising')?.value || '0'),
-            computer: parseInt(document.getElementById('custom-chip-computer')?.value || '1'),
-            insurance: parseInt(document.getElementById('custom-chip-insurance')?.value || '1')
+            research: parseInt(document.getElementById('state-chip-research')?.value) || 0,
+            education: parseInt(document.getElementById('state-chip-education')?.value) || 0,
+            advertising: parseInt(document.getElementById('state-chip-advertising')?.value) || 0,
+            computer: 1,
+            insurance: 1
+        },
+        nextPeriodChips: {
+            research: parseInt(document.getElementById('state-next-research')?.value) || 0,
+            education: parseInt(document.getElementById('state-next-education')?.value) || 0
         }
     };
 }
 
-function startCustomGame() {
-    const settings = getCustomSettings();
-    gameState.currentPeriod = settings.period;
-    gameState.currentRow = 2;
-    gameState.maxRows = GAME_RULES.MAX_ROWS[settings.period];
+function performAnalysis(state) {
+    const mfgCap = calcMfgCapacity(state);
+    const salesCap = calcSalesCapacity(state);
+    const remainingPeriods = 5 - state.period + 1;
+    const targetGap = GAME_RULES.TARGET_EQUITY - state.equity;
 
-    const company = gameState.companies[0];
-    Object.assign(company, {
-        cash: settings.cash,
-        equity: settings.equity,
-        loans: settings.loans,
-        shortLoans: settings.shortLoans,
-        workers: settings.workers,
-        salesmen: settings.salesmen,
-        materials: settings.materials,
-        wip: settings.wip,
-        products: settings.products,
-        warehouses: settings.warehouses,
-        chips: { ...settings.chips }
-    });
+    // シミュレーション実行
+    const simResults = runSimulations(state, 100);
 
-    company.machines = [];
-    for (let i = 0; i < settings.machinesSmall; i++) {
-        company.machines.push({ type: 'small', hasAttachment: false, purchasePeriod: 1 });
+    // 推奨アクションを決定
+    const recommendations = generateRecommendations(state, mfgCap, salesCap, targetGap, remainingPeriods);
+
+    return {
+        mfgCap,
+        salesCap,
+        remainingPeriods,
+        targetGap,
+        simResults,
+        recommendations,
+        feasibility: simResults.successRate >= 50 ? 'high' : simResults.successRate >= 20 ? 'medium' : 'low'
+    };
+}
+
+function runSimulations(initialState, runs) {
+    let successCount = 0;
+    let totalEquity = 0;
+    let maxEquity = -9999;
+    let minEquity = 9999;
+
+    for (let i = 0; i < runs; i++) {
+        const result = simulateGame(initialState);
+        if (result.equity >= GAME_RULES.TARGET_EQUITY) successCount++;
+        totalEquity += result.equity;
+        maxEquity = Math.max(maxEquity, result.equity);
+        minEquity = Math.min(minEquity, result.equity);
     }
-    for (let i = 0; i < settings.machinesLarge; i++) {
-        company.machines.push({ type: 'large', purchasePeriod: 1 });
+
+    return {
+        runs,
+        successRate: Math.round(successCount / runs * 100),
+        avgEquity: Math.round(totalEquity / runs),
+        maxEquity,
+        minEquity
+    };
+}
+
+function simulateGame(initialState) {
+    let state = JSON.parse(JSON.stringify(initialState));
+
+    for (let period = state.period; period <= 5; period++) {
+        state = simulatePeriod(state, period);
     }
 
-    document.getElementById('startScreen')?.classList.add('hidden');
-    document.getElementById('gameBoard')?.classList.remove('hidden');
-    updateDisplay();
-    saveGame();
-    showToast(`${settings.period}期からカスタム条件でゲーム開始！`, 'success');
+    return { equity: state.equity };
+}
+
+function simulatePeriod(inputState, period) {
+    let state = JSON.parse(JSON.stringify(inputState));
+    const maxRows = GAME_RULES.MAX_ROWS[period];
+    let row = 1;
+    let sales = 0, matCost = 0, procCost = 0;
+
+    // 人件費
+    const wageMulti = period >= 3 ? (0.9 + Math.random() * 0.3) : 1.0;
+    const wage = Math.round(GAME_RULES.WAGE_BASE[period] * wageMulti);
+
+    // === 期首処理 ===
+
+    // 3期以降借入（動的借入戦略）
+    if (period >= 3 && state.cash < GAME_RULES.BORROW_STRATEGY.DYNAMIC_THRESHOLD) {
+        const maxLoan = calcMaxLoan(period, state.equity);
+        let targetBorrow = 0;
+
+        if (period === 3) {
+            // 3期は少額（段階的借入の1回目）
+            targetBorrow = Math.min(GAME_RULES.BORROW_STRATEGY.STAGED_3, maxLoan);
+        } else if (period === 4) {
+            // 4期は追加（段階的借入の2回目）
+            targetBorrow = Math.min(GAME_RULES.BORROW_STRATEGY.STAGED_4, maxLoan - state.loans);
+        } else {
+            // 5期は動的
+            targetBorrow = Math.min(GAME_RULES.BORROW_STRATEGY.DYNAMIC_AMOUNT, maxLoan - state.loans);
+        }
+
+        if (targetBorrow > 0) {
+            state.loans += targetBorrow;
+            state.cash += targetBorrow - Math.floor(targetBorrow * GAME_RULES.LONG_TERM_RATE);
+        }
+    }
+
+    // PC・保険
+    state.chips.computer = 1;
+    state.chips.insurance = 1;
+    state.cash -= GAME_RULES.CHIP_COST + GAME_RULES.INSURANCE_COST;
+    row++;
+
+    // 翌期チップ適用
+    if (state.nextPeriodChips) {
+        state.chips.research += state.nextPeriodChips.research || 0;
+        state.chips.education += state.nextPeriodChips.education || 0;
+        state.nextPeriodChips = { research: 0, education: 0 };
+    }
+
+    // === 2期：チップ購入 ===
+    if (period === 2) {
+        // 研究2枚 + 教育1枚 + 翌期研究1枚（推奨戦略）
+        const targetR = Math.max(0, 2 - (state.chips.research || 0));
+        const targetE = Math.max(0, 1 - (state.chips.education || 0));
+
+        for (let i = 0; i < targetR && state.cash >= GAME_RULES.CHIP_COST; i++) {
+            state.chips.research++; state.cash -= GAME_RULES.CHIP_COST; row++;
+        }
+        for (let i = 0; i < targetE && state.cash >= GAME_RULES.CHIP_COST; i++) {
+            state.chips.education++; state.cash -= GAME_RULES.CHIP_COST; row++;
+        }
+        // 翌期チップ
+        if (state.cash >= GAME_RULES.CHIP_COST) {
+            state.nextPeriodChips = state.nextPeriodChips || {};
+            state.nextPeriodChips.research = (state.nextPeriodChips.research || 0) + 1;
+            state.cash -= GAME_RULES.CHIP_COST; row++;
+        }
+    }
+
+    // === 3期：機械投資 ===
+    if (period === 3 && state.cash >= 120) {
+        // 小型機械追加（オプション）
+        // state.machinesSmall++; state.cash -= 100;
+        // state.workers++; state.cash -= 20;
+    }
+
+    // === メインループ ===
+    const mc = calcMfgCapacity(state);
+    const sc = calcSalesCapacity(state);
+
+    while (row < maxRows) {
+        // リスクカード
+        if (Math.random() < GAME_RULES.RISK_PROBABILITY) {
+            applyRisk(state, period);
+            row++;
+            continue;
+        }
+
+        // 販売
+        if (state.products > 0 && sc > 0) {
+            const sellQty = Math.min(state.products, sc);
+            const bidInfo = GAME_RULES.BID_WIN_RATES[Math.min(state.chips.research, 5)];
+            if (Math.random() < bidInfo.winRate) {
+                const rev = sellQty * bidInfo.price;
+                state.products -= sellQty;
+                state.cash += rev;
+                sales += rev;
+            }
+            row++;
+            continue;
+        }
+
+        // 完成
+        if (state.wip > 0 && mc > 0) {
+            const qty = Math.min(state.wip, mc, GAME_RULES.PRODUCT_BASE - state.products);
+            if (qty > 0) {
+                state.wip -= qty;
+                state.products += qty;
+                state.cash -= qty;
+                procCost += qty;
+
+                // 同時投入
+                const inpQty = Math.min(state.materials, mc, GAME_RULES.WIP_CAPACITY - state.wip);
+                if (inpQty > 0) {
+                    state.materials -= inpQty;
+                    state.wip += inpQty;
+                    state.cash -= inpQty;
+                    procCost += inpQty;
+                }
+            }
+            row++;
+            continue;
+        }
+
+        // 投入
+        if (state.materials > 0 && state.wip < GAME_RULES.WIP_CAPACITY && mc > 0) {
+            const qty = Math.min(state.materials, mc, GAME_RULES.WIP_CAPACITY - state.wip);
+            if (qty > 0) {
+                state.materials -= qty;
+                state.wip += qty;
+                state.cash -= qty;
+                procCost += qty;
+            }
+            row++;
+            continue;
+        }
+
+        // 仕入れ
+        const space = GAME_RULES.MATERIAL_BASE - state.materials;
+        if (space > 0 && state.cash >= 10) {
+            const price = 10 + Math.floor(Math.random() * 4);
+            const qty = Math.min(mc * 2, space, Math.floor(state.cash / price));
+            if (qty > 0) {
+                state.materials += qty;
+                state.cash -= qty * price;
+                matCost += qty * price;
+            }
+            row++;
+            continue;
+        }
+
+        break;
+    }
+
+    // === 期末計算 ===
+    const machCount = state.machinesSmall + (state.machinesLarge || 0);
+    const persCount = state.workers + state.salesmen;
+    const machCost = machCount * wage;
+    const persCost = persCount * wage;
+    const deprec = state.machinesSmall * 10 + (state.machinesLarge || 0) * 20;
+    const chipCost = (state.chips.research + state.chips.education + (state.chips.advertising || 0) + 1) * 20 + 5;
+
+    const fixedCost = machCost + persCost + deprec + chipCost;
+    const MQ = sales - matCost - procCost;
+    const opProfit = MQ - fixedCost;
+    const interest = Math.floor(state.loans * 0.10);
+    const preTax = opProfit - interest;
+
+    let tax = 0;
+    const newEq = state.equity + preTax;
+    if (newEq > 300) {
+        if (!state.hasExceeded300) {
+            tax = Math.round((newEq - 300) * 0.5);
+            state.hasExceeded300 = true;
+        } else if (preTax > 0) {
+            tax = Math.round(preTax * 0.5);
+        }
+    }
+
+    state.cash -= fixedCost + tax;
+    if (state.cash < 0) {
+        const loan = Math.ceil(-state.cash / 40) * 50;
+        state.shortLoans = (state.shortLoans || 0) + loan;
+        state.cash += loan * 0.8;
+    }
+
+    state.equity += preTax - tax;
+    return state;
+}
+
+function applyRisk(state, period) {
+    const r = Math.random();
+    if (r < 0.15) {
+        // F追加
+    } else if (r < 0.25) {
+        if (period > 2) state.cash = Math.max(0, state.cash - 30);
+    } else if (r < 0.30) {
+        if (state.chips.research > 0) state.chips.research--;
+    } else if (r < 0.35) {
+        if (state.wip > 0) state.wip--;
+    }
+}
+
+function generateRecommendations(state, mfgCap, salesCap, targetGap, remainingPeriods) {
+    const recs = [];
+
+    // === 2期の推奨（最重要）===
+    if (state.period === 2) {
+        // 研究チップ不足
+        if ((state.chips.research || 0) < 2) {
+            recs.push({
+                priority: 1,
+                action: '研究チップ購入',
+                detail: `研究チップを${2 - (state.chips.research || 0)}枚購入（¥${(2 - (state.chips.research || 0)) * 20}）`,
+                reason: '研究2枚で名古屋¥28市場確保（勝率70%）',
+                icon: '🔬'
+            });
+        }
+
+        // 教育チップ不足
+        if ((state.chips.education || 0) < 1) {
+            recs.push({
+                priority: 2,
+                action: '教育チップ購入',
+                detail: '教育チップを1枚購入（¥20）',
+                reason: '製造能力+1、販売能力+1で生産効率UP',
+                icon: '📚'
+            });
+        }
+
+        // 翌期チップ（成功率+12%の効果！）
+        if (state.cash >= 80) {
+            recs.push({
+                priority: 3,
+                action: '翌期チップ購入',
+                detail: '翌期チップ（研究）1枚購入（¥20）',
+                reason: '成功率+12%！3期から研究3枚で勝率78%に',
+                icon: '⏰'
+            });
+        }
+    }
+
+    // === 3期の推奨 ===
+    if (state.period === 3) {
+        // 動的借入（最強戦略）
+        const maxLoan = calcMaxLoan(state.period, state.equity);
+        if (state.cash < GAME_RULES.BORROW_STRATEGY.DYNAMIC_THRESHOLD && state.loans === 0) {
+            const borrowAmount = Math.min(GAME_RULES.BORROW_STRATEGY.STAGED_3, maxLoan);
+            recs.push({
+                priority: 1,
+                action: '長期借入（段階1）',
+                detail: `¥${borrowAmount}借入（手取り¥${Math.floor(borrowAmount * 0.9)}）`,
+                reason: '段階的借入で成功率93%！3期は少額から',
+                icon: '💳'
+            });
+        }
+
+        // 機械投資（オプション）
+        if (state.cash >= 120 && (state.machinesSmall || 0) === 1) {
+            recs.push({
+                priority: 4,
+                action: '小型機械追加',
+                detail: '小型機械¥100 + ワーカー¥20',
+                reason: '製造能力2倍で生産量UP（成功率+3%）',
+                icon: '⚙️'
+            });
+        }
+    }
+
+    // === 4期の推奨 ===
+    if (state.period === 4) {
+        const maxLoan = calcMaxLoan(state.period, state.equity);
+        // 段階的借入の2回目
+        if (state.cash < 80 && state.loans < 50) {
+            const borrowAmount = Math.min(GAME_RULES.BORROW_STRATEGY.STAGED_4, maxLoan - state.loans);
+            if (borrowAmount > 0) {
+                recs.push({
+                    priority: 1,
+                    action: '長期借入（段階2）',
+                    detail: `¥${borrowAmount}追加借入（手取り¥${Math.floor(borrowAmount * 0.9)}）`,
+                    reason: '4期追加借入で運転資金確保',
+                    icon: '💳'
+                });
+            }
+        }
+    }
+
+    // === 5期の推奨 ===
+    if (state.period === 5) {
+        if (targetGap > 0) {
+            const neededSales = Math.ceil(targetGap / 14); // 粗利14円/個想定
+            recs.push({
+                priority: 1,
+                action: '目標達成へ',
+                detail: `あと¥${targetGap}（約${neededSales}個販売）`,
+                reason: '全力で販売し目標¥450達成を目指す',
+                icon: '🎯'
+            });
+        }
+    }
+
+    // === 共通推奨 ===
+    // 製品販売
+    if (state.products > 0 && salesCap > 0) {
+        const bidInfo = GAME_RULES.BID_WIN_RATES[Math.min(state.chips.research || 0, 5)];
+        recs.push({
+            priority: 10,
+            action: '商品販売',
+            detail: `${bidInfo.market}¥${bidInfo.price}で販売`,
+            reason: `研究${state.chips.research || 0}枚で勝率${Math.round(bidInfo.winRate * 100)}%`,
+            icon: '💰'
+        });
+    }
+
+    // 製造
+    if (state.wip > 0 && mfgCap > 0 && state.products < GAME_RULES.PRODUCT_BASE) {
+        recs.push({
+            priority: 11,
+            action: '製品完成',
+            detail: `仕掛品${state.wip}個を完成`,
+            reason: `製造能力${mfgCap}で最大${Math.min(state.wip, mfgCap)}個完成可能`,
+            icon: '🏭'
+        });
+    }
+
+    // 仕入れ
+    if (state.materials < 5 && state.cash >= 50) {
+        recs.push({
+            priority: 12,
+            action: '材料仕入れ',
+            detail: '安価市場で材料購入',
+            reason: '仙台¥10 > 札幌¥11 > 福岡¥12の順で狙う',
+            icon: '🧱'
+        });
+    }
+
+    // ソート
+    recs.sort((a, b) => a.priority - b.priority);
+    return recs;
+}
+
+// 借入限度額計算
+function calcMaxLoan(period, equity) {
+    if (period < 3) return 0;
+    const multiplier = (period >= 4 && equity > 300) ? 1.0 : 0.5;
+    return Math.floor(equity * multiplier);
 }
 
 // ============================================
-// 最適シミュレーション実行
+// 提案結果モーダル
 // ============================================
-function runOptimalSimulation() {
-    const settings = getCustomSettings();
-    const engine = new OptimalStrategyEngine(settings);
-
-    // ローディング表示
-    showModal('シミュレーション中', `
-        <div style="text-align: center; padding: 40px;">
-            <div style="font-size: 48px; margin-bottom: 20px;">🧠</div>
-            <div style="font-size: 16px; font-weight: bold;">最適戦略を計算中...</div>
-            <div style="font-size: 12px; color: #666; margin-top: 10px;">${GAME_RULES.SIMULATION_RUNS}回シミュレーション実行</div>
-        </div>
-    `);
-
-    // 非同期で実行
-    setTimeout(() => {
-        const result = engine.findOptimalStrategy();
-        closeModal();
-        showOptimalResultModal(settings, result);
-    }, 100);
-}
-
-function showOptimalResultModal(settings, result) {
-    const { best, stats } = result;
-    const mfg = calcMfgCapacity(settings);
-    const sales = calcSalesCapacity(settings);
+function showProposalModal(state, analysis) {
+    const feasibilityColors = {
+        high: { bg: '#dcfce7', border: '#22c55e', text: '#166534', label: '達成可能性: 高' },
+        medium: { bg: '#fef9c3', border: '#eab308', text: '#854d0e', label: '達成可能性: 中' },
+        low: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', label: '達成可能性: 低' }
+    };
+    const fc = feasibilityColors[analysis.feasibility];
 
     let html = `
-        <div style="max-height: 75vh; overflow-y: auto; padding: 5px;">
-            <!-- 統計サマリー -->
-            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                <div style="font-size: 14px; margin-bottom: 10px;">
-                    📊 ${stats.runs}回シミュレーション結果
+        <div style="max-height: 80vh; overflow-y: auto; padding: 5px;">
+            <!-- 結果サマリー -->
+            <div style="background: ${fc.bg}; border: 2px solid ${fc.border}; border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center;">
+                <div style="font-size: 24px; font-weight: bold; color: ${fc.text};">
+                    ${analysis.feasibility === 'high' ? '🎉' : analysis.feasibility === 'medium' ? '⚠️' : '❌'} ${fc.label}
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 13px;">
-                    <div>🎯 成功率: <strong>${stats.successRate}%</strong></div>
-                    <div>📈 平均: ¥${stats.avgEquity}</div>
-                    <div>🏆 最高: ¥${stats.bestEquity}</div>
-                    <div>📉 最低: ¥${stats.worstEquity}</div>
+                <div style="margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div style="background: white; padding: 10px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: #666;">成功率</div>
+                        <div style="font-size: 24px; font-weight: bold; color: ${fc.text};">${analysis.simResults.successRate}%</div>
+                    </div>
+                    <div style="background: white; padding: 10px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: #666;">平均自己資本</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #2563eb;">¥${analysis.simResults.avgEquity}</div>
+                    </div>
+                    <div style="background: white; padding: 10px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: #666;">最高到達</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #059669;">¥${analysis.simResults.maxEquity}</div>
+                    </div>
                 </div>
             </div>
 
             <!-- 現在状態 -->
-            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">現在の状態（${settings.period}期開始）</div>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px;">
-                    <div>💰 現金: ¥${settings.cash}</div>
-                    <div>📈 自己資本: ¥${settings.equity}</div>
-                    <div>🎯 目標: ¥${GAME_RULES.TARGET_EQUITY}</div>
-                    <div>🔧 製造能力: ${mfg}</div>
-                    <div>📢 販売能力: ${sales}</div>
-                    <div>🔬 研究チップ: ${settings.chips.research}枚</div>
-                </div>
-            </div>
-
-            <!-- 結果判定 -->
-            <div style="background: ${best.success ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'}; color: white; padding: 15px; border-radius: 8px; margin-bottom: 12px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold;">
-                    ${best.success ? '🎉 450達成可能！' : '⚠️ 達成困難'}
-                </div>
-                <div style="margin-top: 5px;">
-                    最良結果: 自己資本 ¥${best.finalEquity}
-                    ${!best.success ? ` (あと¥${GAME_RULES.TARGET_EQUITY - best.finalEquity})` : ''}
-                </div>
-            </div>
-
-            <!-- 重要アドバイス -->
-            ${settings.chips.research < 2 ? `
-                <div style="background: #fef2f2; border: 2px solid #ef4444; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-                    <div style="font-weight: bold; color: #dc2626; margin-bottom: 5px;">⚠️ 最重要アドバイス</div>
-                    <div style="font-size: 13px; color: #7f1d1d;">
-                        <strong>研究チップを2枚購入してください！</strong><br>
-                        研究チップ2枚 = 入札で+4価格優位 → 平均¥28程度で落札可能<br>
-                        仕入¥13(平均) + 加工費¥2 = 原価¥15 → G=約¥13/個
-                    </div>
-                </div>
-            ` : ''}
-    `;
-
-    // 各期の詳細
-    for (const pr of best.periodResults) {
-        const g = pr.financials.grossProfit;
-
-        html += `
-            <div style="background: #f8fafc; border-radius: 8px; margin-bottom: 8px; overflow: hidden;">
-                <div onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'"
-                     style="background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 10px; cursor: pointer;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold;">${pr.period}期</span>
-                        <span style="font-size: 12px;">
-                            G: <span style="color: ${g >= 0 ? '#86efac' : '#fca5a5'};">¥${g}</span>
-                            | 純利益: ¥${pr.financials.netProfit}
-                            | 自己資本: ¥${pr.endState.equity}
-                            <span style="opacity: 0.7; margin-left: 5px;">▼</span>
-                        </span>
-                    </div>
-                </div>
-                <div style="display: none; padding: 10px; font-size: 11px;">
-                    <div style="margin-bottom: 8px; padding: 8px; background: #e0f2fe; border-radius: 4px;">
-                        <strong>G計算:</strong> 売上¥${pr.financials.totalSales} - 材料費¥${pr.financials.materialCost} - 加工費¥${pr.financials.processingCost || 0} = <strong>G¥${g}</strong><br>
-                        固定費¥${pr.financials.fixedCost} | 税¥${pr.financials.tax} | 配当¥${pr.financials.dividend} → 純利益¥${pr.financials.netProfit}<br>
-                        販売数: ${pr.financials.productsSold}個（平均¥${pr.financials.productsSold > 0 ? Math.round(pr.financials.totalSales / pr.financials.productsSold) : 0}/個）
-                    </div>
-                    <div style="max-height: 200px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px;">
-                        ${pr.actions.map(a => `
-                            <div style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f1f5f9; ${a.type === 'risk' ? 'color: #dc2626; font-weight: bold;' : ''}">
-                                <span>${a.row}行: ${a.action}</span>
-                                <span>${a.detail} ${a.cash ? (a.cash > 0 ? `<span style="color: #16a34a;">+¥${a.cash}</span>` : `<span style="color: #dc2626;">¥${a.cash}</span>`) : ''}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    // 戦略まとめ
-    html += `
-        <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; margin-top: 12px;">
-            <div style="font-weight: bold; color: #0369a1; margin-bottom: 8px;">📚 450達成のポイント</div>
-            <div style="font-size: 12px; line-height: 1.6; color: #1e40af;">
-                <div>1. <strong>研究チップ2枚</strong>が最優先（入札で+4価格優位）</div>
-                <div>2. <strong>製造能力5</strong>（仕掛品容量10の半分で効率的）</div>
-                <div>3. <strong>販売能力8</strong>（製品を滞留させない）</div>
-                <div>4. <strong>平均仕入¥13 → 販売¥28程度</strong>でG=約¥13/個</div>
-                <div>5. <strong>毎期15-20個販売</strong>を目指す（G=¥195～¥260）</div>
-                <div>6. <strong>税金50%</strong>（300超過後）、配当は現金支出のみ</div>
-            </div>
-        </div>
-    </div>`;
-
-    showModal('🧠 AI最適戦略提案', html);
-}
-
-// ============================================
-// リアルタイムAIアドバイス
-// ============================================
-function showAIAdviceForCurrentState() {
-    if (!gameState.companies || !gameState.companies[0]) {
-        showToast('ゲームを開始してください', 'error');
-        return;
-    }
-
-    const company = gameState.companies[0];
-    const state = {
-        period: gameState.currentPeriod,
-        cash: company.cash,
-        equity: company.equity,
-        workers: company.workers,
-        salesmen: company.salesmen,
-        machinesSmall: company.machines?.filter(m => m.type === 'small').length || 0,
-        machinesLarge: company.machines?.filter(m => m.type === 'large').length || 0,
-        materials: company.materials,
-        wip: company.wip,
-        products: company.products,
-        chips: company.chips || {}
-    };
-
-    const mfg = calcMfgCapacity(state);
-    const sales = calcSalesCapacity(state);
-    const rec = getRecommendation(state, mfg, sales);
-
-    const content = `
-        <div style="padding: 10px;">
-            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); color: white; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">現在の状態</div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 12px;">
+            <div style="background: #f8fafc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="font-weight: bold; margin-bottom: 10px;">📊 現在の状態（${state.period}期初）</div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 12px;">
                     <div>💰 現金: ¥${state.cash}</div>
                     <div>📈 自己資本: ¥${state.equity}</div>
-                    <div>🔧 製造: ${mfg}</div>
-                    <div>📢 販売: ${sales}</div>
-                    <div>📦 材料: ${state.materials}</div>
-                    <div>🔨 仕掛: ${state.wip}</div>
-                    <div>📱 製品: ${state.products}</div>
-                    <div>🔬 研究: ${state.chips?.research || 0}枚</div>
+                    <div>🎯 目標まで: ¥${analysis.targetGap}</div>
+                    <div>📅 残り期: ${analysis.remainingPeriods}期</div>
+                    <div>🔧 製造能力: ${analysis.mfgCap}</div>
+                    <div>📢 販売能力: ${analysis.salesCap}</div>
+                    <div>🔬 研究: ${state.chips.research || 0}枚</div>
+                    <div>📚 教育: ${state.chips.education || 0}枚</div>
                 </div>
             </div>
 
-            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
-                    ${rec.action}
+            <!-- 推奨アクション -->
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: white; font-weight: bold; margin-bottom: 12px; font-size: 16px;">🎯 推奨アクション</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    ${analysis.recommendations.slice(0, 5).map((rec, i) => `
+                        <div style="background: white; border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;">
+                            <div style="font-size: 28px;">${rec.icon}</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: #1f2937;">${rec.action}</div>
+                                <div style="font-size: 12px; color: #6b7280;">${rec.detail}</div>
+                                <div style="font-size: 11px; color: #4f46e5; margin-top: 3px;">${rec.reason}</div>
+                            </div>
+                            <div style="background: #4f46e5; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${i + 1}</div>
+                        </div>
+                    `).join('')}
                 </div>
-                <div style="font-size: 13px;">${rec.reason}</div>
             </div>
 
-            <div style="background: #fef3c7; padding: 10px; border-radius: 8px;">
-                <div style="font-weight: bold; color: #92400e; margin-bottom: 5px;">💡 ヒント</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #78350f;">
-                    ${rec.tips.map(t => `<li>${t}</li>`).join('')}
-                </ul>
+            <!-- 最適戦略情報 -->
+            <div style="background: #f0f9ff; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #0369a1; margin-bottom: 10px;">📚 v8シミュレーション結果に基づく最適戦略</div>
+                <div style="font-size: 13px; line-height: 1.8; color: #1e40af;">
+                    <div><strong>1位: R2E1_NR_SM_DYN</strong> - 成功率95.20%</div>
+                    <div style="margin-left: 20px; font-size: 12px; color: #6b7280;">研究2+教育1+翌期研究+機械+動的借入</div>
+                    <div style="margin-top: 10px;"><strong>最新発見:</strong></div>
+                    <ul style="margin: 5px 0 0 20px; padding: 0;">
+                        <li><strong>動的借入が最強</strong>: 現金不足時のみ借りる</li>
+                        <li><strong>翌期チップ必須</strong>: 成功率+12%の効果</li>
+                        <li>段階的借入（3期30円+4期70円）も93%成功</li>
+                        <li>研究3枚で名古屋¥28市場を勝率78%確保</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ボタン -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                <button onclick="closeModal(); showStateInputModal()"
+                    style="padding: 14px; background: #6b7280; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                    ← 状態を変更
+                </button>
+                <button onclick="closeModal()"
+                    style="padding: 14px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                    閉じる
+                </button>
             </div>
         </div>
     `;
 
-    showModal('AIアドバイス', content);
+    showModal('🧠 AI戦略提案', html);
 }
 
-function getRecommendation(state, mfg, sales) {
-    // 研究チップ優先
-    if ((state.chips?.research || 0) < 2 && state.cash >= 40 && state.products === 0 && state.wip === 0) {
-        return {
-            action: '研究チップ購入',
-            reason: '研究チップ2枚で入札+4優位。平均¥28販売でG≒¥13/個！',
-            tips: ['最優先で2枚揃える', '入札で+2価格優位/枚', '研究なしは負けやすい']
-        };
-    }
+// ============================================
+// 従来のカスタムゲーム設定（互換性維持）
+// ============================================
+function showCustomGameSetupModal() {
+    showStateInputModal();
+}
 
-    if (state.products > 0 && sales > 0) {
-        const researchCount = state.chips?.research || 0;
-        const expectedPrice = researchCount >= 2 ? '¥28' : researchCount === 1 ? '¥27' : '¥26';
-        return {
-            action: '商品販売',
-            reason: `製品${state.products}個を販売。研究${researchCount}枚で平均${expectedPrice}程度`,
-            tips: ['研究チップで入札有利', '競争があるので¥26-30が現実的']
-        };
-    }
-
-    if (state.wip > 0 && mfg > 0) {
-        return {
-            action: '完成投入',
-            reason: `仕掛品${state.wip}個を製品に変換（加工費¥${state.wip}）`,
-            tips: ['材料があれば同時投入も', '加工費¥1/個（投入+完成で¥2/個）']
-        };
-    }
-
-    if (state.materials > 0 && mfg > 0) {
-        return {
-            action: '投入',
-            reason: `材料${state.materials}個を仕掛品に（加工費¥${Math.min(state.materials, mfg)}）`,
-            tips: ['仕掛品容量は最大10個', '加工費¥1/個']
-        };
-    }
-
-    if (state.cash >= mfg * 10) {
-        return {
-            action: '材料仕入',
-            reason: `仙台¥10で${mfg}個仕入れ`,
-            tips: ['仙台¥10が最安', '2市場購入で効率化']
-        };
-    }
-
-    return {
-        action: 'DO NOTHING / 投資',
-        reason: '状況に応じて判断',
-        tips: ['研究チップ優先', '現金を貯める']
+function runOptimalSimulation() {
+    const state = getStateFromInputs ? getStateFromInputs() : {
+        period: 2,
+        cash: 112,
+        equity: 283,
+        loans: 0,
+        workers: 1,
+        salesmen: 1,
+        machinesSmall: 1,
+        machinesLarge: 0,
+        materials: 1,
+        wip: 2,
+        products: 1,
+        chips: { research: 0, education: 0, advertising: 0, computer: 1, insurance: 1 }
     };
+
+    analyzeAndPropose();
 }
 
+// ============================================
 // グローバルエクスポート
+// ============================================
 if (typeof window !== 'undefined') {
+    window.showStateInputModal = showStateInputModal;
     window.showCustomGameSetupModal = showCustomGameSetupModal;
-    window.startCustomGame = startCustomGame;
     window.runOptimalSimulation = runOptimalSimulation;
-    window.showAIAdviceForCurrentState = showAIAdviceForCurrentState;
-    window.OptimalStrategyEngine = OptimalStrategyEngine;
+    window.analyzeAndPropose = analyzeAndPropose;
+    window.selectPeriod = selectPeriod;
+    window.adjustValue = adjustValue;
+    window.getStateFromInputs = getStateFromInputs;
     window.GAME_RULES = GAME_RULES;
     window.calcMfgCapacity = calcMfgCapacity;
     window.calcSalesCapacity = calcSalesCapacity;
+    window.calcMaxLoan = calcMaxLoan;
+    window.generateRecommendations = generateRecommendations;
 }
