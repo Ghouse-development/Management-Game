@@ -1828,9 +1828,21 @@ const AIBrain = {
         }
 
         // 市場の空き具合をチェック
-        const marketCapacity = market.maxStock - market.currentStock;
-        if (marketCapacity <= 0) {
-            return { shouldSell: false, reason: '市場枠なし' };
+        if (!market) {
+            // marketが渡されない場合は全市場の空きを計算
+            const markets = gameState.markets || [];
+            const totalSpace = markets.reduce((sum, m) => {
+                if (!m || m.closed) return sum;
+                return sum + ((m.maxStock || 0) - (m.currentStock || 0));
+            }, 0);
+            if (totalSpace <= 0) {
+                return { shouldSell: false, reason: '市場枠なし' };
+            }
+        } else {
+            const marketCapacity = (market.maxStock || 0) - (market.currentStock || 0);
+            if (marketCapacity <= 0) {
+                return { shouldSell: false, reason: '市場枠なし' };
+            }
         }
 
         // 期末が近い場合は積極的に売る
@@ -2265,10 +2277,13 @@ const AIBrain = {
         const researchBonus = (company.chips.research || 0) * 2;
         const price = basePrice + researchBonus;
 
-        // 市場の空き状況を考慮
-        const market = gameState.market;
-        const marketSpace = market.maxStock - market.currentStock;
-        const actualQuantity = Math.min(quantity, marketSpace);
+        // 市場の空き状況を考慮（全市場の空きを合計）
+        const markets = gameState.markets || [];
+        const totalMarketSpace = markets.reduce((sum, m) => {
+            if (!m || m.closed) return sum;
+            return sum + ((m.maxStock || 0) - (m.currentStock || 0));
+        }, 0);
+        const actualQuantity = Math.min(quantity, totalMarketSpace);
 
         // 変動費（製品評価額15円）
         const variableCost = actualQuantity * 15;
@@ -2805,8 +2820,9 @@ const AIBrain = {
      * 他プレイヤーの行動を考慮した最適応答を計算
      */
     calculateBestResponse: function(company, companyIndex) {
-        const competitors = this.analyzeCompetitors(company, companyIndex);
-        const myActions = this.enumeratePossibleActions(company, companyIndex);
+        try {
+            const competitors = this.analyzeCompetitors(company, companyIndex);
+            const myActions = this.enumeratePossibleActions(company, companyIndex);
 
         // 各競合の予測行動を取得
         const opponentPredictions = [];
@@ -2859,10 +2875,19 @@ const AIBrain = {
         actionPayoffs.sort((a, b) => b.expectedPayoff - a.expectedPayoff);
 
         return {
-            bestResponse: actionPayoffs[0],
+            bestResponse: actionPayoffs[0] || { action: { type: 'WAIT' }, expectedPayoff: 0 },
             alternatives: actionPayoffs.slice(1, 3),
             gameTheoreticAnalysis: true
         };
+        } catch (error) {
+            console.error('[AIBrain] calculateBestResponse エラー:', error);
+            return {
+                bestResponse: { action: { type: 'WAIT' }, expectedPayoff: 0 },
+                alternatives: [],
+                gameTheoreticAnalysis: false,
+                error: error.message
+            };
+        }
     },
 
     /**
@@ -2915,14 +2940,15 @@ const AIBrain = {
      * 統合的な最適意思決定（全手法を組み合わせ）
      */
     makeOptimalDecision: function(company, companyIndex) {
-        const period = gameState.currentPeriod;
+        try {
+            const period = gameState.currentPeriod;
 
-        // 1. 学習データからの調整を取得
-        const learnedAdj = this.getLearnedStrategyAdjustment(company, companyIndex);
-        const successPatterns = this.analyzeSuccessPatterns(companyIndex);
+            // 1. 学習データからの調整を取得
+            const learnedAdj = this.getLearnedStrategyAdjustment(company, companyIndex);
+            const successPatterns = this.analyzeSuccessPatterns(companyIndex);
 
-        // 2. ゲーム理論による最適応答
-        const gameTheory = this.calculateBestResponse(company, companyIndex);
+            // 2. ゲーム理論による最適応答
+            const gameTheory = this.calculateBestResponse(company, companyIndex);
 
         // 3. モンテカルロシミュレーション
         const monteCarlo = this.monteCarloDecision(company, companyIndex, 30);
@@ -2995,6 +3021,15 @@ const AIBrain = {
                 dynamicMode: dynamicAdj.reasoning
             }
         };
+        } catch (error) {
+            console.error('[AIBrain] makeOptimalDecision エラー:', error);
+            return {
+                action: { type: 'WAIT' },
+                score: 0,
+                confidence: 0.3,
+                reasoning: { error: error.message }
+            };
+        }
     },
 
     // ========================================
@@ -3757,7 +3792,10 @@ const AIBrain = {
 
         // 市場状況の分析
         const markets = gameState.markets || [];
-        const totalMarketSpace = markets.reduce((sum, m) => sum + (m.maxStock - m.currentStock), 0);
+        const totalMarketSpace = markets.reduce((sum, m) => {
+            if (!m || m.closed) return sum;
+            return sum + ((m.maxStock || 0) - (m.currentStock || 0));
+        }, 0);
 
         // 競合の販売圧力
         const competitors = this.analyzeCompetitors(company, companyIndex);
@@ -3807,10 +3845,17 @@ const AIBrain = {
      * 究極の統合意思決定（全機能統合）
      */
     makeUltimateDecision: function(company, companyIndex) {
-        const period = gameState.currentPeriod;
+        try {
+            const period = gameState.currentPeriod;
 
-        // 1. 基本の統合意思決定
-        const baseDecision = this.makeOptimalDecision(company, companyIndex);
+            // 安全チェック
+            if (!company || !gameState.companies || !gameState.markets) {
+                console.warn('[AIBrain] makeUltimateDecision: 必要なデータが未初期化');
+                return this.getFallbackDecision(company);
+            }
+
+            // 1. 基本の統合意思決定
+            const baseDecision = this.makeOptimalDecision(company, companyIndex);
 
         // 2. リスク調整
         const riskProfile = this.calculateExpectedRisk(company);
@@ -3875,6 +3920,47 @@ const AIBrain = {
                 bidTiming: bidTiming.reasoning
             },
             components: scores
+        };
+        } catch (error) {
+            console.error('[AIBrain] makeUltimateDecision エラー:', error);
+            return this.getFallbackDecision(company);
+        }
+    },
+
+    /**
+     * エラー時のフォールバック意思決定
+     */
+    getFallbackDecision: function(company) {
+        // 最もシンプルで安全な行動を返す
+        let action = { type: 'WAIT' };
+        let reason = 'フォールバック: ';
+
+        if (company) {
+            if (company.products > 0) {
+                action = { type: 'SELL', quantity: 1 };
+                reason += '製品販売';
+            } else if (company.wip > 0) {
+                action = { type: 'COMPLETE', quantity: 1 };
+                reason += '完成';
+            } else if (company.materials > 0) {
+                action = { type: 'PRODUCE', quantity: 1 };
+                reason += '投入';
+            } else if (company.cash >= 20) {
+                action = { type: 'BUY_MATERIALS' };
+                reason += '材料購入';
+            } else {
+                reason += '待機';
+            }
+        } else {
+            reason += 'company未定義';
+        }
+
+        return {
+            action: action,
+            score: 0,
+            confidence: 0.5,
+            reasoning: { fallback: reason },
+            components: { base: 0, riskAdjusted: 0, longTerm: 0, rl: 0, bidUrgency: 0 }
         };
     }
 };
