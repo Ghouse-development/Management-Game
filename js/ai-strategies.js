@@ -187,6 +187,129 @@ const CUMULATIVE_G_TARGETS = {
     5: { periodG: 160, cumulativeG: 330, equityTarget: 457 }  // 50%保持
 };
 
+// ============================================
+// 📊 行別進捗追跡・動的調整システム
+// ============================================
+
+/**
+ * 現在の行における目標進捗を計算
+ * @returns {Object} 進捗状況と調整アクション
+ */
+function getRowProgressTracking(company, period) {
+    const target = PERIOD_STRATEGY_TARGETS[period];
+    const gTarget = CUMULATIVE_G_TARGETS[period];
+    if (!target || !gTarget) return null;
+
+    const currentRow = company.currentRow || 1;
+    const totalRows = target.rows;
+    const progressRatio = currentRow / totalRows;
+
+    // 現在のMQとG推定
+    const currentMQ = company.periodMQ || 0;
+    const currentF = calculateFixedCost(company);
+    const currentG = currentMQ - currentF;
+
+    // 行進捗に対する期待G
+    const expectedG = Math.floor(gTarget.periodG * progressRatio);
+    const gGap = currentG - expectedG;
+
+    // 残り行数でどれだけMQが必要か
+    const rowsRemaining = totalRows - currentRow;
+    const neededG = gTarget.periodG - currentG;
+    const neededMQ = neededG + (currentF * (rowsRemaining / totalRows)); // 残り期間のF分も考慮
+
+    // サイクル効率計算
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const effectiveSales = Math.min(mfgCapacity, salesCapacity);
+    const priceComp = getPriceCompetitiveness(company, gameState.companies.indexOf(company));
+    const mqPerSale = 20 + priceComp - 10; // 東京売り基準
+    const cyclesRemaining = Math.floor(rowsRemaining / 3);
+    const potentialMQ = cyclesRemaining * effectiveSales * mqPerSale;
+
+    // 達成可能性
+    const achievability = potentialMQ >= neededMQ ? 'ON_TRACK' :
+                          potentialMQ >= neededMQ * 0.8 ? 'SLIGHTLY_BEHIND' :
+                          potentialMQ >= neededMQ * 0.5 ? 'BEHIND' : 'CRITICAL';
+
+    // 動的調整アクション
+    let adjustmentAction = null;
+    let adjustmentReason = '';
+
+    if (achievability === 'CRITICAL') {
+        // 緊急: 高価格市場を狙うか、サイクル加速
+        if (company.products > 0) {
+            adjustmentAction = 'EMERGENCY_SELL_HIGH';
+            adjustmentReason = `G目標大幅遅れ（現在${currentG} vs 期待${expectedG}）→高価格販売`;
+        } else {
+            adjustmentAction = 'ACCELERATE_CYCLE';
+            adjustmentReason = `G目標大幅遅れ→サイクル加速`;
+        }
+    } else if (achievability === 'BEHIND') {
+        // 遅れ: 販売優先、投資抑制
+        if (company.products > 0 && salesCapacity > 0) {
+            adjustmentAction = 'PRIORITIZE_SELL';
+            adjustmentReason = `G目標遅れ（${gGap}円）→販売優先`;
+        } else if (company.wip > 0 || company.materials > 0) {
+            adjustmentAction = 'PRIORITIZE_PRODUCE';
+            adjustmentReason = `G目標遅れ→生産加速`;
+        }
+    } else if (achievability === 'ON_TRACK' && gGap > 20) {
+        // 余裕あり: 投資機会
+        adjustmentAction = 'CONSIDER_INVESTMENT';
+        adjustmentReason = `G目標達成見込み（+${gGap}円余裕）→投資検討`;
+    }
+
+    return {
+        currentRow,
+        totalRows,
+        progressRatio: Math.round(progressRatio * 100),
+        currentG,
+        expectedG,
+        gGap,
+        neededG,
+        neededMQ: Math.round(neededMQ),
+        potentialMQ: Math.round(potentialMQ),
+        achievability,
+        adjustmentAction,
+        adjustmentReason,
+        cyclesRemaining,
+        effectiveSales,
+        mqPerSale
+    };
+}
+
+/**
+ * 進捗に基づく動的行動調整を適用
+ */
+function applyProgressBasedAdjustment(company, companyIndex) {
+    const period = gameState.currentPeriod;
+    const progress = getRowProgressTracking(company, period);
+    if (!progress) return null;
+
+    // ログ出力（5行ごと）
+    if (progress.currentRow % 5 === 0 || progress.achievability === 'CRITICAL') {
+        console.log(`[進捗追跡] ${company.name} ${period}期${progress.currentRow}行目:`);
+        console.log(`  G: 現在${progress.currentG} / 期待${progress.expectedG} / 目標${CUMULATIVE_G_TARGETS[period].periodG}`);
+        console.log(`  状態: ${progress.achievability} (残${progress.cyclesRemaining}サイクル, 潜在MQ${progress.potentialMQ})`);
+        if (progress.adjustmentAction) {
+            console.log(`  調整: ${progress.adjustmentAction} - ${progress.adjustmentReason}`);
+        }
+    }
+
+    // 調整アクションを返す
+    if (progress.adjustmentAction) {
+        return {
+            action: progress.adjustmentAction,
+            reason: progress.adjustmentReason,
+            priority: progress.achievability === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+            progress: progress
+        };
+    }
+
+    return null;
+}
+
 /**
  * 現在期の戦略計画を取得
  */
@@ -2188,6 +2311,52 @@ function planAIPeriodStrategy(company, companyIndex) {
     const mfgCapacity = getManufacturingCapacity(company);
     const salesCapacity = getSalesCapacity(company);
 
+    // ============================================
+    // 🏦 長期借入戦略（積極的に活用）
+    // ============================================
+    // 長期借入は10%金利だが、投資によるリターンがそれ以上なら借りるべき
+    // - 研究チップ: 1枚で+2価格 → 期あたり5-10個販売で+10-20 MQ
+    // - 教育チップ: 製造+1、販売+1 → サイクル効率向上
+    // - 機械投資: 製造能力向上 → MQ増加
+
+    const currentLoans = company.loans || 0;
+    const maxLoanLimit = 300;  // 借入上限
+    const loanIncrement = 100; // 借入単位
+
+    // 投資に必要な資金を計算
+    const targetChips = PERIOD_STRATEGY_TARGETS[period]?.investmentPlan || {};
+    const neededChipCost = (targetChips.research || 0) * 20 +
+                           (targetChips.education || 0) * 20 +
+                           (targetChips.advertising || 0) * 20;
+    const neededMachineCost = (targetChips.machine || 0) * 60;
+    const neededWorkerCost = (targetChips.worker || 0) * 5;
+    const totalInvestmentNeed = neededChipCost + neededMachineCost + neededWorkerCost;
+
+    // 期末までに必要な現金（給与+返済+安全マージン）
+    const estimatedPeriodEndCost = calculatePeriodPayment(company) + 50;
+
+    // 借入判断: 現金不足 + 投資余地あり + 借入枠あり
+    const cashShortfall = Math.max(0, totalInvestmentNeed + estimatedPeriodEndCost - company.cash);
+    const canBorrow = currentLoans < maxLoanLimit;
+    const shouldBorrow = cashShortfall > 30 && canBorrow && period <= 4; // 5期は借りない
+
+    if (shouldBorrow) {
+        // 必要額を100円単位に切り上げ
+        const borrowAmount = Math.min(
+            Math.ceil(cashShortfall / loanIncrement) * loanIncrement,
+            maxLoanLimit - currentLoans
+        );
+
+        if (borrowAmount >= loanIncrement) {
+            const interestPaid = Math.floor(borrowAmount * INTEREST_RATES.longTerm);
+            company.loans += borrowAmount;
+            company.cash += borrowAmount - interestPaid;
+            company.periodStartInterest = (company.periodStartInterest || 0) + interestPaid;
+
+            console.log(`[長期借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）→ 投資資金確保`);
+        }
+    }
+
     // === 1. 競争状況の分析（勝つためには何が必要か） ===
     const rivals = gameState.companies.filter((c, i) => i !== companyIndex);
     const myEquity = company.equity;
@@ -2796,6 +2965,43 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         logStrategyEvaluation(company, period);
     }
     trackScoreProgress(company, period);
+
+    // === 【進捗追跡・動的調整】G目標に対する進捗に基づく調整 ===
+    const progressAdjustment = applyProgressBasedAdjustment(company, companyIndex);
+    if (progressAdjustment && (progressAdjustment.priority === 'CRITICAL' || progressAdjustment.priority === 'HIGH')) {
+        console.log(`[進捗調整実行] ${company.name}: ${progressAdjustment.action} - ${progressAdjustment.reason}`);
+
+        let adjusted = false;
+        switch (progressAdjustment.action) {
+            case 'EMERGENCY_SELL_HIGH':
+                // 緊急高価格販売: 入札市場を狙う
+                if (company.products > 0 && salesCapacity > 0) {
+                    executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.70); // 積極的入札
+                    adjusted = true;
+                }
+                break;
+            case 'PRIORITIZE_SELL':
+                if (company.products > 0 && salesCapacity > 0) {
+                    executeDefaultSale(company, Math.min(salesCapacity, company.products), 0.75);
+                    adjusted = true;
+                }
+                break;
+            case 'PRIORITIZE_PRODUCE':
+            case 'ACCELERATE_CYCLE':
+                if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                    executeDefaultProduction(company, mfgCapacity);
+                    adjusted = true;
+                }
+                break;
+            case 'CONSIDER_INVESTMENT':
+                // 余裕がある場合の投資判断はここでは行わず、通常フローに任せる
+                break;
+        }
+
+        if (adjusted) {
+            return; // 進捗調整アクションが実行されたら終了
+        }
+    }
 
     // === 【自己改善システム】120点達成に向けた自動改善 ===
     const improvementAction = applyImprovementAction(company, period);
