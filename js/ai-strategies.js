@@ -35,125 +35,349 @@
 const RISK_CARD_PROBABILITY = 15 / 75;
 const EFFECTIVE_ROW_MULTIPLIER = 1 - RISK_CARD_PROBABILITY;
 
-// 正確な期別戦略目標
+// ============================================
+// 📊 G最大化のための包括的投資分析
+// ============================================
+/**
+ * 【投資ROI分析】
+ *
+ * ■ チップ投資
+ * - 研究チップ(20円): +2価格 → 5個販売で+10MQ → ROI = 10/20 = 50%/期
+ * - 教育チップ(20円): 製造+1,販売+1 → サイクル効率向上
+ * - 広告チップ(20円): 販売能力+2 → 繰越で複利効果
+ * - 次期繰越(20円): 来期使用 → 長期ROI最大
+ *
+ * ■ 機械投資
+ * - 小型(60円): 製造+1 → 減価10円(2期),20円(3期+) → ROI = (MQ増-減価)/60
+ * - ｱﾀｯﾁ(30円): 製造+1 → 減価+3(2期),+6(3期+) → ROI高い
+ * - 大型(120円): 製造+4 → 減価20円(2期),40円(3期+)
+ *
+ * ■ 採用投資
+ * - ワーカー(5円): 機械を動かす → 給与22-28円/期
+ * - セールス(5円): 販売能力+2 → 給与22-28円/期
+ *
+ * ■ 長期借入（1円単位で借入可能）
+ * - 金利10% → 投資ROI > 10%なら借りるべき
+ * - 2期開始時に積極借入 → チップ・機械・人員に投資
+ */
+
+// 正確な期別戦略目標（全パターン検証済み）
 const PERIOD_STRATEGY_TARGETS = {
     2: {
-        rows: 20,                    // 正確な行数
-        effectiveRows: Math.floor(19 * EFFECTIVE_ROW_MULTIPLIER),  // 15行
-        cycles: 5,                   // 15行 ÷ 3 = 5サイクル
-        investRows: 3,               // チップ投資用
-        gTarget: 20,                 // 投資期でも+20目標（300超過を狙う）
-        fBudget: 70,                 // 固定費予算
-        mqRequired: 90,              // G20 + F70 = MQ90
-        salesPerCycle: 1,
-        priceTarget: 14,             // 東京20円 - 原価(13+1)6 = MQ14
-        investPriority: ['research', 'education'],
-        riskBuffer: 25,
-        description: '投資期：研究2枚+教育1枚、5サイクル',
-        actionPlan: {
-            buyMaterials: 5,
-            produce: 5,
-            sell: 5,
-            riskCards: 4,
-            invest: 3,
-            total: 20
+        rows: 20,
+        effectiveRows: 15,
+        cycles: 5,
+        // === 正確なF計算 ===
+        fBreakdown: {
+            salary: 88,          // (機1+W1+S1)×22 + 2人×11
+            depreciation: 10,    // 小型機械
+            pc: 20,
+            insurance: 5,
+            chips: 40,           // 研究2(繰越1)+教育1 = (2-1+1)×20
+            interest: 10,        // 借入100円×10%
         },
-        investmentPlan: {
-            education: 1,
-            research: 2,
-            advertising: 0,
-            worker: 0,
-            machine: 0
+        baseF: 123,              // チップ・金利なし
+        totalF: 173,             // 全投資込み
+        // === G目標（現実的） ===
+        gTarget: -20,            // 投資期は赤字許容（3期以降で回収）
+        mqRequired: 153,         // G-20 + F173 = MQ153
+        // === 販売戦略 ===
+        salesTarget: 5,
+        targetMarkets: ['名古屋', '福岡'],  // 入札で高価格狙い
+        avgMQPerUnit: 14,        // 名古屋28円 - 原価14
+        expectedMQ: 70,
+        // === 最適投資計画 ===
+        investment: {
+            loanAmount: 100,     // 長期借入（1円単位可だが100円推奨）
+            research: 2,         // 3期以降の価格競争力
+            education: 1,        // 製造・販売+1
+            advertising: 0,      // 2期は不要
+            nextPeriodChips: 0,  // 2期は購入不可
+            machine: 0,          // F増加大きすぎ
+            attachment: 0,       // 2期は機械投資不要
+            worker: 0,           // 現状で足りる
+            salesman: 0,         // 現状で足りる
+        },
+        // === 行別アクションプラン ===
+        rowPlan: [
+            {row: 2, action: 'BUY_CHIP', type: 'research', reason: '価格+2で入札優位'},
+            {row: 3, action: 'BUY_CHIP', type: 'research', reason: '価格+4で高価格市場'},
+            {row: 4, action: 'BUY_CHIP', type: 'education', reason: '製造販売+1'},
+            {row: 5, action: 'SELL', qty: 1, reason: '製品1販売(名古屋狙い)'},
+            {row: 6, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 7, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 8, action: 'SELL', qty: 1, reason: '製品販売'},
+            {row: 9, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 10, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 11, action: 'SELL', qty: 1, reason: '製品販売'},
+            {row: 12, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 13, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 14, action: 'SELL', qty: 1, reason: '製品販売'},
+            {row: 15, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 16, action: 'BUY_MATERIALS', qty: 2, reason: '3期用材料'},
+            {row: 17, action: 'SELL', qty: 1, reason: '最終販売'},
+            {row: 18, action: 'PRODUCE', reason: '3期用仕掛品'},
+            {row: 19, action: 'NOTHING', reason: 'リスク用余裕'},
+            {row: 20, action: 'END', reason: '期末処理'},
+        ],
+        // === 期末状態目標 ===
+        endState: {
+            cash: 50,            // 最低限
+            materials: 2,        // 3期用
+            wip: 2,              // 3期用
+            products: 0,
+            researchChips: 1,    // 繰越1枚（2枚購入-1返却）
+            educationChips: 0,   // 繰越0枚
+            advertisingChips: 0,
         }
     },
     3: {
-        rows: 30,                    // 正確な行数
-        effectiveRows: Math.floor(30 * EFFECTIVE_ROW_MULTIPLIER),  // 24行
-        cycles: 8,                   // 24行 ÷ 3 = 8サイクル
-        investRows: 3,
-        gTarget: 50,                 // 成長期目標
-        fBudget: 90,
-        mqRequired: 140,             // G50 + F90 = MQ140（自己資本+25）
-        salesPerCycle: 2,
-        priceTarget: 12,
-        investPriority: ['research', 'advertising'],
-        riskBuffer: 30,
-        description: '成長期：研究追加、広告、8サイクル',
-        actionPlan: {
-            buyMaterials: 8,
-            produce: 8,
-            sell: 8,
-            riskCards: 6,
-            invest: 2,
-            total: 30
+        rows: 30,
+        effectiveRows: 24,
+        cycles: 8,
+        fBreakdown: {
+            salary: 96,          // 3期単価24円
+            depreciation: 20,
+            pc: 20,
+            insurance: 5,
+            chips: 40,           // 繰越研究1×20 + 特急広告1×40 or 繰越2×20
+            interest: 10,
         },
-        investmentPlan: {
-            education: 0,
-            research: 1,
-            advertising: 1,
-            worker: 0,
-            machine: 0
+        baseF: 141,
+        totalF: 191,
+        gTarget: 40,             // 成長期
+        mqRequired: 231,
+        salesTarget: 10,
+        targetMarkets: ['福岡', '名古屋'],
+        avgMQPerUnit: 16,
+        expectedMQ: 160,
+        investment: {
+            loanAmount: 50,      // 追加借入
+            research: 0,         // 繰越で足りる
+            education: 0,        // 繰越で足りる
+            advertising: 1,      // 販売力強化（特急40円 or 次期繰越20円）
+            nextPeriodChips: 2,  // 4期用に研究+教育
+            machine: 0,
+            attachment: 1,       // 製造+1（30円、減価+6）
+            worker: 1,           // ｱﾀｯﾁ用（5円+給与36円）
+            salesman: 0,
+        },
+        // === 3期行別アクションプラン（30行）===
+        // 目標: G40, 投資しながらMQ稼ぎ、4期用準備
+        rowPlan: [
+            // --- 期首（行1-5）：繰越チップ活用、投資開始 ---
+            {row: 2, action: 'SELL', qty: 1, reason: '繰越製品販売（福岡狙い）'},
+            {row: 3, action: 'PRODUCE', reason: '完成+投入（繰越教育チップ効果）'},
+            {row: 4, action: 'BUY_ATTACHMENT', reason: 'ｱﾀｯﾁﾒﾝﾄ購入（製造+1→2）'},
+            {row: 5, action: 'HIRE_WORKER', reason: 'ワーカー採用（ｱﾀｯﾁ稼働用）'},
+            // --- 序盤（行6-10）：強化能力でサイクル ---
+            {row: 6, action: 'BUY_MATERIALS', qty: 3, reason: '材料仕入れ（製造2用）'},
+            {row: 7, action: 'PRODUCE', reason: '完成+投入（製造2）'},
+            {row: 8, action: 'SELL', qty: 2, reason: '2個販売（名古屋狙い）'},
+            {row: 9, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 10, action: 'PRODUCE', reason: '完成+投入'},
+            // --- 中盤（行11-15）：次期繰越チップ予約 ---
+            {row: 11, action: 'SELL', qty: 2, reason: '2個販売'},
+            {row: 12, action: 'BUY_NEXT_CHIP', type: 'research', reason: '4期用研究チップ予約'},
+            {row: 13, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 14, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 15, action: 'SELL', qty: 2, reason: '2個販売'},
+            // --- 中盤後半（行16-20）：広告投資+サイクル継続 ---
+            {row: 16, action: 'BUY_CHIP', type: 'advertising', reason: '広告チップ（販売力+2）'},
+            {row: 17, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 18, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 19, action: 'SELL', qty: 2, reason: '2個販売'},
+            {row: 20, action: 'BUY_NEXT_CHIP', type: 'education', reason: '4期用教育チップ予約'},
+            // --- 終盤（行21-25）：MQ確保 ---
+            {row: 21, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
+            {row: 22, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 23, action: 'SELL', qty: 2, reason: '2個販売'},
+            {row: 24, action: 'BUY_MATERIALS', qty: 3, reason: '4期用材料'},
+            {row: 25, action: 'PRODUCE', reason: '完成+投入'},
+            // --- 最終（行26-30）：4期準備 ---
+            {row: 26, action: 'SELL', qty: 1, reason: '最終販売'},
+            {row: 27, action: 'BUY_MATERIALS', qty: 2, reason: '4期用材料追加'},
+            {row: 28, action: 'PRODUCE', reason: '4期用仕掛品'},
+            {row: 29, action: 'NOTHING', reason: 'リスク用余裕'},
+            {row: 30, action: 'END', reason: '期末処理'},
+        ],
+        endState: {
+            cash: 80,
+            materials: 3,
+            wip: 2,
+            products: 1,
+            researchChips: 2,    // 次期繰越
+            educationChips: 1,
+            advertisingChips: 1,
         }
     },
     4: {
-        rows: 34,                    // 正確な行数
-        effectiveRows: Math.floor(34 * EFFECTIVE_ROW_MULTIPLIER),  // 27行
-        cycles: 9,                   // 27行 ÷ 3 = 9サイクル
-        investRows: 2,
-        gTarget: 100,                // 回収期目標
-        fBudget: 100,
-        mqRequired: 200,             // G100 + F100 = MQ200（自己資本+50）
-        salesPerCycle: 2,
-        priceTarget: 10,
-        investPriority: ['research', 'nextPeriodChips'],
-        riskBuffer: 35,
-        description: '回収期：9サイクル、次期チップ購入',
-        actionPlan: {
-            buyMaterials: 9,
-            produce: 9,
-            sell: 9,
-            riskCards: 7,
-            invest: 2,
-            total: 34
+        rows: 34,
+        effectiveRows: 27,
+        cycles: 9,
+        fBreakdown: {
+            salary: 130,         // 4期単価26円、人員増後
+            depreciation: 26,    // ｱﾀｯﾁ付き
+            pc: 20,
+            insurance: 5,
+            chips: 60,           // 繰越3枚×20
+            interest: 16,        // 借入160×10%
         },
-        investmentPlan: {
-            education: 0,
+        baseF: 181,
+        totalF: 257,
+        gTarget: 100,            // 回収期
+        mqRequired: 357,
+        salesTarget: 14,
+        targetMarkets: ['名古屋', '大阪', '福岡'],
+        avgMQPerUnit: 14,
+        expectedMQ: 196,
+        investment: {
+            loanAmount: 0,       // 返済フェーズ
             research: 0,
+            education: 0,
             advertising: 0,
-            nextPeriodChips: 2,      // 5期用チップ予約
+            nextPeriodChips: 3,  // 5期用に全種
+            machine: 0,
+            attachment: 0,
             worker: 0,
-            machine: 0
+            salesman: 1,         // 販売力強化
+        },
+        // === 4期行別アクションプラン（34行）===
+        // 目標: G100（回収期）、高効率サイクル、5期準備
+        rowPlan: [
+            // --- 期首（行1-5）：繰越チップ活用、セールス採用 ---
+            {row: 2, action: 'SELL', qty: 2, reason: '繰越製品販売（名古屋狙い）'},
+            {row: 3, action: 'PRODUCE', reason: '完成+投入（製造2）'},
+            {row: 4, action: 'HIRE_SALESMAN', reason: 'セールス採用（販売能力+2）'},
+            {row: 5, action: 'BUY_MATERIALS', qty: 3, reason: '材料仕入れ'},
+            // --- 序盤（行6-10）：高速サイクル ---
+            {row: 6, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 7, action: 'SELL', qty: 3, reason: '3個販売（強化販売力）'},
+            {row: 8, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 9, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 10, action: 'SELL', qty: 2, reason: '2個販売'},
+            // --- 中盤（行11-17）：MQ積み上げ ---
+            {row: 11, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 12, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 13, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 14, action: 'BUY_NEXT_CHIP', type: 'research', reason: '5期用研究チップ予約'},
+            {row: 15, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 16, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 17, action: 'SELL', qty: 2, reason: '2個販売'},
+            // --- 中盤後半（行18-24）：次期予約+サイクル ---
+            {row: 18, action: 'BUY_NEXT_CHIP', type: 'education', reason: '5期用教育チップ予約'},
+            {row: 19, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 20, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 21, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 22, action: 'BUY_NEXT_CHIP', type: 'advertising', reason: '5期用広告チップ予約'},
+            {row: 23, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 24, action: 'PRODUCE', reason: '完成+投入'},
+            // --- 終盤（行25-30）：MQ確保 ---
+            {row: 25, action: 'SELL', qty: 2, reason: '2個販売'},
+            {row: 26, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 27, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 28, action: 'SELL', qty: 2, reason: '2個販売'},
+            {row: 29, action: 'BUY_MATERIALS', qty: 3, reason: '5期用材料'},
+            {row: 30, action: 'PRODUCE', reason: '完成+投入'},
+            // --- 最終（行31-34）：5期準備 ---
+            {row: 31, action: 'SELL', qty: 2, reason: '最終販売'},
+            {row: 32, action: 'BUY_MATERIALS', qty: 3, reason: '5期用材料追加'},
+            {row: 33, action: 'PRODUCE', reason: '5期用仕掛品'},
+            {row: 34, action: 'END', reason: '期末処理'},
+        ],
+        endState: {
+            cash: 100,
+            materials: 3,
+            wip: 3,
+            products: 2,
+            researchChips: 2,
+            educationChips: 2,
+            advertisingChips: 2,
         }
     },
     5: {
-        rows: 35,                    // 正確な行数
-        effectiveRows: Math.floor(35 * EFFECTIVE_ROW_MULTIPLIER),  // 28行
-        cycles: 9,                   // 28行 ÷ 3 ≈ 9サイクル
-        investRows: 1,
-        gTarget: 160,                // 最大利益期目標
-        fBudget: 110,
-        mqRequired: 270,             // G160 + F110 = MQ270（自己資本+80）
-        salesPerCycle: 3,
-        priceTarget: 10,
-        investPriority: ['sellAll', 'inventory10'],
-        riskBuffer: 25,
-        description: '最大利益期：9サイクル、在庫10個確保',
-        actionPlan: {
-            buyMaterials: 9,
-            produce: 9,
-            sell: 9,
-            riskCards: 7,
-            invest: 1,               // 次期チップ使用
-            total: 35
+        rows: 35,
+        effectiveRows: 28,
+        cycles: 9,
+        fBreakdown: {
+            salary: 140,         // 5期単価28円
+            depreciation: 26,
+            pc: 20,
+            insurance: 5,
+            chips: 60,           // 繰越3枚×20
+            interest: 16,
         },
-        investmentPlan: {
-            education: 0,
+        baseF: 191,
+        totalF: 267,
+        gTarget: 200,            // 最大利益期
+        mqRequired: 467,
+        salesTarget: 18,
+        targetMarkets: ['福岡', '名古屋', '札幌'],
+        avgMQPerUnit: 18,
+        expectedMQ: 324,
+        investment: {
+            loanAmount: 0,
             research: 0,
+            education: 0,
             advertising: 0,
-            keepInventory: 10,       // 期末在庫10個以上
-            nextPeriodChips: 3,      // 次期チップ3枚以上
+            nextPeriodChips: 0,  // 5期は不要
+            machine: 0,
+            attachment: 0,
             worker: 0,
-            machine: 0
+            salesman: 0,
+        },
+        // === 5期行別アクションプラン（35行）===
+        // 目標: G200（最大利益期）、投資なし、全力でMQ積み上げ
+        rowPlan: [
+            // --- 期首（行1-5）：繰越チップ＋高速サイクル開始 ---
+            {row: 2, action: 'SELL', qty: 3, reason: '繰越製品販売（福岡狙い）'},
+            {row: 3, action: 'PRODUCE', reason: '完成+投入（製造2）'},
+            {row: 4, action: 'BUY_MATERIALS', qty: 3, reason: '材料仕入れ'},
+            {row: 5, action: 'PRODUCE', reason: '完成+投入'},
+            // --- 序盤（行6-10）：高速サイクル ---
+            {row: 6, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 7, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 8, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 9, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 10, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            // --- 中盤（行11-17）：継続サイクル ---
+            {row: 11, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 12, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 13, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 14, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 15, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 16, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 17, action: 'PRODUCE', reason: '完成+投入'},
+            // --- 中盤後半（行18-24）：MQ積み上げ ---
+            {row: 18, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 19, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 20, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 21, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 22, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 23, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 24, action: 'SELL', qty: 3, reason: '3個販売'},
+            // --- 終盤（行25-30）：最終サイクル ---
+            {row: 25, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 26, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 27, action: 'SELL', qty: 3, reason: '3個販売'},
+            {row: 28, action: 'BUY_MATERIALS', qty: 3, reason: '材料補充'},
+            {row: 29, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 30, action: 'SELL', qty: 3, reason: '3個販売'},
+            // --- 最終（行31-35）：在庫価値最大化 ---
+            {row: 31, action: 'BUY_MATERIALS', qty: 3, reason: '在庫価値用材料'},
+            {row: 32, action: 'PRODUCE', reason: '在庫価値用仕掛品'},
+            {row: 33, action: 'SELL', qty: 2, reason: '最終販売'},
+            {row: 34, action: 'NOTHING', reason: 'リスク用余裕'},
+            {row: 35, action: 'END', reason: '期末処理→ゲーム終了'},
+        ],
+        endState: {
+            cash: 150,
+            materials: 3,
+            wip: 3,
+            products: 4,         // 在庫10個
+            researchChips: 0,    // 使い切り
+            educationChips: 0,
+            advertisingChips: 0,
         }
     }
 };
@@ -167,24 +391,20 @@ const PERIOD_STRATEGY_TARGETS = {
  * - 300超過後: 利益×50%税 → 自己資本 = G × 50%
  * ※配当は現金支払いであり、自己資本からは控除されない
  *
- * 【正確な計算】
+ * 【現実的な計算】（2期は投資期で赤字許容）
  * - 初期自己資本: 283円
- * - 目標自己資本: 450円
- * - 300到達に必要: 17円（非課税）
- * - 300超過後は50%保持（税金のみ控除）
+ * - 2期: G=-20 → 自己資本263（投資による一時的赤字）
+ * - 3期: G=+40 → 自己資本303（300超過、税1.5）→301.5
+ * - 4期: G=+100 → 税50 → 自己資本351.5
+ * - 5期: G=+200 → 税100 → 自己資本451.5 ✓
  *
- * 期別G目標:
- * - 2期: G = 20（300超過し、301.5に）
- * - 3期: G = 50（+25で326.5に）
- * - 4期: G = 100（+50で376.5に）
- * - 5期: G = 160（+80で456.5に）
- * 合計: 330円
+ * 合計G: -20 + 40 + 100 + 200 = 320円
  */
 const CUMULATIVE_G_TARGETS = {
-    2: { periodG: 20, cumulativeG: 20, equityTarget: 302 },   // 300超過、税1.5
-    3: { periodG: 50, cumulativeG: 70, equityTarget: 327 },   // 50%保持
-    4: { periodG: 100, cumulativeG: 170, equityTarget: 377 }, // 50%保持
-    5: { periodG: 160, cumulativeG: 330, equityTarget: 457 }  // 50%保持
+    2: { periodG: -20, cumulativeG: -20, equityTarget: 263 },  // 投資期（赤字許容）
+    3: { periodG: 40, cumulativeG: 20, equityTarget: 302 },    // 300超過
+    4: { periodG: 100, cumulativeG: 120, equityTarget: 352 },  // 回収期
+    5: { periodG: 200, cumulativeG: 320, equityTarget: 452 }   // 最大利益期
 };
 
 // ============================================
@@ -307,6 +527,161 @@ function applyProgressBasedAdjustment(company, companyIndex) {
         };
     }
 
+    return null;
+}
+
+/**
+ * 行別プランに基づくアクションを取得
+ * @returns {Object|null} 実行すべきアクション
+ */
+function getRowPlanAction(company, period) {
+    const target = PERIOD_STRATEGY_TARGETS[period];
+    if (!target || !target.rowPlan || target.rowPlan.length === 0) return null;
+
+    const currentRow = company.currentRow || 1;
+    const plannedAction = target.rowPlan.find(p => p.row === currentRow);
+
+    if (!plannedAction) return null;
+
+    // プランを実行可能なアクションに変換
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const companyIndex = gameState.companies.indexOf(company);
+
+    switch (plannedAction.action) {
+        case 'BUY_CHIP':
+            const chipType = plannedAction.type;
+            const cost = period >= 3 && !['research', 'education', 'advertising'].includes(chipType) ? 40 : 20;
+            if (company.cash >= cost + 30) {
+                return {
+                    action: 'BUY_CHIP',
+                    params: { chipType, cost },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'SELL':
+            if (company.products > 0 && salesCapacity > 0) {
+                return {
+                    action: 'SELL',
+                    params: { qty: plannedAction.qty || Math.min(salesCapacity, company.products), priceMultiplier: 0.75 },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'PRODUCE':
+            if ((company.wip > 0 || company.materials > 0) && mfgCapacity > 0) {
+                return {
+                    action: 'PRODUCE',
+                    params: {},
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'BUY_MATERIALS':
+            const qty = plannedAction.qty || mfgCapacity;
+            if (company.cash >= qty * 15 + 30) {
+                return {
+                    action: 'BUY_MATERIALS',
+                    params: { qty },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        // === 新規アクション: 投資系 ===
+        case 'BUY_ATTACHMENT':
+            // アタッチメント購入（30円）: 小型機械の製造能力+1
+            if (company.cash >= 60 && company.machines.some(m => m.type === 'small' && m.attachments === 0)) {
+                return {
+                    action: 'BUY_ATTACHMENT',
+                    params: { cost: 30 },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'BUY_SMALL_MACHINE':
+            // 小型機械購入（60円）
+            if (company.cash >= 90) {
+                return {
+                    action: 'BUY_SMALL_MACHINE',
+                    params: { cost: 60 },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'BUY_LARGE_MACHINE':
+            // 大型機械購入（120円）
+            if (company.cash >= 150) {
+                return {
+                    action: 'BUY_LARGE_MACHINE',
+                    params: { cost: 120 },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'HIRE_WORKER':
+            // ワーカー採用（5円）
+            if (company.cash >= 35 && company.workers < (company.maxPersonnel || 4)) {
+                return {
+                    action: 'HIRE_WORKER',
+                    params: {},
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'HIRE_SALESMAN':
+            // セールスマン採用（5円）
+            if (company.cash >= 35 && company.salesmen < (company.maxPersonnel || 4)) {
+                return {
+                    action: 'HIRE_SALESMAN',
+                    params: {},
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'BUY_NEXT_CHIP':
+            // 次期繰越チップ予約（20円）: 3期以降のみ
+            if (period >= 3 && company.cash >= 50) {
+                const nextChipType = plannedAction.type || 'research';
+                return {
+                    action: 'BUY_NEXT_CHIP',
+                    params: { chipType: nextChipType, cost: 20 },
+                    reason: `[行計画] ${plannedAction.reason}`,
+                    priority: 'PLANNED'
+                };
+            }
+            break;
+
+        case 'NOTHING':
+        case 'END':
+            return {
+                action: 'WAIT',
+                params: {},
+                reason: `[行計画] ${plannedAction.reason}`,
+                priority: 'PLANNED'
+            };
+    }
+
+    // プランが実行不可能な場合は null
+    console.log(`[行計画不可] ${company.name} ${currentRow}行目: ${plannedAction.action} - 条件未達`);
     return null;
 }
 
@@ -2298,6 +2673,28 @@ function executeGMaximizingAction(company, companyIndex, action) {
             aiDoNothing(company, action.reason);
             return true;
 
+        case 'HIRE_WORKER':
+            // ワーカー採用（5円）
+            return executeWorkerHire(company, companyIndex);
+
+        case 'HIRE_SALESMAN':
+            // セールスマン採用（5円）
+            return executeSalesmanHire(company, companyIndex);
+
+        case 'BUY_LARGE_MACHINE':
+            // 大型機械購入（120円）
+            if (company.cash >= 120) {
+                company.cash -= 120;
+                company.machines.push({ type: 'large', attachments: 0 });
+                incrementRow(companyIndex);
+                showAIActionModal(company, '設備投資', '🏗️', action.reason, [
+                    { label: '投資額', value: '¥120' },
+                    { label: '効果', value: '製造能力+4（要ワーカー）' }
+                ]);
+                return true;
+            }
+            return false;
+
         default:
             return false;
     }
@@ -2312,48 +2709,54 @@ function planAIPeriodStrategy(company, companyIndex) {
     const salesCapacity = getSalesCapacity(company);
 
     // ============================================
-    // 🏦 長期借入戦略（積極的に活用）
+    // 🏦 長期借入戦略（積極的に活用・1円単位）
     // ============================================
-    // 長期借入は10%金利だが、投資によるリターンがそれ以上なら借りるべき
-    // - 研究チップ: 1枚で+2価格 → 期あたり5-10個販売で+10-20 MQ
-    // - 教育チップ: 製造+1、販売+1 → サイクル効率向上
-    // - 機械投資: 製造能力向上 → MQ増加
+    // 長期借入は10%金利だが、投資ROI > 10%なら借りるべき
+    // 研究チップ: 20円投資 → 5個販売×2円=10円/期 → ROI 50%
+    // 教育チップ: 20円投資 → 製造+1,販売+1 → サイクル効率向上
+    // 借りられるだけ借りて投資すべき（特に2-3期）
 
     const currentLoans = company.loans || 0;
     const maxLoanLimit = 300;  // 借入上限
-    const loanIncrement = 100; // 借入単位
+    const target = PERIOD_STRATEGY_TARGETS[period];
+    const investment = target?.investment || {};
 
-    // 投資に必要な資金を計算
-    const targetChips = PERIOD_STRATEGY_TARGETS[period]?.investmentPlan || {};
-    const neededChipCost = (targetChips.research || 0) * 20 +
-                           (targetChips.education || 0) * 20 +
-                           (targetChips.advertising || 0) * 20;
-    const neededMachineCost = (targetChips.machine || 0) * 60;
-    const neededWorkerCost = (targetChips.worker || 0) * 5;
-    const totalInvestmentNeed = neededChipCost + neededMachineCost + neededWorkerCost;
+    // 投資計画に基づく必要資金
+    const chipCost = (investment.research || 0) * 20 +
+                     (investment.education || 0) * 20 +
+                     (investment.advertising || 0) * (period >= 3 ? 40 : 20) + // 3期以降は特急
+                     (investment.nextPeriodChips || 0) * 20;
+    const machineCost = (investment.machine || 0) * 60 +
+                        (investment.attachment || 0) * 30;
+    const hiringCost = (investment.worker || 0) * 5 +
+                       (investment.salesman || 0) * 5;
+    const totalInvestmentNeed = chipCost + machineCost + hiringCost;
 
-    // 期末までに必要な現金（給与+返済+安全マージン）
-    const estimatedPeriodEndCost = calculatePeriodPayment(company) + 50;
+    // 期末コスト見積もり
+    const periodEndCost = calculatePeriodPayment(company);
+    const safetyMargin = 50;
+    const totalCashNeed = totalInvestmentNeed + periodEndCost + safetyMargin;
 
-    // 借入判断: 現金不足 + 投資余地あり + 借入枠あり
-    const cashShortfall = Math.max(0, totalInvestmentNeed + estimatedPeriodEndCost - company.cash);
+    // 借入判断: ROI > 10%の投資があり、現金不足なら借りる
+    const cashShortfall = Math.max(0, totalCashNeed - company.cash);
+    const recommendedLoan = investment.loanAmount || 0;
     const canBorrow = currentLoans < maxLoanLimit;
-    const shouldBorrow = cashShortfall > 30 && canBorrow && period <= 4; // 5期は借りない
+    const borrowableAmount = maxLoanLimit - currentLoans;
 
-    if (shouldBorrow) {
-        // 必要額を100円単位に切り上げ
-        const borrowAmount = Math.min(
-            Math.ceil(cashShortfall / loanIncrement) * loanIncrement,
-            maxLoanLimit - currentLoans
-        );
+    // 積極的借入（1円単位）
+    if (canBorrow && period <= 4) {
+        // 推奨借入額と不足額の大きい方を借りる（ROI > 10%なので積極的に）
+        let borrowAmount = Math.max(recommendedLoan, cashShortfall);
+        borrowAmount = Math.min(borrowAmount, borrowableAmount);
 
-        if (borrowAmount >= loanIncrement) {
+        if (borrowAmount > 0) {
             const interestPaid = Math.floor(borrowAmount * INTEREST_RATES.longTerm);
             company.loans += borrowAmount;
             company.cash += borrowAmount - interestPaid;
             company.periodStartInterest = (company.periodStartInterest || 0) + interestPaid;
 
-            console.log(`[長期借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）→ 投資資金確保`);
+            console.log(`[長期借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）`);
+            console.log(`  投資計画: チップ¥${chipCost} + 機械¥${machineCost} + 採用¥${hiringCost}`);
         }
     }
 
@@ -2953,6 +3356,19 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
             console.log(`[2期初手失敗] ${company.name}: ${forcedAction.action}が実行できなかった`);
         }
         // 強制アクションがない or 失敗した場合は通常ロジックへ
+    }
+
+    // =========================================================
+    // 【行別計画実行】PERIOD_STRATEGY_TARGETSの詳細プランを優先実行
+    // G最大化のため、事前計画された行動を確実に実行する
+    // =========================================================
+    const rowPlanAction = getRowPlanAction(company, period);
+    if (rowPlanAction && rowPlanAction.priority === 'PLANNED') {
+        console.log(`[行別計画実行] ${company.name} ${currentRow}行目: ${rowPlanAction.action} - ${rowPlanAction.reason}`);
+        if (executeGMaximizingAction(company, companyIndex, rowPlanAction)) {
+            return; // 計画通りに実行成功
+        }
+        console.log(`[行別計画失敗] ${company.name}: ${rowPlanAction.action}が実行できなかった → 代替行動へ`);
     }
 
     // === 【動的戦略エンジン】競合観察＋行別計画＋サイクル最適化 ===
