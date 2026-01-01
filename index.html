@@ -392,33 +392,7 @@ function showPeriodStartOptions() {
     showModal('期首処理', content);
 }
 
-// 借入金額入力の更新
-function updateLoanSelection() {
-    const input = document.getElementById('loanAmountInput');
-    const interestDisplay = document.getElementById('loanInterestDisplay');
-    const amount = parseInt(input.value) || 0;
-    const interest = Math.floor(amount * 0.1);
-    interestDisplay.textContent = `¥${interest}`;
-    window.periodStartSelections.loan = amount;
-}
-
-// 期首処理のカード選択
-function selectPeriodStart(type, value) {
-    window.periodStartSelections[type] = value;
-
-    // 全カードのスタイルをリセット
-    document.querySelectorAll(`[id^="${type}-"]`).forEach(card => {
-        card.style.background = '#374151';
-        card.style.borderColor = '#6b7280';
-    });
-
-    // 選択されたカードをハイライト
-    const selected = document.getElementById(`${type}-${value}`);
-    if (selected) {
-        selected.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-        selected.style.borderColor = '#34d399';
-    }
-}
+// updateLoanSelection, selectPeriodStart は js/turns.js に移動済み
 
 // Process period start
 function processPeriodStart() {
@@ -578,31 +552,7 @@ function processPeriodStart() {
     showTurnStartOptions();
 }
 
-// Show turn start options
-function showTurnStartOptions() {
-    if (gameState.currentPlayerIndex !== 0) return;
-
-    const company = gameState.companies[0];
-    const content = `
-        <div class="card-choice-container">
-            <h2>あなたのターン</h2>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <button class="action-btn main card-choice-btn" onclick="drawCard()" style="flex: 2;">カードを引く</button>
-                <button class="action-btn secondary" onclick="viewGameState()" style="flex: 1; font-size: 12px;">全体を見る</button>
-            </div>
-            <div style="margin-top: 20px;">
-                <p>その他のアクション（Bルール）</p>
-                <button class="action-btn secondary" onclick="showInsurancePurchaseModal()">保険チップ購入</button>
-                <button class="action-btn secondary" onclick="showWarehouseModal()">無災害倉庫を購入</button>
-                ${company.warehouses === 1 ? '<button class="action-btn secondary" onclick="showWarehouseMoveModal()">倉庫の移動</button>' : ''}
-                <button class="action-btn secondary" onclick="showReassignModal()">配置転換</button>
-                <button class="action-btn secondary" onclick="showSellMachineModal()">機械売却</button>
-            </div>
-        </div>
-    `;
-    
-    showModal('行動選択', content);
-}
+// showTurnStartOptions() は js/modals.js に移動済み
 
 // View game state - 全体を見る機能
 function viewGameState() {
@@ -729,169 +679,7 @@ function viewGameState() {
 }
 
 // initializeCardDeck は js/game.js に移動済み
-
-// Draw card from deck
-function drawCard() {
-    closeModal();
-
-    // デッキがない、または空の場合は初期化
-    if (!gameState.deckInitialized || gameState.cardDeck.length === 0) {
-        initializeCardDeck();
-    }
-
-    // デッキからカードを引く
-    const cardType = gameState.cardDeck.pop();
-    console.log(`カードを引きました: ${cardType}（残り${gameState.cardDeck.length}枚）`);
-
-    // 臨場感のあるカードめくり演出
-    showCardDrawAnimation(cardType);
-}
-
-// カードめくりアニメーション
-function showCardDrawAnimation(cardType) {
-    const isRisk = cardType === 'risk';
-    const cardColor = isRisk ? '#dc2626' : '#3b82f6';
-    const cardLabel = isRisk ? 'リスクカード' : '意思決定カード';
-    const cardIcon = isRisk ? '⚠️' : '🎯';
-
-    const animationHtml = `
-        <div class="card-draw-overlay" id="cardDrawOverlay">
-            <div class="draw-deck">
-                <div class="deck-stack">
-                    <div class="deck-card"></div>
-                    <div class="deck-card"></div>
-                    <div class="deck-card"></div>
-                </div>
-                <div class="deck-count">残り ${gameState.cardDeck.length}枚</div>
-            </div>
-            <div class="drawn-card-container">
-                <div class="drawn-card" id="drawnCard">
-                    <div class="card-face card-back">
-                        <div class="card-pattern">MG</div>
-                    </div>
-                    <div class="card-face card-front" style="background: linear-gradient(135deg, ${cardColor} 0%, ${cardColor}dd 100%);">
-                        <div class="card-icon">${cardIcon}</div>
-                        <div class="card-type">${cardLabel}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('modalContainer').innerHTML = animationHtml;
-
-    // 0.5秒後にカードをめくる
-    setTimeout(() => {
-        document.getElementById('drawnCard').classList.add('flipped');
-    }, 500);
-
-    // 1.5秒後に結果画面へ
-    setTimeout(() => {
-        document.getElementById('modalContainer').innerHTML = '';
-        if (cardType === 'decision') {
-            showDecisionCard();
-        } else {
-            drawRiskCard();
-        }
-    }, 1500);
-}
-
-// Show decision card (会社盤が見える状態で表示)
-function showDecisionCard() {
-    const company = gameState.companies[0];
-    const mfgCapacity = getManufacturingCapacity(company);
-    const salesCapacity = getSalesCapacity(company);
-    const priceComp = getPriceCompetitiveness(company, 0);
-
-    // 各アクションの設定
-    const actionConfig = {
-        1: { icon: '💰', label: '商品販売', color: '#22c55e', border: '#16a34a', desc: '製品を販売' },
-        2: { icon: '📦', label: '材料仕入', color: '#8b5cf6', border: '#7c3aed', desc: '材料を購入' },
-        3: { icon: '🏭', label: '完成・投入', color: '#3b82f6', border: '#2563eb', desc: '製造を実行' },
-        4: { icon: '👥', label: '採用', color: '#f59e0b', border: '#d97706', desc: '人員を採用' },
-        5: { icon: '⚙️', label: '設備投資', color: '#6366f1', border: '#4f46e5', desc: '機械を購入' },
-        6: { icon: '🎯', label: '戦略チップ', color: '#ef4444', border: '#dc2626', desc: 'チップ購入' },
-        7: { icon: '⏭️', label: 'DO NOTHING', color: '#64748b', border: '#475569', desc: 'パス' }
-    };
-
-    const cardHtml = gameState.decisionCards.map(card => {
-        const cfg = actionConfig[card.id];
-        return `
-            <div onclick="selectDecisionCard(${card.id})" style="
-                background: linear-gradient(135deg, ${cfg.color} 0%, ${cfg.border} 100%);
-                border: 3px solid ${cfg.border};
-                border-radius: 10px;
-                padding: 12px 8px;
-                text-align: center;
-                cursor: pointer;
-                color: white;
-                transition: transform 0.2s, box-shadow 0.2s;
-                box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-            " onmouseover="this.style.transform='scale(1.05)'"
-               onmouseout="this.style.transform='scale(1)'">
-                <div style="font-size: 24px; margin-bottom: 4px;">${cfg.icon}</div>
-                <div style="font-weight: bold; font-size: 12px;">${cfg.label}</div>
-                <div style="font-size: 9px; opacity: 0.9;">${cfg.desc}</div>
-            </div>
-        `;
-    }).join('');
-
-    const content = `
-        <div style="background: #fef3c7; border-radius: 8px; padding: 8px; margin-bottom: 12px; text-align: center;">
-            <div style="font-weight: bold; color: #92400e; font-size: 14px;">💰 持ち金: ¥${company.cash}</div>
-        </div>
-        <div style="display: flex; justify-content: space-around; margin-bottom: 12px; padding: 8px; background: #f1f5f9; border-radius: 8px;">
-            <div style="text-align: center;">
-                <div style="font-size: 10px; color: #64748b;">製造</div>
-                <div style="font-size: 16px; font-weight: bold; color: #0284c7;">${mfgCapacity}</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 10px; color: #64748b;">販売</div>
-                <div style="font-size: 16px; font-weight: bold; color: #dc2626;">${salesCapacity}</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 10px; color: #64748b;">価格競争力</div>
-                <div style="font-size: 16px; font-weight: bold; color: #16a34a;">+${priceComp}</div>
-            </div>
-        </div>
-        <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 12px; font-size: 11px;">
-            <div style="background: #e0e7ff; padding: 4px 10px; border-radius: 6px;">
-                <span style="color: #4338ca;">材料</span> <b>${company.materials}</b>
-            </div>
-            <div style="background: #fae8ff; padding: 4px 10px; border-radius: 6px;">
-                <span style="color: #a21caf;">仕掛品</span> <b>${company.wip}</b>
-            </div>
-            <div style="background: #dbeafe; padding: 4px 10px; border-radius: 6px;">
-                <span style="color: #1d4ed8;">製品</span> <b>${company.products}</b>
-            </div>
-        </div>
-        <p style="text-align: center; font-size: 12px; color: #666; margin-bottom: 10px;">アクションを選択してください</p>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-            ${cardHtml}
-        </div>
-    `;
-
-    showModal('意思決定カード', content);
-}
-
-// Select decision card
-function selectDecisionCard(cardId) {
-    const card = gameState.decisionCards.find(c => c.id === cardId);
-    gameState.companies[0].decisionCard = card;
-    
-    closeModal();
-    
-    // Execute decision card action
-    switch(cardId) {
-        case 1: showSalesModal(); break;
-        case 2: showBuyMaterialsModal(); break;
-        case 3: showProductionModal(); break;
-        case 4: showHireModal(); break;
-        case 5: showMachineModal(); break;
-        case 6: showChipPurchaseModal(); break;  // チップ購入
-        case 7: doNothing(); break;
-    }
-}
+// drawCard, showCardDrawAnimation, showDecisionCard, selectDecisionCard は js/modals.js, js/turns.js に移動済み
 
 // Draw risk card
 function drawRiskCard() {
@@ -1525,48 +1313,7 @@ function renderActionButtons() {
 // UI関数はjs/ui.jsに移行済み
 // renderCompanyBoard, renderMarketsBoard, renderFixedCostBreakdown,
 // renderOtherCompanies, showAICompanyModal, showToast, showModal, closeModal
-
-// 保険再加入モーダル
-function showInsuranceRepurchaseModal(disasterType, lostItems, compensation, netLoss) {
-    const company = gameState.companies[0];
-    const canAfford = company.cash >= 5;
-
-    const itemLabel = disasterType === '倉庫火災' ? '材料' : '商品';
-    const content = `
-        <div style="padding: 15px; text-align: center;">
-            <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); border-radius: 12px; padding: 20px; margin-bottom: 15px; color: white;">
-                <div style="font-size: 24px; margin-bottom: 10px;">⚠️ ${disasterType}発生！</div>
-                <div style="font-size: 14px;">
-                    <div>${itemLabel} ${lostItems}個をストッカーへ</div>
-                    <div>保険金 ¥${compensation} を受け取りました</div>
-                    <div>特別損失 ¥${netLoss}</div>
-                </div>
-            </div>
-
-            <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                <div style="font-weight: bold; color: #92400e; margin-bottom: 10px;">
-                    保険チップを消費しました
-                </div>
-                <div style="font-size: 14px; color: #78350f;">
-                    再加入: ¥5（現在の現金: ¥${company.cash}）
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 10px; justify-content: center;">
-                ${canAfford ? `
-                    <button class="action-btn primary" onclick="repurchaseInsurance()" style="flex: 1;">
-                        再加入する（¥5）
-                    </button>
-                ` : ''}
-                <button class="action-btn secondary" onclick="closeModal(); updateDisplay();" style="flex: 1;">
-                    ${canAfford ? '再加入しない' : '閉じる'}
-                </button>
-            </div>
-        </div>
-    `;
-
-    showModal('保険使用', content);
-}
+// showInsuranceRepurchaseModal は js/modals.js に移動済み
 
 // 保険再加入処理
 function repurchaseInsurance() {
@@ -2160,187 +1907,26 @@ function showManufacturingCapacityDetail(companyIndex) {
 // Do nothing
 function doNothing() {
     const company = gameState.companies[0];
-    
+
     if (!gameState.doNothingCount[0]) {
         gameState.doNothingCount[0] = 0;
     }
-    
+
     if (gameState.doNothingCount[0] >= 3) {
         showToast('DO NOTHINGは連続3回までです！', 'danger', 3000);
         return;
     }
-    
+
     gameState.doNothingCount[0]++;
     showToast(`DO NOTHINGを選択しました（${gameState.doNothingCount[0]}/3回）\n行は消費されません。`, 'info', 3000);
-    
+
     // DO NOTHING doesn't use a row
     nextTurn();
 }
 
-// ラスト5行警告モーダル
-function showLast5RowWarning(company) {
-    const remaining = gameState.maxRows - company.currentRow + 1;
-    const content = `
-        <div style="padding: 20px; text-align: center;">
-            <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
-            <div style="font-size: 18px; font-weight: bold; color: #dc2626; margin-bottom: 10px;">
-                ${company.name}がラスト5行に到達！
-            </div>
-            <div style="font-size: 14px; color: #6b7280; margin-bottom: 15px;">
-                残り${remaining}行で期末処理が始まります。<br>
-                給料支払いに備えて資金を確保してください。
-            </div>
-            <div style="background: #fef2f2; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                <div style="font-size: 12px; color: #991b1b;">
-                    現在行: ${company.currentRow} / 上限: ${gameState.maxRows}行
-                </div>
-            </div>
-            <button class="submit-btn" onclick="closeModal()">OK</button>
-        </div>
-    `;
-    showModal('ラスト5行警告', content);
-}
-
-// 行数を増やす関数（資源変更時に呼ぶ）
-function incrementRow(companyIndex) {
-    const company = gameState.companies[companyIndex];
-    company.currentRow = (company.currentRow || 1) + 1;
-
-    // ラスト5行の警告（各社が個別に残り5行に到達するたびに警告）
-    if (!company.last5RowWarningShown && company.currentRow === gameState.maxRows - 4) {
-        company.last5RowWarningShown = true;
-        showLast5RowWarning(company);
-    }
-    
-    // 誰かが上限に達したら期末処理（全員強制終了）
-    if (company.currentRow >= gameState.maxRows) {
-        console.log(`${company.name}が行数上限（${gameState.maxRows}行）に達しました！期末処理を開始します。`);
-
-        // 全員に告知：誰かが規定行数に達したので全員この期は終了
-        showPeriodEndAnnouncement(company);
-        return true;  // 期末処理を開始した
-    }
-    return false;  // まだ続行
-}
-
-// 期末告知モーダル（誰かが規定行数に達した時）
-function showPeriodEndAnnouncement(triggerCompany) {
-    // フリーズ防止タイムアウトをクリア（AI行動中に期末になった場合）
-    if (window.currentAITurnTimeout) {
-        clearTimeout(window.currentAITurnTimeout);
-        window.currentAITurnTimeout = null;
-    }
-    const companies = gameState.companies;
-
-    // 各社の行数一覧を生成
-    let rowsHtml = companies.map((c, i) => {
-        const emoji = i === 0 ? '👤' : ['🅰️', '🅱️', '©️', '🇩', '🇪'][i - 1] || '🏢';
-        const isTrigger = (c === triggerCompany);
-        return `
-            <div style="display: flex; justify-content: space-between; padding: 8px; background: ${isTrigger ? '#fef3c7' : '#f9fafb'}; border-radius: 6px; margin: 5px 0; ${isTrigger ? 'border: 2px solid #f59e0b;' : ''}">
-                <span>${emoji} ${c.name}</span>
-                <span style="font-weight: bold; ${isTrigger ? 'color: #d97706;' : ''}">${c.currentRow}行 ${isTrigger ? '(規定到達！)' : ''}</span>
-            </div>
-        `;
-    }).join('');
-
-    const content = `
-        <div style="text-align: center; padding: 15px;">
-            <div style="font-size: 48px; margin-bottom: 10px;">🏁</div>
-            <h3 style="color: #dc2626; margin-bottom: 15px;">第${gameState.currentPeriod}期 終了！</h3>
-            <p style="font-size: 14px; color: #4b5563; margin-bottom: 15px;">
-                <strong>${triggerCompany.name}</strong> が規定行数（${gameState.maxRows}行）に到達しました。<br>
-                <span style="color: #dc2626; font-weight: bold;">全プレイヤーのこの期は強制終了となります。</span>
-            </p>
-            <div style="background: #f3f4f6; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
-                <div style="font-size: 12px; color: #6b7280; margin-bottom: 10px;">各社の使用行数</div>
-                ${rowsHtml}
-            </div>
-            <button class="submit-btn" onclick="closePeriodEndAnnouncementAndStartSettlement()">決算処理へ進む</button>
-        </div>
-    `;
-
-    showModal('期終了', content);
-}
-
-function closePeriodEndAnnouncementAndStartSettlement() {
-    // フリーズ防止タイムアウトをクリア（AI行動中に期末になった場合）
-    if (window.currentAITurnTimeout) {
-        clearTimeout(window.currentAITurnTimeout);
-        window.currentAITurnTimeout = null;
-    }
-    closeModal();
-    endPeriod();
-}
-
-// End turn
-function endTurn() {
-    const company = gameState.companies[gameState.currentPlayerIndex];
-
-    // 労災フラグをリセット（ターン終了時）
-    company.cannotProduce = false;
-
-    // 行数を増やす（資源変更があったため）
-    if (incrementRow(gameState.currentPlayerIndex)) {
-        return;  // 期末処理が始まったので終了
-    }
-
-    gameState.doNothingCount[gameState.currentPlayerIndex] = 0;
-
-    // 自動セーブ
-    saveGame();
-
-    nextTurn();
-}
-
-// Next turn
-function nextTurn() {
-    // フリーズ防止タイムアウトをクリア
-    if (window.currentAITurnTimeout) {
-        clearTimeout(window.currentAITurnTimeout);
-        window.currentAITurnTimeout = null;
-    }
-    // ターン順の処理（逆回りの場合）
-    if (gameState.turnReversed) {
-        gameState.currentPlayerIndex--;
-        if (gameState.currentPlayerIndex < 0) {
-            gameState.currentPlayerIndex = gameState.companies.length - 1;
-            gameState.currentRow++;
-            
-            if (gameState.currentRow > gameState.maxRows) {
-                endPeriod();
-                return;
-            }
-        }
-    } else {
-        gameState.currentPlayerIndex++;
-        if (gameState.currentPlayerIndex >= gameState.companies.length) {
-            gameState.currentPlayerIndex = 0;
-            gameState.currentRow++;
-            
-            if (gameState.currentRow > gameState.maxRows) {
-                endPeriod();
-                return;
-            }
-        }
-    }
-    
-    updateDisplay();
-    
-    // Auto-execute AI turn
-    if (gameState.currentPlayerIndex !== 0) {
-        setTimeout(executeAITurn, 1000);
-    } else {
-        // Player's turn
-        if (gameState.companies[0].skipTurns > 0) {
-            gameState.companies[0].skipTurns--;
-            alert(`休み中（残り${gameState.companies[0].skipTurns}回）`);
-            nextTurn();
-        } else {
-            showTurnStartOptions();
-        }
-    }
-}
+// showLast5RowWarning, incrementRow, showPeriodEndAnnouncement,
+// closePeriodEndAnnouncementAndStartSettlement, endTurn, nextTurn
+// は js/turns.js, js/modals.js に移動済み
 
 // ============================================
 // AI行動関数は js/ai-actions.js に移動しました
@@ -2776,102 +2362,9 @@ function endGame() {
 
 // ============================================
 // セーブ・ロード機能は js/save.js に移動しました
-
-function showStartMenu() {
-    const hasSave = hasSavedGame();
-    const saveData = hasSave ? loadGame() : null;
-    const saveInfo = saveData ? `（${saveData.currentPeriod}期、${new Date(saveData.timestamp).toLocaleString('ja-JP')}）` : '';
-
-    const menuHtml = `
-        <div class="modal active" style="z-index: 2000;">
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <h2 style="margin-bottom: 20px; color: #1e40af;">🎮 MG（マネジメントゲーム）</h2>
-                <p style="margin-bottom: 20px; color: #666;">自主練モード - 6人対戦</p>
-
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    ${hasSave ? `
-                        <button onclick="resumeGame()" class="action-btn primary" style="padding: 15px; font-size: 16px;">
-                            ▶ 続きから始める${saveInfo}
-                        </button>
-                    ` : ''}
-                    <button onclick="startNewGame()" class="action-btn success" style="padding: 15px; font-size: 16px;">
-                        🆕 2期から新しく始める
-                    </button>
-                    ${hasSave ? `
-                        <button onclick="confirmDeleteSave()" class="action-btn secondary" style="padding: 10px; font-size: 14px;">
-                            🗑 セーブデータを削除
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-        </div>
-    `;
-    document.getElementById('modalContainer').innerHTML = menuHtml;
-}
-
-function resumeGame() {
-    const saveData = loadGame();
-    if (saveData) {
-        restoreGame(saveData);
-        document.getElementById('modalContainer').innerHTML = '';
-        updateDisplay();
-        showToast('ゲームを再開しました（' + gameState.currentPeriod + '期）', 'success', 3000);
-    }
-}
-
-function startNewGame() {
-    deleteSavedGame();
-    initializeCompanies();
-    initializeCardDeck();
-    // 2期のスタート順をランダム化（ジャンケン代わり）
-    const randomStartIndex = Math.floor(Math.random() * gameState.companies.length);
-    gameState.currentPlayerIndex = randomStartIndex;
-    gameState.periodStartPlayerIndex = randomStartIndex;
-    document.getElementById('modalContainer').innerHTML = '';
-    updateDisplay();
-    saveGame(); // 初期状態を保存
-    // スタート順を通知
-    const startPlayer = gameState.companies[randomStartIndex];
-    showToast(`🎲 ${startPlayer.name}からスタート！`, 'info', 3000);
-
-    // AIが最初のプレイヤーの場合、AIターンを開始
-    if (randomStartIndex !== 0) {
-        setTimeout(executeAITurn, 1500);
-    } else {
-        showTurnStartOptions();
-    }
-}
-
-function confirmDeleteSave() {
-    if (confirm('セーブデータを削除しますか？この操作は取り消せません。')) {
-        deleteSavedGame();
-        showStartMenu();
-    }
-}
-
-// Initialize game
-function initGame() {
-    console.log("initGame started");
-    try {
-        // まず会社とデッキを初期化（デフォルト状態）
-        initializeCompanies();
-        console.log("Companies initialized");
-        initializeCardDeck();
-        console.log("Card deck initialized (75 cards)");
-
-        // セーブデータがあればスタートメニューを表示
-        if (hasSavedGame()) {
-            showStartMenu();
-        } else {
-            updateDisplay();
-            saveGame(); // 初期状態を保存
-        }
-        console.log("Display updated");
-    } catch(e) {
-        console.error("Error in initGame:", e);
-        alert("エラーが発生しました: " + e.message);
-    }
-}
+// showStartMenu, resumeGame, startNewGame, confirmDeleteSave, initGame
+// は js/turns.js, js/modals.js に移動済み
+// ============================================
 
 // Start the game
 console.log("Starting game...");
