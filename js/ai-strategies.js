@@ -802,15 +802,37 @@ function getFirstMoveByStrategy(company, mfgCapacity, salesCapacity) {
 }
 
 // ============================================
-// AI性格別の戦略実行（AIBrain統合版）
+// AI性格別の戦略実行（AIBrain統合版 + 強化AI機能）
 // ============================================
 function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) {
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
 
+    // === 動的戦略調整: 現在のゲーム状況に応じてパラメータ調整 ===
+    const dynamicAdj = AIBrain.dynamicStrategyAdjustment(company, companyIndex);
+    console.log(`[動的調整] ${company.name}: ${dynamicAdj.reasoning}`);
+
+    // === 複数ターン先読み: シナリオ比較で最適方針を決定 ===
+    const futureSim = AIBrain.simulateFutureTurns(company, companyIndex, 3);
+    console.log(`[先読み] ${company.name}: ${futureSim.reasoning}`);
+
+    // === 期待値ベース最適行動選択 ===
+    const evDecision = AIBrain.selectOptimalAction(company, companyIndex);
+    if (evDecision.recommended && evDecision.recommended.ev.expectedValue > 10) {
+        console.log(`[期待値] ${company.name}: ${evDecision.recommended.action.type} EV=${evDecision.recommended.ev.expectedValue.toFixed(0)}`);
+    }
+
     // === G最大化マスター戦略を最優先で実行 ===
     const strategyParams = STRATEGY_PARAMS[company.strategy] || STRATEGY_PARAMS.balanced;
-    const gMaxAction = getGMaximizingAction(company, companyIndex, strategyParams);
+
+    // 動的調整を反映
+    const adjustedParams = {
+        ...strategyParams,
+        aggressiveness: Math.min(1, strategyParams.aggressiveness + (dynamicAdj.aggressiveness - 0.5) * 0.5),
+        safetyMultiplier: strategyParams.safetyMultiplier * (1 + (0.5 - dynamicAdj.riskTolerance) * 0.3)
+    };
+
+    const gMaxAction = getGMaximizingAction(company, companyIndex, adjustedParams);
 
     if (gMaxAction && gMaxAction.action !== 'WAIT') {
         console.log(`[G最大化] ${company.name}: ${gMaxAction.action} - ${gMaxAction.reason}`);

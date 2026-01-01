@@ -1672,6 +1672,596 @@ const AIBrain = {
         }
 
         return { shouldSell: true, reason: '通常の販売判断' };
+    },
+
+    // ========================================
+    // === 強化AI機能: 他社行動予測 ===
+    // ========================================
+
+    /**
+     * 競合の入札価格を予測
+     * @returns {Array} 各競合の予測入札価格
+     */
+    predictCompetitorBidPrices: function(company, companyIndex) {
+        const predictions = [];
+
+        gameState.companies.forEach((rival, i) => {
+            if (i === companyIndex) return;
+
+            // 入札参加するかどうか
+            const needsMaterials = rival.materials < 5;
+            const hasCash = rival.cash > 30;
+            const hasCapacity = rival.materials < 20;
+            const willBid = needsMaterials && hasCash && hasCapacity;
+
+            if (!willBid) {
+                predictions.push({ index: i, willBid: false, price: 0 });
+                return;
+            }
+
+            // 予測価格の計算
+            let basePrice = 26; // 最低入札価格
+
+            // 研究チップによる価格競争力（チップが多い=安く仕入れたい）
+            const researchBonus = (rival.chips.research || 0) * 2;
+
+            // 現金に余裕があれば高めに入札（確実に欲しい）
+            const cashFactor = rival.cash > 100 ? 3 : rival.cash > 60 ? 1 : 0;
+
+            // 在庫が少ないほど高めに入札（緊急度）
+            const urgencyFactor = rival.materials === 0 ? 4 :
+                                  rival.materials < 3 ? 2 : 0;
+
+            // 戦略別の傾向
+            const strategyFactor = {
+                'aggressive': 3,
+                'price_focused': -2, // 安く買いたい
+                'conservative': -1,
+                'balanced': 0,
+                'tech_focused': 1,
+                'unpredictable': Math.floor(Math.random() * 6) - 2
+            }[rival.strategy] || 0;
+
+            const predictedPrice = Math.max(26, Math.min(35,
+                basePrice + cashFactor + urgencyFactor + strategyFactor - Math.floor(researchBonus / 2)
+            ));
+
+            predictions.push({
+                index: i,
+                name: rival.name,
+                willBid: true,
+                price: predictedPrice,
+                confidence: 0.7, // 70%信頼度
+                reasoning: {
+                    basePrice,
+                    researchBonus,
+                    cashFactor,
+                    urgencyFactor,
+                    strategyFactor
+                }
+            });
+        });
+
+        return predictions;
+    },
+
+    /**
+     * 最適な入札価格を計算
+     * 勝てる最低価格を予測し、かつROIを最大化
+     */
+    calculateOptimalBidPrice: function(company, companyIndex, currentBasePrice) {
+        const predictions = this.predictCompetitorBidPrices(company, companyIndex);
+        const biddingRivals = predictions.filter(p => p.willBid);
+
+        if (biddingRivals.length === 0) {
+            // 競合なし：最低価格で入札
+            return {
+                optimalPrice: 26,
+                reason: '競合入札なし予測',
+                confidence: 0.9
+            };
+        }
+
+        // 競合の最高予測価格を取得
+        const maxRivalPrice = Math.max(...biddingRivals.map(p => p.price));
+
+        // 自社の研究チップによる優位性
+        const myResearch = company.chips.research || 0;
+        const priceAdvantage = myResearch * 2;
+
+        // 勝つための最低価格（同額なら研究チップで勝てる可能性）
+        let winPrice = maxRivalPrice;
+
+        // 研究チップで優位なら同額で勝てる可能性あり
+        const rivalMaxResearch = Math.max(...biddingRivals.map(p => {
+            const rival = gameState.companies[p.index];
+            return rival.chips.research || 0;
+        }));
+
+        if (myResearch > rivalMaxResearch) {
+            // 研究チップで優位なので同額以下でも勝てる可能性
+            winPrice = Math.max(26, maxRivalPrice - 1);
+        } else if (myResearch < rivalMaxResearch) {
+            // 研究チップで不利なので高めに入札が必要
+            winPrice = maxRivalPrice + 1;
+        }
+
+        // 親ボーナス考慮
+        const isDealer = gameState.currentDealer === companyIndex;
+        if (isDealer) {
+            winPrice = Math.max(26, winPrice - 2);
+        }
+
+        return {
+            optimalPrice: Math.min(35, Math.max(26, winPrice)),
+            maxRivalPrice,
+            rivalMaxResearch,
+            myResearch,
+            isDealer,
+            reason: `競合最高${maxRivalPrice}円予測、研究${myResearch > rivalMaxResearch ? '優位' : myResearch < rivalMaxResearch ? '劣位' : '同等'}`,
+            confidence: 0.65
+        };
+    },
+
+    /**
+     * 競合の次のアクションを予測
+     */
+    predictCompetitorActions: function(company, companyIndex) {
+        const predictions = [];
+
+        gameState.companies.forEach((rival, i) => {
+            if (i === companyIndex) return;
+
+            const actions = [];
+
+            // 製品があり販売能力があれば売る可能性高い
+            if (rival.products > 0 && getSalesCapacity(rival) > 0) {
+                actions.push({ action: 'SELL', probability: 0.8 });
+            }
+
+            // 仕掛品があれば完成させる可能性
+            if (rival.wip > 0 && getManufacturingCapacity(rival) > rival.wip) {
+                actions.push({ action: 'COMPLETE', probability: 0.7 });
+            }
+
+            // 材料があれば投入する可能性
+            if (rival.materials > 0 && getManufacturingCapacity(rival) > 0) {
+                actions.push({ action: 'PRODUCE', probability: 0.6 });
+            }
+
+            // 現金があればチップ購入の可能性
+            if (rival.cash > 50) {
+                actions.push({ action: 'BUY_CHIP', probability: 0.4 });
+            }
+
+            predictions.push({
+                index: i,
+                name: rival.name,
+                predictedActions: actions.sort((a, b) => b.probability - a.probability),
+                mostLikely: actions[0]?.action || 'WAIT'
+            });
+        });
+
+        return predictions;
+    },
+
+    // ========================================
+    // === 強化AI機能: 複数ターン先読み ===
+    // ========================================
+
+    /**
+     * N行先までのシミュレーション
+     * @param {number} lookAhead 先読み行数（デフォルト3）
+     */
+    simulateFutureTurns: function(company, companyIndex, lookAhead = 3) {
+        // 現在の状態をコピー
+        const simState = {
+            cash: company.cash,
+            materials: company.materials,
+            wip: company.wip,
+            products: company.products,
+            equity: company.equity,
+            row: company.currentRow || 1
+        };
+
+        const maxRows = gameState.maxRows;
+        const scenarios = [];
+
+        // シナリオ1: 積極販売
+        const aggressiveSim = this.simulateScenario(simState, 'aggressive', lookAhead, company);
+        scenarios.push({ name: 'aggressive', ...aggressiveSim });
+
+        // シナリオ2: 保守的（在庫維持）
+        const conservativeSim = this.simulateScenario(simState, 'conservative', lookAhead, company);
+        scenarios.push({ name: 'conservative', ...conservativeSim });
+
+        // シナリオ3: 投資重視
+        const investmentSim = this.simulateScenario(simState, 'investment', lookAhead, company);
+        scenarios.push({ name: 'investment', ...investmentSim });
+
+        // 最適シナリオを選択（期待G最大）
+        const best = scenarios.reduce((max, s) =>
+            s.expectedG > max.expectedG ? s : max, scenarios[0]);
+
+        return {
+            scenarios,
+            recommended: best.name,
+            expectedG: best.expectedG,
+            reasoning: `${best.name}シナリオが期待G${best.expectedG}で最適`
+        };
+    },
+
+    /**
+     * 特定シナリオのシミュレーション
+     */
+    simulateScenario: function(state, scenarioType, turns, company) {
+        let cash = state.cash;
+        let materials = state.materials;
+        let wip = state.wip;
+        let products = state.products;
+        let totalRevenue = 0;
+        let totalCost = 0;
+
+        const salesPrice = 40 + (company.chips.research || 0) * 2;
+
+        for (let t = 0; t < turns; t++) {
+            switch (scenarioType) {
+                case 'aggressive':
+                    // 売れるだけ売る
+                    if (products > 0) {
+                        const sellQty = Math.min(products, getSalesCapacity(company));
+                        totalRevenue += sellQty * salesPrice;
+                        products -= sellQty;
+                    }
+                    // 完成
+                    if (wip > 0) {
+                        const completeQty = Math.min(wip, getManufacturingCapacity(company));
+                        products += completeQty;
+                        wip -= completeQty;
+                    }
+                    // 投入
+                    if (materials > 0) {
+                        const produceQty = Math.min(materials, getManufacturingCapacity(company));
+                        totalCost += produceQty * 5;
+                        wip += produceQty;
+                        materials -= produceQty;
+                    }
+                    break;
+
+                case 'conservative':
+                    // 在庫を維持しつつ売る
+                    if (products > 2) {
+                        const sellQty = Math.min(products - 2, getSalesCapacity(company));
+                        totalRevenue += sellQty * salesPrice;
+                        products -= sellQty;
+                    }
+                    // 完成
+                    if (wip > 0) {
+                        const completeQty = Math.min(wip, getManufacturingCapacity(company));
+                        products += completeQty;
+                        wip -= completeQty;
+                    }
+                    break;
+
+                case 'investment':
+                    // 在庫を積み上げる
+                    if (materials > 0) {
+                        const produceQty = Math.min(materials, getManufacturingCapacity(company));
+                        totalCost += produceQty * 5;
+                        wip += produceQty;
+                        materials -= produceQty;
+                    }
+                    if (wip > 0) {
+                        const completeQty = Math.min(wip, getManufacturingCapacity(company));
+                        products += completeQty;
+                        wip -= completeQty;
+                    }
+                    break;
+            }
+        }
+
+        // 期待G計算（簡易）
+        const pq = totalRevenue;
+        const vq = totalCost + (state.materials - materials) * 13 +
+                   (state.wip - wip) * 14 + (state.products - products) * 15;
+        const mq = pq - vq;
+
+        return {
+            expectedG: mq,
+            finalCash: cash + totalRevenue - totalCost,
+            finalInventory: materials + wip + products,
+            totalRevenue,
+            totalCost
+        };
+    },
+
+    // ========================================
+    // === 強化AI機能: 動的戦略調整 ===
+    // ========================================
+
+    /**
+     * 現在のゲーム状況に応じて戦略を動的調整
+     */
+    dynamicStrategyAdjustment: function(company, companyIndex) {
+        const competitors = this.analyzeCompetitors(company, companyIndex);
+        const period = gameState.currentPeriod;
+        const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+
+        let adjustment = {
+            aggressiveness: 0.5, // 0-1
+            investmentFocus: 0.5,
+            riskTolerance: 0.5
+        };
+
+        // 順位に応じた調整
+        if (competitors.myRank === 1) {
+            // 1位：守りを固める
+            adjustment.aggressiveness = 0.3;
+            adjustment.riskTolerance = 0.3;
+        } else if (competitors.myRank >= 4) {
+            // 下位：リスクを取って挽回
+            adjustment.aggressiveness = 0.9;
+            adjustment.riskTolerance = 0.8;
+        }
+
+        // 期に応じた調整
+        if (period === 2) {
+            // 2期は投資重視
+            adjustment.investmentFocus = 0.8;
+        } else if (period === 5) {
+            // 5期は目標達成とG最大化
+            adjustment.investmentFocus = 0.3;
+            adjustment.aggressiveness = 0.6;
+        }
+
+        // 現金状況に応じた調整
+        const periodPayment = calculatePeriodPayment(company);
+        if (company.cash < periodPayment * 1.5) {
+            // 現金不足：保守的に
+            adjustment.riskTolerance = 0.2;
+            adjustment.aggressiveness = 0.8; // 売上優先
+        }
+
+        // 期末が近い場合
+        if (rowsRemaining <= 5) {
+            adjustment.aggressiveness = 0.9;
+        }
+
+        // リーダーとの差に応じた調整
+        const leaderGap = competitors.leader.equity - company.equity;
+        if (leaderGap > 50) {
+            // 大きく離されている：ハイリスクハイリターン
+            adjustment.riskTolerance = 0.9;
+            adjustment.aggressiveness = 0.9;
+        }
+
+        return {
+            ...adjustment,
+            reasoning: this.explainAdjustment(adjustment, competitors, company)
+        };
+    },
+
+    explainAdjustment: function(adj, competitors, company) {
+        const reasons = [];
+        if (adj.aggressiveness > 0.7) reasons.push('積極的販売モード');
+        if (adj.investmentFocus > 0.6) reasons.push('投資重視モード');
+        if (adj.riskTolerance < 0.4) reasons.push('リスク回避モード');
+        if (competitors.myRank === 1) reasons.push('首位防衛');
+        if (competitors.myRank >= 4) reasons.push('挽回モード');
+        return reasons.join('、') || '通常モード';
+    },
+
+    // ========================================
+    // === 強化AI機能: 期待値ベース意思決定 ===
+    // ========================================
+
+    /**
+     * アクションの期待値を計算
+     */
+    calculateActionExpectedValue: function(company, action, companyIndex) {
+        const period = gameState.currentPeriod;
+
+        switch (action.type) {
+            case 'SELL':
+                return this.calculateSellExpectedValue(company, action.quantity, companyIndex);
+            case 'BID':
+                return this.calculateBidExpectedValue(company, action.price, action.quantity, companyIndex);
+            case 'BUY_CHIP':
+                return this.calculateChipExpectedValue(company, action.chipType, companyIndex);
+            case 'PRODUCE':
+                return this.calculateProduceExpectedValue(company, action.quantity);
+            case 'COMPLETE':
+                return this.calculateCompleteExpectedValue(company, action.quantity);
+            default:
+                return { expectedValue: 0, variance: 0 };
+        }
+    },
+
+    calculateSellExpectedValue: function(company, quantity, companyIndex) {
+        const basePrice = 40;
+        const researchBonus = (company.chips.research || 0) * 2;
+        const price = basePrice + researchBonus;
+
+        // 市場の空き状況を考慮
+        const market = gameState.market;
+        const marketSpace = market.maxStock - market.currentStock;
+        const actualQuantity = Math.min(quantity, marketSpace);
+
+        // 変動費（製品評価額15円）
+        const variableCost = actualQuantity * 15;
+
+        // MQ貢献（売上 - 変動費）
+        const mqContribution = (actualQuantity * price) - variableCost;
+
+        return {
+            expectedValue: mqContribution,
+            revenue: actualQuantity * price,
+            cost: variableCost,
+            certainty: 0.95 // ほぼ確実
+        };
+    },
+
+    calculateBidExpectedValue: function(company, price, quantity, companyIndex) {
+        const optimalBid = this.calculateOptimalBidPrice(company, companyIndex, price);
+
+        // 勝率を推定
+        let winProbability = 0.5;
+        if (price > optimalBid.maxRivalPrice) {
+            winProbability = 0.85;
+        } else if (price === optimalBid.maxRivalPrice) {
+            winProbability = company.chips.research > optimalBid.rivalMaxResearch ? 0.7 : 0.3;
+        } else {
+            winProbability = 0.2;
+        }
+
+        // 勝った場合の期待MQ貢献
+        // 材料13円で仕入れ → 製品15円で在庫 → 40+円で販売
+        // 期待利益 = 販売価格 - 仕入価格 - 製造費(5+5)
+        const expectedProfit = winProbability * quantity * ((40 + (company.chips.research || 0) * 2) - price - 10);
+
+        return {
+            expectedValue: expectedProfit,
+            winProbability,
+            cost: price * quantity,
+            certainty: optimalBid.confidence
+        };
+    },
+
+    calculateChipExpectedValue: function(company, chipType, companyIndex) {
+        const period = gameState.currentPeriod;
+        const remainingPeriods = 5 - period + 1;
+
+        // チップ別のROI計算
+        switch (chipType) {
+            case 'research':
+                // 研究チップ: +2円/製品 × 残り期間の予想販売数
+                const expectedSales = (company.salesmen + 1) * 10 * remainingPeriods;
+                const revenueIncrease = expectedSales * 2;
+                const cost = period === 2 ? 20 : 30; // 2期は通常、3期以降は特急
+                return {
+                    expectedValue: revenueIncrease - cost,
+                    roi: (revenueIncrease - cost) / cost,
+                    certainty: 0.7
+                };
+
+            case 'education':
+                // 教育チップ: 効果は1枚のみ
+                if ((company.chips.education || 0) >= 1) {
+                    return { expectedValue: -30, roi: -1, certainty: 1.0 }; // 2枚目以降は無駄
+                }
+                // +1製造/+1販売 = 約+3製品/期 × 残り期間
+                const extraProducts = 3 * remainingPeriods;
+                const educationValue = extraProducts * 25; // 製品あたり粗利約25円
+                const eduCost = period === 2 ? 20 : 30;
+                return {
+                    expectedValue: educationValue - eduCost,
+                    roi: (educationValue - eduCost) / eduCost,
+                    certainty: 0.6
+                };
+
+            case 'advertising':
+                // 広告チップ: +2販売/枚（セールスマン数まで）
+                const currentAd = company.chips.advertising || 0;
+                if (currentAd >= company.salesmen) {
+                    return { expectedValue: -30, roi: -1, certainty: 1.0 }; // 効果上限
+                }
+                const extraSales = 2 * remainingPeriods;
+                const adValue = extraSales * 25;
+                const adCost = period === 2 ? 20 : 30;
+                return {
+                    expectedValue: adValue - adCost,
+                    roi: (adValue - adCost) / adCost,
+                    certainty: 0.65
+                };
+
+            default:
+                return { expectedValue: 0, roi: 0, certainty: 0 };
+        }
+    },
+
+    calculateProduceExpectedValue: function(company, quantity) {
+        // 投入コスト5円/個
+        const cost = quantity * 5;
+        // 材料13円 → 仕掛品14円（在庫評価増+1円）
+        const inventoryValueIncrease = quantity * 1;
+
+        return {
+            expectedValue: inventoryValueIncrease - cost,
+            certainty: 1.0 // 確実
+        };
+    },
+
+    calculateCompleteExpectedValue: function(company, quantity) {
+        // 完成コスト5円/個
+        const cost = quantity * 5;
+        // 仕掛品14円 → 製品15円（在庫評価増+1円）
+        const inventoryValueIncrease = quantity * 1;
+
+        return {
+            expectedValue: inventoryValueIncrease - cost,
+            certainty: 1.0 // 確実
+        };
+    },
+
+    /**
+     * 全可能アクションの期待値を比較し、最適を選択
+     */
+    selectOptimalAction: function(company, companyIndex) {
+        const possibleActions = this.enumeratePossibleActions(company, companyIndex);
+
+        const evaluated = possibleActions.map(action => ({
+            action,
+            ev: this.calculateActionExpectedValue(company, action, companyIndex)
+        }));
+
+        // 期待値でソート
+        evaluated.sort((a, b) => b.ev.expectedValue - a.ev.expectedValue);
+
+        return {
+            recommended: evaluated[0],
+            alternatives: evaluated.slice(1, 4),
+            allOptions: evaluated
+        };
+    },
+
+    /**
+     * 可能なアクションを列挙
+     */
+    enumeratePossibleActions: function(company, companyIndex) {
+        const actions = [];
+
+        // 販売
+        if (company.products > 0 && getSalesCapacity(company) > 0) {
+            for (let q = 1; q <= Math.min(company.products, getSalesCapacity(company)); q++) {
+                actions.push({ type: 'SELL', quantity: q });
+            }
+        }
+
+        // 完成
+        if (company.wip > 0 && getManufacturingCapacity(company) > 0) {
+            for (let q = 1; q <= Math.min(company.wip, getManufacturingCapacity(company)); q++) {
+                actions.push({ type: 'COMPLETE', quantity: q });
+            }
+        }
+
+        // 投入
+        if (company.materials > 0 && getManufacturingCapacity(company) > 0) {
+            for (let q = 1; q <= Math.min(company.materials, getManufacturingCapacity(company)); q++) {
+                actions.push({ type: 'PRODUCE', quantity: q });
+            }
+        }
+
+        // チップ購入
+        if (company.cash > 30) {
+            actions.push({ type: 'BUY_CHIP', chipType: 'research' });
+            actions.push({ type: 'BUY_CHIP', chipType: 'education' });
+            actions.push({ type: 'BUY_CHIP', chipType: 'advertising' });
+        }
+
+        // 待機
+        actions.push({ type: 'WAIT' });
+
+        return actions;
     }
 };
 
