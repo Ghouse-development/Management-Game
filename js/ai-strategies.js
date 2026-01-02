@@ -3054,7 +3054,7 @@ function aiDoNothing(company, originalReason = '') {
     // === 優先順位6: 材料を現金化（緊急時） ===
     if (company.materials > 0 && company.cash < periodEndCost) {
         const sellQty = Math.min(company.materials, 3);
-        const revenue = sellQty * 8;
+        const revenue = sellQty * 10;
         company.materials -= sellQty;
         company.cash += revenue;
         incrementRow(companyIndex);
@@ -4389,6 +4389,27 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
     const companyIndex = gameState.companies.indexOf(company);
     const period = gameState.currentPeriod;
     const currentRow = company.currentRow || 1;
+
+    // =========================================================
+    // 【AIOptimizer統合】モンテカルロ/MCTS最適化エンジン活用
+    // =========================================================
+    if (typeof AIOptimizer !== 'undefined' && companyIndex > 0) {
+        // ゲーム内AIはAIOptimizerからリスク情報を取得
+        const optimizerInsight = AIOptimizer.getOptimalActionForAI(companyIndex);
+        if (optimizerInsight) {
+            // リスクが出尽くしている場合の戦略調整
+            company._exhaustedRisks = optimizerInsight.exhaustedRisks || [];
+            company._riskAdjustedStrategy = optimizerInsight.riskAdjusted;
+
+            // 5行ごとにAIOptimizer分析を表示
+            if (currentRow % 5 === 0) {
+                console.log(`[AIOptimizer] ${company.name}: 推奨=${AIOptimizer.formatActionName(optimizerInsight.action)}, スコア=${optimizerInsight.score.toFixed(1)}`);
+                if (company._exhaustedRisks.length > 0) {
+                    console.log(`  出尽くしリスク: ${company._exhaustedRisks.join(', ')}`);
+                }
+            }
+        }
+    }
 
     // =========================================================
     // 【動的分析】会社状態・競合状況を毎ターン評価

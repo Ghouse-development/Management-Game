@@ -143,10 +143,10 @@ function applyRiskCardToAI(company, card) {
                 const hireCost = 5;
                 // 現金不足の場合、材料売却→短期借入で対応
                 if (company.cash < hireCost) {
-                    // 1. 材料売却（8円/個）
+                    // 1. 材料売却（10円/個）
                     while (company.cash < hireCost && company.materials > 0) {
                         company.materials--;
-                        company.cash += 8;
+                        company.cash += 10;
                     }
                     // 2. それでも足りなければ短期借入
                     if (company.cash < hireCost) {

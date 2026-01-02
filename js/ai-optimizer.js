@@ -608,6 +608,870 @@ const AIOptimizer = {
         }
 
         console.log('═'.repeat(60) + '\n');
+    },
+
+    // ============================================
+    // 競合AI行動予測システム
+    // ============================================
+
+    /**
+     * 競合会社の行動を予測
+     */
+    predictCompetitorActions: function() {
+        const competitors = gameState.companies.slice(1);  // プレイヤー以外
+        const predictions = [];
+
+        competitors.forEach((comp, idx) => {
+            const strategy = comp.strategy || 'balanced';
+            const mfgCap = this.getCompetitorMfgCapacity(comp);
+            const salesCap = this.getCompetitorSalesCapacity(comp);
+
+            // 戦略別の行動パターン予測
+            const prediction = {
+                name: comp.name,
+                strategy,
+                equity: comp.equity,
+                researchChips: comp.chips?.research || 0,
+                likelyActions: [],
+                bidAggression: 0.5  // 0-1の入札積極性
+            };
+
+            // 研究チップ数から入札戦略を予測
+            if (prediction.researchChips >= 3) {
+                prediction.bidAggression = 0.8;
+                prediction.likelyActions.push('高価格市場狙い');
+            } else if (prediction.researchChips >= 2) {
+                prediction.bidAggression = 0.6;
+                prediction.likelyActions.push('名古屋28円狙い');
+            } else {
+                prediction.bidAggression = 0.4;
+                prediction.likelyActions.push('大阪24円確保');
+            }
+
+            // 製造・販売能力から行動予測
+            if (comp.products > 0 && salesCap > 0) {
+                prediction.likelyActions.push(`販売${Math.min(comp.products, salesCap)}個`);
+            } else if (comp.wip > 0 || comp.materials > 0) {
+                prediction.likelyActions.push('製造');
+            } else if (comp.cash >= 30) {
+                prediction.likelyActions.push('材料購入');
+            }
+
+            // 自己資本から目標を推測
+            if (comp.equity >= 400) {
+                prediction.goal = '450達成圏内 - 安全プレイ';
+            } else if (comp.equity >= 300) {
+                prediction.goal = '税金発生中 - 積極投資';
+            } else {
+                prediction.goal = '300到達目標 - バランス';
+            }
+
+            predictions.push(prediction);
+        });
+
+        return predictions;
+    },
+
+    getCompetitorMfgCapacity: function(comp) {
+        let cap = 0;
+        (comp.machines || []).forEach(m => {
+            if (m.type === 'small') cap += m.attachments > 0 ? 2 : 1;
+            else cap += 4;
+        });
+        cap += Math.min(comp.chips?.education || 0, 1);
+        return Math.min(cap, comp.workers || 1);
+    },
+
+    getCompetitorSalesCapacity: function(comp) {
+        const salesmen = comp.salesmen || 1;
+        if (salesmen === 0) return 0;
+        const base = salesmen * 2;
+        const adBonus = Math.min(comp.chips?.advertising || 0, salesmen * 2) * 2;
+        return base + adBonus + Math.min(comp.chips?.education || 0, 1);
+    },
+
+    /**
+     * 競合分析レポートを表示
+     */
+    showCompetitorReport: function() {
+        const predictions = this.predictCompetitorActions();
+
+        console.log('\n' + '═'.repeat(70));
+        console.log('【競合AI行動予測レポート】');
+        console.log('═'.repeat(70));
+
+        predictions.forEach(pred => {
+            console.log(`\n【${pred.name}】 戦略: ${pred.strategy}`);
+            console.log(`  自己資本: ¥${pred.equity} | 研究チップ: ${pred.researchChips}枚`);
+            console.log(`  入札積極性: ${(pred.bidAggression * 100).toFixed(0)}%`);
+            console.log(`  予測目標: ${pred.goal}`);
+            console.log(`  予測行動: ${pred.likelyActions.join(' → ')}`);
+        });
+
+        console.log('\n' + '═'.repeat(70) + '\n');
+    },
+
+    // ============================================
+    // 長期投資計画最適化
+    // ============================================
+
+    /**
+     * 期別の最適投資計画を計算
+     */
+    calculateOptimalInvestmentPlan: function() {
+        const company = gameState.companies[0];
+        const period = gameState.currentPeriod;
+        const periodsRemaining = 5 - period + 1;
+
+        console.log('\n' + '═'.repeat(70));
+        console.log('【長期投資計画最適化】');
+        console.log('═'.repeat(70));
+
+        const plan = {
+            periods: [],
+            totalInvestment: 0,
+            expectedFinalEquity: company.equity
+        };
+
+        // 期別に投資計画を計算
+        for (let p = period; p <= 5; p++) {
+            const periodPlan = this.planPeriodInvestment(company, p, periodsRemaining - (p - period));
+            plan.periods.push(periodPlan);
+            plan.totalInvestment += periodPlan.investment;
+        }
+
+        // 結果表示
+        console.log('\n期別投資計画:');
+        console.log('─'.repeat(60));
+        plan.periods.forEach(pp => {
+            console.log(`\n${pp.period}期:`);
+            console.log(`  投資総額: ¥${pp.investment}`);
+            pp.recommendations.forEach(rec => {
+                console.log(`  ・${rec.item}: ¥${rec.cost} (ROI: ${rec.roi.toFixed(0)}%)`);
+            });
+            console.log(`  期末目標G: ¥${pp.targetG}`);
+        });
+
+        console.log('\n' + '─'.repeat(60));
+        console.log(`総投資額: ¥${plan.totalInvestment}`);
+        console.log('═'.repeat(70) + '\n');
+
+        return plan;
+    },
+
+    planPeriodInvestment: function(company, period, periodsAfter) {
+        const recommendations = [];
+        let investment = 0;
+
+        const chipCost = period === 2 ? 20 : 40;
+        const salesCycles = Math.floor({ 2: 20, 3: 30, 4: 34, 5: 35 }[period] / 4);
+
+        // 研究チップROI計算
+        const currentResearch = company.chips?.research || 0;
+        if (currentResearch < 3) {
+            const priceIncrease = 2;  // 1枚あたり+2円
+            const roi = (priceIncrease * salesCycles * periodsAfter * 2) / chipCost * 100;
+            if (roi > 100) {
+                recommendations.push({
+                    item: '研究チップ',
+                    cost: chipCost,
+                    roi,
+                    priority: 1
+                });
+                investment += chipCost;
+            }
+        }
+
+        // 教育チップROI（1枚まで）
+        if ((company.chips?.education || 0) < 1 && period <= 3) {
+            const benefitPerCycle = 13;  // 製造+1、販売+1のMQ増加
+            const roi = (benefitPerCycle * salesCycles * periodsAfter) / chipCost * 100;
+            if (roi > 80) {
+                recommendations.push({
+                    item: '教育チップ',
+                    cost: chipCost,
+                    roi,
+                    priority: 2
+                });
+                investment += chipCost;
+            }
+        }
+
+        // アタッチメントROI
+        const hasAttachment = company.machines?.some(m => m.attachments > 0);
+        if (!hasAttachment && period <= 3) {
+            const benefitPerCycle = 15;  // 製造能力+1のMQ増加
+            const roi = (benefitPerCycle * salesCycles * periodsAfter) / 30 * 100;
+            if (roi > 100) {
+                recommendations.push({
+                    item: 'アタッチメント',
+                    cost: 30,
+                    roi,
+                    priority: 3
+                });
+                investment += 30;
+            }
+        }
+
+        // 広告チップROI
+        if ((company.chips?.advertising || 0) < 2 && (company.salesmen || 1) >= 2) {
+            const benefitPerCycle = 26;  // 販売+4のMQ増加
+            const roi = (benefitPerCycle * salesCycles * periodsAfter) / chipCost * 100;
+            if (roi > 80) {
+                recommendations.push({
+                    item: '広告チップ',
+                    cost: chipCost,
+                    roi,
+                    priority: 4
+                });
+                investment += chipCost;
+            }
+        }
+
+        // 優先度順にソート
+        recommendations.sort((a, b) => a.priority - b.priority);
+
+        // 目標G計算
+        const targetG = period === 2 ? -20 : period === 3 ? 50 : period === 4 ? 60 : 70;
+
+        return {
+            period,
+            recommendations,
+            investment,
+            targetG
+        };
+    },
+
+    // ============================================
+    // ゲーム内AIへの統合インターフェース
+    // ============================================
+
+    /**
+     * ゲーム内AIが呼び出す最適行動取得関数
+     * @param {number} companyIndex - 会社インデックス
+     * @returns {Object} 推奨行動
+     */
+    getOptimalActionForAI: function(companyIndex) {
+        const company = gameState.companies[companyIndex];
+        const riskProb = this.calculateRiskProbabilities();
+        const exhausted = this.getExhaustedRisks();
+
+        // 出尽くしたリスクを考慮した戦略調整
+        let strategy = {
+            prioritizeSafety: true,
+            aggressiveBid: false,
+            investHeavily: false
+        };
+
+        // 不良在庫が出尽くしていれば在庫を多めに持てる
+        if (exhausted.includes('badInventory')) {
+            strategy.allowHighInventory = true;
+        }
+
+        // 火災・盗難が出尽くしていれば倉庫不要
+        if (exhausted.includes('fire') && exhausted.includes('theft')) {
+            strategy.skipWarehouse = true;
+        }
+
+        // 市場閉鎖が多く残っていれば分散販売
+        if (riskProb.marketClosureProb > 0.15) {
+            strategy.diversifyMarkets = true;
+        }
+
+        // 簡易シミュレーションで最適行動を決定
+        const possibleActions = this.enumeratePossibleActions(company, gameState.currentPeriod, {});
+        let bestAction = possibleActions[0];
+        let bestScore = -Infinity;
+
+        possibleActions.forEach(action => {
+            const score = this.quickEvaluateAction(company, action, riskProb, strategy);
+            if (score > bestScore) {
+                bestScore = score;
+                bestAction = action;
+            }
+        });
+
+        return {
+            action: bestAction,
+            score: bestScore,
+            riskAdjusted: true,
+            exhaustedRisks: exhausted
+        };
+    },
+
+    /**
+     * 行動の簡易評価（高速版）
+     */
+    quickEvaluateAction: function(company, action, riskProb, strategy) {
+        let score = 0;
+        const period = gameState.currentPeriod;
+
+        switch (action.type) {
+            case 'SELL':
+                const price = 24 + (company.chips?.research || 0) * 2;
+                const mq = (price - 10) * action.qty;
+                score = mq * 1.5;  // 販売は高評価
+                break;
+
+            case 'PRODUCE':
+                score = 30;  // 製造は中評価
+                break;
+
+            case 'BUY_MATERIALS':
+                score = 20 - action.qty * 2;  // 材料購入は低評価（現金流出）
+                break;
+
+            case 'BUY_CHIP':
+                if (action.chipType === 'research' && (company.chips?.research || 0) < 2) {
+                    score = 50;  // 研究2枚目までは高評価
+                } else if (action.chipType === 'education' && (company.chips?.education || 0) < 1) {
+                    score = 40;
+                } else {
+                    score = 20;
+                }
+                break;
+
+            case 'BUY_NEXT_CHIP':
+                score = 35;  // 翌期チップは中〜高評価
+                break;
+
+            case 'BUY_ATTACHMENT':
+                score = period <= 3 ? 45 : 10;
+                break;
+
+            case 'HIRE_WORKER':
+            case 'HIRE_SALESMAN':
+                score = period <= 3 ? 35 : 5;
+                break;
+
+            case 'WAIT':
+                score = -10;  // 待機は低評価
+                break;
+        }
+
+        // リスク調整
+        if (riskProb.laborAccidentProb > 0.05 && action.type === 'PRODUCE') {
+            score -= 5;  // 労災リスクがある場合は製造を少し下げる
+        }
+
+        if (riskProb.bankruptcyProb > 0.05 && action.type === 'SELL') {
+            score -= 3;  // 得意先倒産リスクがある場合は販売を少し下げる
+        }
+
+        return score;
+    },
+
+    /**
+     * 完全な最適解探索（遅いが正確）
+     */
+    findTrueOptimal: function(options = {}) {
+        console.log('\n⏳ 完全最適解探索中... (5000回シミュレーション)');
+        const originalCount = this.SIMULATION_COUNT;
+        this.SIMULATION_COUNT = 5000;
+
+        const result = this.findOptimalAction(options);
+
+        this.SIMULATION_COUNT = originalCount;
+        return result;
+    },
+
+    // ============================================
+    // MCTS（モンテカルロ木探索）実装
+    // ============================================
+
+    MCTS: {
+        // UCB1の探索パラメータ
+        EXPLORATION_CONSTANT: 1.414,
+        // 最大イテレーション
+        MAX_ITERATIONS: 2000,
+        // シミュレーション深さ（残り行数）
+        MAX_DEPTH: 50,
+
+        /**
+         * MCTSノードクラス
+         */
+        createNode: function(state, action, parent) {
+            return {
+                state: state,
+                action: action,
+                parent: parent,
+                children: [],
+                visits: 0,
+                totalReward: 0,
+                untriedActions: null,
+                isTerminal: false
+            };
+        },
+
+        /**
+         * UCB1スコア計算
+         */
+        ucb1: function(node, parentVisits) {
+            if (node.visits === 0) return Infinity;
+            const exploitation = node.totalReward / node.visits;
+            const exploration = this.EXPLORATION_CONSTANT * Math.sqrt(Math.log(parentVisits) / node.visits);
+            return exploitation + exploration;
+        },
+
+        /**
+         * 選択フェーズ：最も有望なノードを選択
+         */
+        select: function(node) {
+            while (node.children.length > 0) {
+                // 未展開の行動があればそちらを優先
+                if (node.untriedActions && node.untriedActions.length > 0) {
+                    return node;
+                }
+                // UCB1で最良の子を選択
+                let bestChild = null;
+                let bestScore = -Infinity;
+                node.children.forEach(child => {
+                    const score = this.ucb1(child, node.visits);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestChild = child;
+                    }
+                });
+                if (!bestChild) break;
+                node = bestChild;
+            }
+            return node;
+        },
+
+        /**
+         * 展開フェーズ：新しい子ノードを追加
+         */
+        expand: function(node, optimizer) {
+            if (!node.untriedActions) {
+                const company = node.state.company;
+                const period = node.state.period;
+                node.untriedActions = optimizer.enumeratePossibleActions(company, period, {
+                    closedMarkets: node.state.closedMarkets || []
+                });
+            }
+
+            if (node.untriedActions.length === 0) {
+                return node;
+            }
+
+            // ランダムに行動を選択
+            const actionIdx = Math.floor(Math.random() * node.untriedActions.length);
+            const action = node.untriedActions.splice(actionIdx, 1)[0];
+
+            // 新しい状態を作成
+            const newState = this.applyActionToState(node.state, action, optimizer);
+            const childNode = this.createNode(newState, action, node);
+
+            // 終端判定
+            if (newState.period > 5 || newState.currentRow > newState.maxRows) {
+                childNode.isTerminal = true;
+            }
+
+            node.children.push(childNode);
+            return childNode;
+        },
+
+        /**
+         * 状態に行動を適用
+         */
+        applyActionToState: function(state, action, optimizer) {
+            const newState = JSON.parse(JSON.stringify(state));
+            const company = newState.company;
+
+            optimizer.applyAction(company, action, newState.period, {
+                closedMarkets: newState.closedMarkets || []
+            });
+
+            // 行進行
+            newState.currentRow++;
+            if (newState.currentRow > newState.maxRows) {
+                // 期末処理
+                newState.period++;
+                newState.currentRow = 1;
+                if (newState.period <= 5) {
+                    newState.maxRows = { 2: 20, 3: 30, 4: 34, 5: 35 }[newState.period];
+                    // 決算シミュレーション（簡易）
+                    this.simulateSettlement(company, newState.period - 1);
+                }
+            }
+
+            return newState;
+        },
+
+        /**
+         * 簡易決算シミュレーション
+         */
+        simulateSettlement: function(company, period) {
+            // MQ計算
+            const sales = company.totalSales || 0;
+            const VQ = (company.initialMaterials - company.materials) * 10;
+            const MQ = sales - VQ;
+
+            // F計算
+            const baseSalary = { 2: 22, 3: 24, 4: 26, 5: 28 }[period] || 22;
+            const workers = company.workers || 1;
+            const salesmen = company.salesmen || 1;
+            const machines = company.machines?.length || 1;
+            const F = (machines + workers + salesmen) * baseSalary * 1.5 +
+                     ((company.chips?.research || 0) + (company.chips?.education || 0) +
+                      (company.chips?.advertising || 0)) * 20 +
+                     (period === 2 ? 10 : 20);
+
+            // G計算
+            const G = MQ - F;
+
+            // 税金
+            const tax = company.equity > 300 && G > 0 ? Math.round(G * 0.5) : 0;
+
+            company.equity += G - tax;
+            company.totalSales = 0;
+            company.initialMaterials = company.materials;
+
+            // 翌期チップ移行
+            company.chips = company.nextPeriodChips || { research: 0, education: 0, advertising: 0 };
+            company.nextPeriodChips = { research: 0, education: 0, advertising: 0 };
+        },
+
+        /**
+         * シミュレーションフェーズ（ロールアウト）
+         */
+        simulate: function(node, optimizer) {
+            let state = JSON.parse(JSON.stringify(node.state));
+            let depth = 0;
+
+            while (state.period <= 5 && depth < this.MAX_DEPTH) {
+                // ランダムな行動を選択
+                const actions = optimizer.enumeratePossibleActions(state.company, state.period, {
+                    closedMarkets: state.closedMarkets || []
+                });
+
+                if (actions.length === 0) break;
+
+                const action = actions[Math.floor(Math.random() * actions.length)];
+                state = this.applyActionToState(state, action, optimizer);
+                depth++;
+            }
+
+            // 最終自己資本を報酬として返す
+            return this.evaluateState(state);
+        },
+
+        /**
+         * 状態評価（報酬計算）
+         */
+        evaluateState: function(state) {
+            const equity = state.company.equity;
+            // 450を基準に正規化（0-1の範囲）
+            const normalized = Math.max(0, Math.min(1, (equity - 200) / 300));
+            // 450達成ボーナス
+            const bonus = equity >= 450 ? 0.2 : 0;
+            return normalized + bonus;
+        },
+
+        /**
+         * バックプロパゲーション
+         */
+        backpropagate: function(node, reward) {
+            while (node !== null) {
+                node.visits++;
+                node.totalReward += reward;
+                node = node.parent;
+            }
+        },
+
+        /**
+         * MCTS実行
+         */
+        run: function(initialState, optimizer, iterations = null) {
+            iterations = iterations || this.MAX_ITERATIONS;
+            const root = this.createNode(initialState, null, null);
+
+            console.log(`\n🌲 MCTS探索開始（${iterations}イテレーション）`);
+            const startTime = Date.now();
+
+            for (let i = 0; i < iterations; i++) {
+                // 1. 選択
+                let node = this.select(root);
+
+                // 2. 展開
+                if (!node.isTerminal) {
+                    node = this.expand(node, optimizer);
+                }
+
+                // 3. シミュレーション
+                const reward = this.simulate(node, optimizer);
+
+                // 4. バックプロパゲーション
+                this.backpropagate(node, reward);
+
+                // 進捗表示
+                if ((i + 1) % 500 === 0) {
+                    console.log(`  ${i + 1}/${iterations} イテレーション完了`);
+                }
+            }
+
+            const elapsed = Date.now() - startTime;
+            console.log(`✓ MCTS完了: ${elapsed}ms`);
+
+            // 最良の子ノードを返す（訪問回数が最大のもの）
+            let bestChild = null;
+            let mostVisits = -1;
+            root.children.forEach(child => {
+                if (child.visits > mostVisits) {
+                    mostVisits = child.visits;
+                    bestChild = child;
+                }
+            });
+
+            // 結果を整形
+            const results = root.children.map(child => ({
+                action: child.action,
+                visits: child.visits,
+                avgReward: child.totalReward / child.visits,
+                winRate: child.totalReward / child.visits
+            })).sort((a, b) => b.visits - a.visits);
+
+            return {
+                bestAction: bestChild ? bestChild.action : null,
+                results: results,
+                totalIterations: iterations,
+                elapsed: elapsed
+            };
+        }
+    },
+
+    /**
+     * MCTSを使用した最適行動探索
+     */
+    findOptimalWithMCTS: function(options = {}) {
+        const company = gameState.companies[0];
+        const period = gameState.currentPeriod;
+        const currentRow = company.currentRow || 1;
+        const maxRows = { 2: 20, 3: 30, 4: 34, 5: 35 }[period] || 20;
+
+        console.log('\n' + '═'.repeat(70));
+        console.log('【MCTS（モンテカルロ木探索）最適化】');
+        console.log('═'.repeat(70));
+        console.log(`現在: ${period}期 ${currentRow}行目`);
+
+        // 初期状態を作成
+        const initialState = {
+            company: JSON.parse(JSON.stringify(company)),
+            period: period,
+            currentRow: currentRow,
+            maxRows: maxRows,
+            closedMarkets: options.closedMarkets || [],
+            diceRoll: options.diceRoll || null
+        };
+
+        initialState.company.initialMaterials = initialState.company.materials;
+
+        // MCTS実行
+        const iterations = options.iterations || this.MCTS.MAX_ITERATIONS;
+        const result = this.MCTS.run(initialState, this, iterations);
+
+        // 結果表示
+        console.log('\n【探索結果】');
+        console.log('─'.repeat(60));
+        console.log('行動                    │ 訪問回数 │ 平均報酬 │ 勝率');
+        console.log('────────────────────────┼──────────┼──────────┼──────');
+
+        result.results.slice(0, 5).forEach(r => {
+            const actionName = this.formatActionName(r.action).padEnd(22);
+            console.log(`${actionName} │ ${String(r.visits).padStart(8)} │ ${r.avgReward.toFixed(3).padStart(8)} │ ${(r.winRate * 100).toFixed(1)}%`);
+        });
+
+        if (result.bestAction) {
+            console.log('\n★ MCTS推奨: ' + this.formatActionName(result.bestAction));
+        }
+        console.log('═'.repeat(70) + '\n');
+
+        return result;
+    },
+
+    // ============================================
+    // ハイブリッド探索（MCTS + モンテカルロ）
+    // ============================================
+
+    /**
+     * 状況に応じて最適なアルゴリズムを選択
+     */
+    findBestAction: function(options = {}) {
+        const company = gameState.companies[0];
+        const period = gameState.currentPeriod;
+        const currentRow = company.currentRow || 1;
+
+        // 残り行数に応じてアルゴリズムを選択
+        const maxRows = { 2: 20, 3: 30, 4: 34, 5: 35 }[period] || 20;
+        const remainingRows = maxRows - currentRow;
+
+        console.log('\n' + '╔'.repeat(1) + '═'.repeat(68) + '╗'.repeat(1));
+        console.log('║ 【ハイブリッドAI最適化エンジン】                                  ║');
+        console.log('╚' + '═'.repeat(68) + '╝');
+
+        let result;
+
+        if (remainingRows <= 10) {
+            // 残り行数が少ない場合はMCTSで精密探索
+            console.log('📊 選択アルゴリズム: MCTS（残り行数少・精密探索）');
+            result = this.findOptimalWithMCTS({
+                ...options,
+                iterations: 3000  // より多くの探索
+            });
+            result.algorithm = 'MCTS';
+        } else if (period <= 3) {
+            // 序盤〜中盤は通常のモンテカルロ
+            console.log('📊 選択アルゴリズム: モンテカルロシミュレーション（中盤）');
+            result = this.findOptimalAction(options);
+            result.algorithm = 'MonteCarlo';
+        } else {
+            // 終盤はMCTSと組み合わせ
+            console.log('📊 選択アルゴリズム: MCTS + モンテカルロ（終盤ハイブリッド）');
+
+            // 両方実行して比較
+            const mcResult = this.findOptimalAction(options);
+            const mctsResult = this.findOptimalWithMCTS({
+                ...options,
+                iterations: 1500
+            });
+
+            // より信頼性の高い方を採用
+            if (mctsResult.results[0]?.visits > 500 &&
+                mctsResult.results[0]?.winRate > mcResult.recommended?.successRate) {
+                result = mctsResult;
+                result.algorithm = 'MCTS';
+            } else {
+                result = mcResult;
+                result.algorithm = 'MonteCarlo';
+            }
+        }
+
+        return result;
+    },
+
+    // ============================================
+    // 完全ゲームシミュレーション
+    // ============================================
+
+    /**
+     * 1期から5期まで完全にシミュレート
+     */
+    simulateFullGame: function(strategy = 'optimal', options = {}) {
+        console.log('\n' + '═'.repeat(70));
+        console.log('【完全ゲームシミュレーション】');
+        console.log('═'.repeat(70));
+        console.log(`戦略: ${strategy}`);
+        console.log(`閉鎖市場: ${(options.closedMarkets || []).join(', ') || 'なし'}`);
+
+        // 初期状態
+        const company = {
+            name: 'シミュレーション',
+            cash: 100,
+            equity: 300,
+            materials: 3,
+            wip: 3,
+            products: 3,
+            workers: 1,
+            salesmen: 1,
+            machines: [{ type: 'small', attachments: 0 }],
+            chips: { research: 0, education: 0, advertising: 0 },
+            nextPeriodChips: { research: 0, education: 0, advertising: 0 }
+        };
+
+        const history = [];
+
+        // 2期から5期までシミュレート
+        for (let period = 2; period <= 5; period++) {
+            const maxRows = { 2: 20, 3: 30, 4: 34, 5: 35 }[period];
+            const periodStart = { cash: company.cash, equity: company.equity };
+
+            console.log(`\n【${period}期】開始: 現金¥${company.cash}, 自己資本¥${company.equity}`);
+
+            // 期内の行動をシミュレート
+            for (let row = 1; row <= maxRows; row++) {
+                const state = {
+                    company: JSON.parse(JSON.stringify(company)),
+                    period,
+                    currentRow: row,
+                    maxRows,
+                    closedMarkets: options.closedMarkets || []
+                };
+
+                // 行動決定
+                let action;
+                if (strategy === 'optimal') {
+                    const possibleActions = this.enumeratePossibleActions(company, period, {
+                        closedMarkets: options.closedMarkets || []
+                    });
+                    action = this.selectBestActionSimple(company, possibleActions, period);
+                } else {
+                    action = { type: 'WAIT' };
+                }
+
+                // 行動適用
+                this.applyAction(company, action, period, {
+                    closedMarkets: options.closedMarkets || []
+                });
+            }
+
+            // 期末決算
+            this.MCTS.simulateSettlement(company, period);
+
+            const G = company.equity - periodStart.equity;
+            console.log(`  期末G: ¥${G >= 0 ? '+' : ''}${G}`);
+            console.log(`  自己資本: ¥${company.equity}`);
+
+            history.push({
+                period,
+                G,
+                equity: company.equity,
+                chips: { ...company.chips }
+            });
+        }
+
+        console.log('\n' + '─'.repeat(70));
+        console.log(`【最終結果】自己資本: ¥${company.equity}`);
+        console.log(`450達成: ${company.equity >= 450 ? '○ 成功' : '× 失敗'}`);
+        console.log('═'.repeat(70) + '\n');
+
+        return {
+            finalEquity: company.equity,
+            success: company.equity >= 450,
+            history
+        };
+    },
+
+    /**
+     * シンプルな行動選択（シミュレーション用）
+     */
+    selectBestActionSimple: function(company, actions, period) {
+        // 優先度順に行動を選択
+        // 1. 販売可能なら販売
+        const sellAction = actions.find(a => a.type === 'SELL');
+        if (sellAction && company.products > 0) {
+            return sellAction;
+        }
+
+        // 2. 製造可能なら製造
+        const produceAction = actions.find(a => a.type === 'PRODUCE');
+        if (produceAction && (company.wip > 0 || company.materials > 0)) {
+            return produceAction;
+        }
+
+        // 3. 材料購入
+        const buyMaterials = actions.find(a => a.type === 'BUY_MATERIALS');
+        if (buyMaterials && company.cash >= 30) {
+            return buyMaterials;
+        }
+
+        // 4. 研究チップ購入（2枚まで）
+        if (period <= 3 && (company.chips?.research || 0) < 2) {
+            const buyChip = actions.find(a => a.type === 'BUY_CHIP' && a.chipType === 'research');
+            if (buyChip) return buyChip;
+        }
+
+        // 5. 待機
+        return { type: 'WAIT' };
     }
 };
 
@@ -616,9 +1480,26 @@ if (typeof window !== 'undefined') {
     window.AIOptimizer = AIOptimizer;
 }
 
-console.log('AI最適化エンジン準備完了。');
-console.log('  AIOptimizer.suggest()                      - 最適行動を提案');
-console.log('  AIOptimizer.suggest({diceRoll: 3})         - サイコロ出目3で提案');
-console.log('  AIOptimizer.suggestWith2MarketClosure("名古屋", "福岡", 4)');
-console.log('                                             - 2市場閉鎖 + サイコロ4で提案');
-console.log('  AIOptimizer.showRiskReport()               - リスク分析レポート');
+console.log('╔════════════════════════════════════════════════════════════════════╗');
+console.log('║        AI最適化エンジン v2.0 - MCTS + モンテカルロ統合             ║');
+console.log('╠════════════════════════════════════════════════════════════════════╣');
+console.log('║ 【基本コマンド】                                                    ║');
+console.log('║  AIOptimizer.suggest()                   - 最適行動を提案          ║');
+console.log('║  AIOptimizer.suggest({diceRoll: 3})      - サイコロ出目指定        ║');
+console.log('║  AIOptimizer.findBestAction()            - ハイブリッド最適化      ║');
+console.log('║                                                                    ║');
+console.log('║ 【高度な探索】                                                      ║');
+console.log('║  AIOptimizer.findOptimalWithMCTS()       - MCTS木探索              ║');
+console.log('║  AIOptimizer.findTrueOptimal()           - 5000回シミュレーション  ║');
+console.log('║  AIOptimizer.simulateFullGame()          - 完全ゲームシミュレート  ║');
+console.log('║                                                                    ║');
+console.log('║ 【2市場閉鎖シナリオ】                                               ║');
+console.log('║  AIOptimizer.suggestWith2MarketClosure("名古屋", "福岡", 4)        ║');
+console.log('║                           - 2市場閉鎖 + サイコロ4で提案            ║');
+console.log('║                                                                    ║');
+console.log('║ 【分析レポート】                                                    ║');
+console.log('║  AIOptimizer.showRiskReport()            - リスクカード分析        ║');
+console.log('║  AIOptimizer.showCompetitorReport()      - 競合行動予測            ║');
+console.log('║  AIOptimizer.calculateOptimalInvestmentPlan()                      ║');
+console.log('║                                          - 長期投資計画            ║');
+console.log('╚════════════════════════════════════════════════════════════════════╝');
