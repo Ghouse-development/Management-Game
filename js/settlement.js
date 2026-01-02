@@ -635,6 +635,109 @@ function proceedToNextPeriod() {
 }
 
 // ============================================
+// ゲーム終了処理
+// ============================================
+function endGame() {
+    // 最終結果を収集
+    const gameResults = gameState.companies.map((company, index) => ({
+        name: company.name,
+        equity: company.equity,
+        strategy: company.strategy || 'balanced',
+        isPlayer: index === 0
+    }));
+
+    // AIに学習させる
+    if (typeof AIBrain !== 'undefined' && AIBrain.learnFromGameResult) {
+        AIBrain.learnFromGameResult(gameResults);
+        console.log('[ゲーム終了] AI学習完了');
+    }
+
+    // ランキングを作成（自己資本順）
+    const rankings = [...gameResults].sort((a, b) => b.equity - a.equity);
+    const playerRank = rankings.findIndex(r => r.isPlayer) + 1;
+    const topEquity = rankings[0].equity;
+    const playerEquity = gameResults[0].equity;
+    const targetEquity = (typeof MG_CONSTANTS !== 'undefined') ? MG_CONSTANTS.TARGET_EQUITY : 450;
+
+    // 勝敗判定
+    const playerWon = playerRank === 1;
+    const reached450 = playerEquity >= targetEquity;
+
+    // 結果表示
+    let resultTitle = '';
+    let resultColor = '';
+    if (playerWon && reached450) {
+        resultTitle = '🏆 完全勝利！';
+        resultColor = '#ffd700';
+    } else if (playerWon) {
+        resultTitle = '🥇 1位達成！';
+        resultColor = '#4CAF50';
+    } else if (reached450) {
+        resultTitle = '✅ 450円達成！';
+        resultColor = '#2196F3';
+    } else {
+        resultTitle = '📊 ゲーム終了';
+        resultColor = '#9e9e9e';
+    }
+
+    // ランキング表を作成
+    const rankingsHtml = rankings.map((r, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}位`;
+        const highlight = r.isPlayer ? 'background: #e3f2fd; font-weight: bold;' : '';
+        const equityColor = r.equity >= targetEquity ? 'color: #4CAF50; font-weight: bold;' : '';
+        return `
+            <tr style="${highlight}">
+                <td style="padding: 8px; text-align: center;">${medal}</td>
+                <td style="padding: 8px;">${r.name}${r.isPlayer ? ' (あなた)' : ''}</td>
+                <td style="padding: 8px; text-align: right; ${equityColor}">¥${r.equity}</td>
+            </tr>
+        `;
+    }).join('');
+
+    // AI学習統計
+    let learningStatsHtml = '';
+    if (typeof AIBrain !== 'undefined' && AIBrain.getLearningStats) {
+        const stats = AIBrain.getLearningStats();
+        learningStatsHtml = `
+            <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 8px; font-size: 12px;">
+                <div style="font-weight: bold; margin-bottom: 5px;">📚 AI学習データ</div>
+                <div>総ゲーム数: ${stats.gamesPlayed} | AI勝率: ${stats.winRate}</div>
+            </div>
+        `;
+    }
+
+    const content = `
+        <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 36px; color: ${resultColor}; margin-bottom: 10px;">${resultTitle}</div>
+            <div style="font-size: 18px; margin-bottom: 20px;">
+                あなたの自己資本: <span style="font-size: 24px; font-weight: bold; color: ${playerEquity >= targetEquity ? '#4CAF50' : '#333'};">¥${playerEquity}</span>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr style="background: #e0e0e0;">
+                        <th style="padding: 8px;">順位</th>
+                        <th style="padding: 8px;">会社名</th>
+                        <th style="padding: 8px; text-align: right;">自己資本</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rankingsHtml}
+                </tbody>
+            </table>
+
+            ${learningStatsHtml}
+
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 12px 30px; font-size: 16px; background: #4f46e5; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                🔄 もう一度プレイ
+            </button>
+        </div>
+    `;
+
+    showModal('🎮 ゲーム結果', content);
+}
+
+// ============================================
 // 財務詳細表示
 // ============================================
 function showFinancialDetails(companyIndex) {

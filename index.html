@@ -401,6 +401,11 @@ function processPeriodStart() {
     const selections = window.periodStartSelections || { loan: 0, warehouse: 0, computer: 1, insurance: 1 };
     let totalCost = 0;
 
+    // === 翌期チップの適用（3期以降）===
+    // 注: 決算処理（settlement）で既にnextPeriodChipsはchipsに移行済み
+    // ここでは追加の適用は行わず、carriedOverChipsは決算で設定済みの値を維持
+    // （決算で: chips = nextPeriodChips として設定、carriedOverChips も設定済み）
+
     // 120点評価システム用のカウンターをリセット
     gameState.companies.forEach(c => {
         c.periodSalesCount = 0;  // 販売回数リセット

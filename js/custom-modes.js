@@ -18,104 +18,99 @@
  */
 
 // ============================================
-// ゲームルール定数（シミュレーション結果反映）
+// ゲームルール定数（MG_CONSTANTSから統一参照）
 // ============================================
-const GAME_RULES = {
-    // 容量制限
-    WIP_CAPACITY: 10,
-    MATERIAL_BASE: 10,
-    PRODUCT_BASE: 10,
-    WAREHOUSE_BONUS: 12,
+// 注: constants.js で定義されたMG_CONSTANTSを使用
+// 後方互換性のためにGAME_RULESエイリアスを提供
 
-    // 機械
-    MACHINE: {
-        SMALL: { cost: 100, capacity: 1, depreciation: 10 },
-        LARGE: { cost: 200, capacity: 4, depreciation: 20 }
-    },
+const GAME_RULES = (() => {
+    // MG_CONSTANTSが利用可能な場合はそれを使用
+    const C = (typeof MG_CONSTANTS !== 'undefined') ? MG_CONSTANTS : null;
 
-    // コスト
-    HIRING_COST: 20,
-    CHIP_COST: 20,
-    INSURANCE_COST: 5,
-    WAREHOUSE_COST: 20,
-    PROCESSING_COST: 1,
+    return {
+        // 容量制限
+        WIP_CAPACITY: 10,
+        MATERIAL_BASE: C ? C.INVENTORY_CAPACITY.base : 10,
+        PRODUCT_BASE: C ? C.INVENTORY_CAPACITY.base : 10,
+        WAREHOUSE_BONUS: C ? C.INVENTORY_CAPACITY.warehouseBonus : 12,
 
-    // 人件費基準
-    WAGE_BASE: { 2: 22, 3: 24, 4: 26, 5: 28 },
+        // 機械（参照用）
+        MACHINE: {
+            SMALL: { cost: 100, capacity: 1, depreciation: 10 },
+            LARGE: { cost: 200, capacity: 4, depreciation: 20 }
+        },
 
-    // 市場価格上限
-    MARKETS: {
-        SENDAI: { buy: 10, sell: 40 },
-        SAPPORO: { buy: 11, sell: 36 },
-        FUKUOKA: { buy: 12, sell: 32 },
-        NAGOYA: { buy: 13, sell: 28 },
-        OSAKA: { buy: 14, sell: 24 },
-        TOKYO: { buy: 15, sell: 20 }
-    },
+        // コスト（MG_CONSTANTSから参照）
+        HIRING_COST: C ? C.HIRING_COSTS.worker : 20,
+        CHIP_COST: C ? C.CHIP_COSTS.normal : 20,
+        INSURANCE_COST: C ? C.CHIP_COSTS.insurance : 5,
+        WAREHOUSE_COST: C ? C.WAREHOUSE_COST : 20,
+        PROCESSING_COST: C ? C.PRODUCTION_COST : 1,
 
-    // 行数
-    MAX_ROWS: { 2: 20, 3: 30, 4: 34, 5: 35 },
+        // 人件費基準（MG_CONSTANTSから参照）
+        WAGE_BASE: C ? C.BASE_SALARY_BY_PERIOD : { 2: 22, 3: 24, 4: 26, 5: 28 },
 
-    // 借入（1円単位、3期以降のみ）
-    LONG_TERM_RATE: 0.10,
-    SHORT_TERM_RATE: 0.20,
-    // 借入限度倍率: 自己資本 × 倍率
-    // 4期以降 かつ 自己資本300超: 1.0（100%）
-    // それ以外: 0.5（50%）
-    LOAN_MULTIPLIER: { default: 0.5, period4Plus300: 1.0 },
+        // 市場価格上限
+        MARKETS: {
+            SENDAI: { buy: 10, sell: 40 },
+            SAPPORO: { buy: 11, sell: 36 },
+            FUKUOKA: { buy: 12, sell: 32 },
+            NAGOYA: { buy: 13, sell: 28 },
+            OSAKA: { buy: 14, sell: 24 },
+            TOKYO: { buy: 15, sell: 20 }
+        },
 
-    // リスク確率（実効）
-    RISK_PROBABILITY: 0.08,
+        // 行数（MG_CONSTANTSから参照）
+        MAX_ROWS: C ? C.MAX_ROWS_BY_PERIOD : { 2: 20, 3: 30, 4: 34, 5: 35 },
 
-    // 目標
-    TARGET_EQUITY: 450,
+        // 借入（1円単位、3期以降のみ）
+        LONG_TERM_RATE: C ? C.INTEREST_RATES.longTerm : 0.10,
+        SHORT_TERM_RATE: C ? C.INTEREST_RATES.shortTerm : 0.20,
+        // 借入限度倍率: 自己資本 × 倍率
+        LOAN_MULTIPLIER: { default: 0.5, period4Plus300: 1.0 },
+        getLoanMultiplier: C ? C.getLoanMultiplier : function(p, e) { return (p >= 4 && e > 300) ? 1.0 : 0.5; },
 
-    // シミュレーション
-    SIMULATION_RUNS: 100,
+        // リスク確率（実効）
+        RISK_PROBABILITY: 0.08,
 
-    // === 入札勝率テーブル（v8シミュレーション結果） ===
-    BID_WIN_RATES: {
-        // 研究チップ数 → { 推奨価格, 勝率 }
-        0: { price: 24, winRate: 0.55, market: '大阪' },
-        1: { price: 24, winRate: 0.60, market: '大阪' },
-        2: { price: 28, winRate: 0.70, market: '名古屋' },
-        3: { price: 28, winRate: 0.78, market: '名古屋' },
-        4: { price: 32, winRate: 0.82, market: '福岡' },
-        5: { price: 36, winRate: 0.88, market: '札幌' }
-    },
+        // 目標（MG_CONSTANTSから参照）
+        TARGET_EQUITY: C ? C.TARGET_EQUITY : 450,
 
-    // === 最適戦略（v8シミュレーション結果）===
-    OPTIMAL_STRATEGIES: [
-        { name: 'R2E1_NR_SM_DYN', successRate: 95.20, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: true, desc: '最強: 動的借入+機械' },
-        { name: 'R2E1_NR_DYN', successRate: 94.80, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: false, desc: '動的借入のみ' },
-        { name: 'R2E1_NR_B30_B70', successRate: 93.20, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: false, desc: '段階借入' },
-        { name: 'R2E1_NR_B40_B60', successRate: 93.10, chips: {r:2, e:1}, nextR: 1, borrow: [40, 60], sm: false, desc: '段階借入' },
-        { name: 'R2E1_NR_SM_B30_B70', successRate: 92.90, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: true, desc: '段階借入+機械' },
-        { name: 'R2E1_NR_B50_B50', successRate: 92.40, chips: {r:2, e:1}, nextR: 1, borrow: [50, 50], sm: false, desc: '段階借入' },
-        { name: 'FULL_R2_B50', successRate: 92.20, chips: {r:2, e:1}, nextR: 1, borrow: 50, sm: true, desc: '機械+借入50' },
-        { name: 'R2E1_NR_B30', successRate: 91.50, chips: {r:2, e:1}, nextR: 1, borrow: 30, sm: false, desc: '軽め借入' },
-        { name: 'R3E1_B50', successRate: 90.30, chips: {r:3, e:1}, nextR: 0, borrow: 50, sm: false, desc: '研究3枚' }
-    ],
+        // シミュレーション
+        SIMULATION_RUNS: 100,
 
-    // === 失敗戦略（避けるべき）===
-    FAILED_STRATEGIES: [
-        { name: 'ZERO', successRate: 0.00, reason: '価格競争力なし' },
-        { name: 'R1', successRate: 0.00, reason: '中途半端' },
-        { name: 'R3', successRate: 1.80, reason: '教育なしで能力不足' },
-        { name: 'R2', successRate: 6.80, reason: '教育なしで能力不足' },
-        { name: 'E1', successRate: 21.10, reason: '研究なしで価格競争力不足' }
-    ],
+        // === 入札勝率テーブル（MG_CONSTANTSから参照） ===
+        BID_WIN_RATES: C ? C.BID_WIN_RATES : {
+            0: { price: 24, winRate: 0.55, market: '大阪' },
+            1: { price: 24, winRate: 0.60, market: '大阪' },
+            2: { price: 28, winRate: 0.70, market: '名古屋' },
+            3: { price: 28, winRate: 0.78, market: '名古屋' },
+            4: { price: 32, winRate: 0.82, market: '福岡' },
+            5: { price: 36, winRate: 0.88, market: '札幌' }
+        },
 
-    // === 借入戦略 ===
-    BORROW_STRATEGY: {
-        // 動的借入: 現金60円未満なら借入
-        DYNAMIC_THRESHOLD: 60,
-        DYNAMIC_AMOUNT: 80,
-        // 段階的借入が最も効果的
-        STAGED_3: 30,  // 3期
-        STAGED_4: 70   // 4期
-    }
-};
+        // === 最適戦略（MG_CONSTANTSから参照）===
+        OPTIMAL_STRATEGIES: C ? C.OPTIMAL_STRATEGIES : [
+            { name: 'R2E1_NR_SM_DYN', successRate: 95.20, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: true, desc: '最強: 動的借入+機械' },
+            { name: 'R2E1_NR_DYN', successRate: 94.80, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: false, desc: '動的借入のみ' },
+            { name: 'R2E1_NR_B30_B70', successRate: 93.20, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: false, desc: '段階借入' }
+        ],
+
+        // === 失敗戦略（MG_CONSTANTSから参照）===
+        FAILED_STRATEGIES: C ? C.FAILED_STRATEGIES : [
+            { name: 'ZERO', successRate: 0.00, reason: '価格競争力なし' },
+            { name: 'R1', successRate: 0.00, reason: '中途半端' }
+        ],
+
+        // === 借入戦略（MG_CONSTANTSから参照）===
+        BORROW_STRATEGY: C ? C.BORROW_STRATEGY : {
+            DYNAMIC_THRESHOLD: 60,
+            DYNAMIC_AMOUNT: 80,
+            STAGED_3: 30,
+            STAGED_4: 70
+        }
+    };
+})();
 
 // ============================================
 // 能力計算

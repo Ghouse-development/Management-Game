@@ -651,10 +651,11 @@ const AIBrain = {
     findBestInvestment: function(company, roi, competitors) {
         const period = gameState.currentPeriod;
         const candidates = [];
-        // 2期は2枚以上購入しないと期末に没収されて無駄
-        const minEduChips = period === 2 ? 2 : 1;
+        // 【v8シミュレーション結果】教育チップは1枚で十分
+        // 2枚目はワーカー不足で効果なし（ワーカー1人の場合、教育効果は1枚分のみ）
+        const minEduChips = 1;
 
-        // 教育チップ（最優先：効率が最高）
+        // 教育チップ（1枚のみ推奨）
         if (company.chips.education < minEduChips && roi.education.priority !== 'none') {
             candidates.push({ type: 'education', score: 100, reason: '効率投資（製造+1、販売+1）' });
         }

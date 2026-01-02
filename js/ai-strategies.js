@@ -316,75 +316,79 @@ function selectAdaptiveStrategy(company, period) {
  * - 2期は借入不可（初期現金112円で運用）
  */
 
-// 正確な期別戦略目標（全パターン検証済み）
+// 正確な期別戦略目標（v8シミュレーション結果反映）
+// 【最強戦略】R2E1_NR_SM_DYN: 研究2+教育1+翌期研究1 = 95.20%成功率
 const PERIOD_STRATEGY_TARGETS = {
     2: {
         rows: 20,
         effectiveRows: 16,       // リスク20%考慮
-        cycles: 6,               // 6回販売目標
-        // === 正確なF計算（チップ1枚のみ）===
+        cycles: 4,               // 4回販売（チップ投資を優先）
+        // === 正確なF計算（v8最適戦略: R2E1_NR）===
         fBreakdown: {
             salary: 88,          // (機1+W1+S1)×22 + 2人×11
             depreciation: 10,    // 小型機械
-            pc: 20,
-            insurance: 5,
-            chips: 20,           // 研究1枚のみ = 20円
+            pc: 20,              // コンピュータ
+            insurance: 5,        // 保険
+            chips: 80,           // 研究2枚(40) + 教育1枚(20) + 翌期研究1枚(20)
             interest: 0,         // 借入なし
         },
         baseF: 123,              // チップ・金利なし
-        totalF: 143,             // 研究1枚込み
-        // === G目標（最適化版）===
-        gTarget: -25,            // 6販売で達成可能
-        mqRequired: 118,         // G-25 + F143 = MQ118
+        totalF: 203,             // R2E1_NR込み（PC20+保険5+研究40+教育20+翌期20）
+        // === G目標（v8最適化版）===
+        gTarget: -23,            // 投資期は赤字許容
+        mqRequired: 180,         // G-23 + F203 = MQ180
         // === 販売戦略 ===
-        salesTarget: 6,          // 6回販売
-        targetMarkets: ['福岡', '名古屋'],
-        avgMQPerUnit: 20,        // 売価30円 - 原価10円
-        expectedMQ: 120,         // 6×20 = 120
-        // === 最適投資計画（2期は販売重視）===
+        salesTarget: 4,          // 4回販売（投資優先）
+        targetMarkets: ['名古屋', '大阪'],  // 研究2枚で名古屋28円狙い
+        avgMQPerUnit: 20,        // 売価28円 - 原価8円程度
+        expectedMQ: 80,          // 4×20 = 80
+        // === v8最適投資計画（R2E1_NR）===
+        // 2期の購入: PC¥20 + 保険¥5 + 研究×2(¥40) + 教育×1(¥20) + 翌期研究(¥20) = ¥105
+        // 初期現金¥112 → 残り¥7
         investment: {
-            loanAmount: 0,       // 借入不要
-            research: 1,         // 1枚のみ
-            education: 0,        // 2期は不要
+            loanAmount: 0,       // 借入なし
+            research: 2,         // 【v8】研究2枚 → 名古屋28円確保
+            education: 1,        // 【v8】教育1枚 → 製造+1、販売+1
             advertising: 0,      // 2期は不要
-            nextPeriodChips: 0,  // 2期は購入不可
+            nextPeriodChips: 1,  // 【v8】翌期研究1枚 → 3期で研究3枚に
             machine: 0,
             attachment: 0,
             worker: 0,
             salesman: 0,
         },
-        // === 行別アクションプラン（6回販売最適化）===
+        // === 行別アクションプラン（v8最適化: チップ投資優先）===
         rowPlan: [
-            // 初期状態: 材料1, 仕掛2, 製品1 → 即販売
-            {row: 2, action: 'SELL', qty: 1, reason: '即販売（初期製品）'},
-            {row: 3, action: 'PRODUCE', reason: '仕掛2→製品1, 材料1→仕掛1'},
-            {row: 4, action: 'BUY_CHIP', type: 'research', reason: '研究1枚（入札優位）'},
-            {row: 5, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 6, action: 'SELL', qty: 1, reason: '2回目販売'},
-            {row: 7, action: 'PRODUCE', reason: 'サイクル継続'},
+            // 初期状態: 材料1, 仕掛2, 製品1, 現金112
+            {row: 2, action: 'BUY_CHIP', type: 'research', reason: '研究1枚目（名古屋確保）'},
+            {row: 3, action: 'BUY_CHIP', type: 'research', reason: '研究2枚目（入札優位）'},
+            {row: 4, action: 'BUY_CHIP', type: 'education', reason: '教育1枚（製造+1、販売+1）'},
+            {row: 5, action: 'BUY_NEXT_CHIP', type: 'research', reason: '翌期研究1枚（3期で研究3枚に）'},
+            {row: 6, action: 'SELL', qty: 1, reason: '1回目販売（初期製品）'},
+            {row: 7, action: 'PRODUCE', reason: '仕掛2→製品1, 材料1→仕掛1'},
             {row: 8, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 9, action: 'SELL', qty: 1, reason: '3回目販売'},
+            {row: 9, action: 'SELL', qty: 1, reason: '2回目販売'},
             {row: 10, action: 'PRODUCE', reason: 'サイクル継続'},
             {row: 11, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 12, action: 'SELL', qty: 1, reason: '4回目販売'},
+            {row: 12, action: 'SELL', qty: 1, reason: '3回目販売'},
             {row: 13, action: 'PRODUCE', reason: 'サイクル継続'},
             {row: 14, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 15, action: 'SELL', qty: 1, reason: '5回目販売'},
+            {row: 15, action: 'SELL', qty: 1, reason: '4回目販売'},
             {row: 16, action: 'PRODUCE', reason: 'サイクル継続'},
             {row: 17, action: 'BUY_MATERIALS', qty: 2, reason: '3期用材料'},
-            {row: 18, action: 'SELL', qty: 1, reason: '6回目販売（最終）'},
-            {row: 19, action: 'PRODUCE', reason: '3期用仕掛品'},
+            {row: 18, action: 'PRODUCE', reason: '3期用仕掛品'},
+            {row: 19, action: 'NOTHING', reason: '期末待機'},
             {row: 20, action: 'END', reason: '期末処理'},
         ],
-        // === 期末状態目標 ===
+        // === 期末状態目標（v8最適） ===
         endState: {
-            cash: 80,            // 十分な現金
+            cash: 30,            // 最低限の現金（チップ投資後）
             materials: 2,        // 3期用
             wip: 2,              // 3期用
             products: 0,
-            researchChips: 0,    // 繰越0枚（1枚購入-1返却）
-            educationChips: 0,
+            researchChips: 2,    // 研究2枚（没収後0枚になるがOK）
+            educationChips: 1,   // 教育1枚（没収後0枚になるがOK）
             advertisingChips: 0,
+            nextPeriodResearch: 1, // 翌期研究1枚（3期に適用）
         }
     },
     3: {
@@ -1569,7 +1573,8 @@ function getRowPlanAction(company, period) {
         case 'BUY_CHIP':
             const chipType = plannedAction.type;
             const cost = period >= 3 && !['research', 'education', 'advertising'].includes(chipType) ? 40 : 20;
-            if (company.cash >= cost + 30) {
+            // v8最適戦略: 2期は4枚連続購入するため閾値を下げる (cost + 5)
+            if (company.cash >= cost + 5) {
                 return {
                     action: 'BUY_CHIP',
                     params: { chipType, cost },
@@ -1675,8 +1680,9 @@ function getRowPlanAction(company, period) {
             break;
 
         case 'BUY_NEXT_CHIP':
-            // 次期繰越チップ予約（20円）: 3期以降のみ
-            if (period >= 3 && company.cash >= 50) {
+            // 次期繰越チップ予約（20円）: 2期から購入可能（翌期に適用）
+            // v8最適戦略: 2期5行目で購入（現金7円+安全マージン）
+            if (period >= 2 && company.cash >= 25) {
                 const nextChipType = plannedAction.type || 'research';
                 return {
                     action: 'BUY_NEXT_CHIP',
@@ -3840,14 +3846,21 @@ function planAIPeriodStrategy(company, companyIndex) {
     // - それ以外: 自己資本 × 0.5
 
     const currentLoans = company.loans || 0;
-    const loanMultiplier = (period >= 4 && company.equity > 300) ? 1.0 : 0.5;
+    // MG_CONSTANTSから借入限度倍率を取得
+    const loanMultiplier = (typeof MG_CONSTANTS !== 'undefined' && MG_CONSTANTS.getLoanMultiplier)
+        ? MG_CONSTANTS.getLoanMultiplier(period, company.equity)
+        : ((period >= 4 && company.equity > 300) ? 1.0 : 0.5);
     const maxLoanLimit = Math.floor(company.equity * loanMultiplier);
     const borrowableAmount = Math.max(0, maxLoanLimit - currentLoans);
 
-    // === 動的借入判断（v8シミュレーション最強戦略） ===
-    const DYNAMIC_THRESHOLD = 60;  // 現金がこれ未満なら借入
-    const STAGED_BORROW_3 = 30;    // 3期の段階的借入額
-    const STAGED_BORROW_4 = 70;    // 4期の段階的借入額
+    // === 動的借入判断（v8シミュレーション最強戦略）===
+    // MG_CONSTANTSから借入戦略パラメータを取得
+    const BS = (typeof MG_CONSTANTS !== 'undefined' && MG_CONSTANTS.BORROW_STRATEGY)
+        ? MG_CONSTANTS.BORROW_STRATEGY
+        : { DYNAMIC_THRESHOLD: 60, STAGED_3: 30, STAGED_4: 70 };
+    const DYNAMIC_THRESHOLD = BS.DYNAMIC_THRESHOLD;  // 現金がこれ未満なら借入
+    const STAGED_BORROW_3 = BS.STAGED_3;             // 3期の段階的借入額
+    const STAGED_BORROW_4 = BS.STAGED_4;             // 4期の段階的借入額
 
     if (period >= 3 && borrowableAmount > 0) {
         let borrowAmount = 0;
@@ -4472,7 +4485,8 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
                     }
                     break;
                 case 'BUY_CHIP':
-                    if (company.cash >= 50) {
+                    // チップ20円 + 最低限の安全マージン（v8戦略では積極購入）
+                    if (company.cash >= 25) {
                         forcedAction = { action: 'BUY_CHIP', params: { chipType: plannedAction.type, cost: 20 }, reason: plannedAction.reason };
                     }
                     break;
@@ -4492,7 +4506,9 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
                     }
                     break;
                 case 'BUY_NEXT_CHIP':
-                    if (company.cash >= 50 && period >= 3) {
+                    // 翌期チップは2期から購入可能（3期に適用）
+                    // v8最適戦略では積極購入するため閾値を下げる
+                    if (company.cash >= 25 && period >= 2) {
                         forcedAction = { action: 'BUY_NEXT_CHIP', params: { chipType: plannedAction.type, cost: 20 }, reason: plannedAction.reason };
                     }
                     break;

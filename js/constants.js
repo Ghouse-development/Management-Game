@@ -346,6 +346,57 @@ const WAGE_MULTIPLIER_BY_DICE = {
 };
 
 // ============================================
+// v8シミュレーション結果（57,000回テスト）
+// ============================================
+
+/** 入札勝率テーブル（研究チップ数別） */
+const BID_WIN_RATES = {
+    0: { price: 24, winRate: 0.55, market: '大阪' },
+    1: { price: 24, winRate: 0.60, market: '大阪' },
+    2: { price: 28, winRate: 0.70, market: '名古屋' },
+    3: { price: 28, winRate: 0.78, market: '名古屋' },
+    4: { price: 32, winRate: 0.82, market: '福岡' },
+    5: { price: 36, winRate: 0.88, market: '札幌' }
+};
+
+/** 最適戦略（成功率90%以上） */
+const OPTIMAL_STRATEGIES = [
+    { name: 'R2E1_NR_SM_DYN', successRate: 95.20, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: true, desc: '最強: 動的借入+機械' },
+    { name: 'R2E1_NR_DYN', successRate: 94.80, chips: {r:2, e:1}, nextR: 1, borrow: 'dynamic', sm: false, desc: '動的借入のみ' },
+    { name: 'R2E1_NR_B30_B70', successRate: 93.20, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: false, desc: '段階借入' },
+    { name: 'R2E1_NR_B40_B60', successRate: 93.10, chips: {r:2, e:1}, nextR: 1, borrow: [40, 60], sm: false, desc: '段階借入' },
+    { name: 'R2E1_NR_SM_B30_B70', successRate: 92.90, chips: {r:2, e:1}, nextR: 1, borrow: [30, 70], sm: true, desc: '段階借入+機械' },
+    { name: 'FULL_R2_B50', successRate: 92.20, chips: {r:2, e:1}, nextR: 1, borrow: 50, sm: true, desc: '機械+借入50' },
+    { name: 'R2E1_NR_B30', successRate: 91.50, chips: {r:2, e:1}, nextR: 1, borrow: 30, sm: false, desc: '軽め借入' },
+    { name: 'R3E1_B50', successRate: 90.30, chips: {r:3, e:1}, nextR: 0, borrow: 50, sm: false, desc: '研究3枚' }
+];
+
+/** 失敗戦略（避けるべき） */
+const FAILED_STRATEGIES = [
+    { name: 'ZERO', successRate: 0.00, reason: '価格競争力なし' },
+    { name: 'R1', successRate: 0.00, reason: '中途半端' },
+    { name: 'R3_NO_EDU', successRate: 1.80, reason: '教育なしで能力不足' },
+    { name: 'R2_NO_EDU', successRate: 6.80, reason: '教育なしで能力不足' },
+    { name: 'E1_NO_RESEARCH', successRate: 21.10, reason: '研究なしで価格競争力不足' }
+];
+
+/** 動的借入戦略の閾値 */
+const BORROW_STRATEGY = {
+    DYNAMIC_THRESHOLD: 60,  // 現金がこれ未満なら借入
+    DYNAMIC_AMOUNT: 80,     // 借入目標額
+    STAGED_3: 30,           // 3期の段階借入額
+    STAGED_4: 70            // 4期の段階借入額
+};
+
+/** 借入限度額計算 */
+function getLoanMultiplier(period, equity) {
+    return (period >= 4 && equity > 300) ? 1.0 : 0.5;
+}
+
+/** 目標自己資本 */
+const TARGET_EQUITY = 450;
+
+// ============================================
 // エクスポート（グローバルスコープ用）
 // ============================================
 
@@ -374,6 +425,13 @@ if (typeof window !== 'undefined') {
         AI_COMPANY_NAMES,
         INITIAL_COMPANY_STATE,
         OSAKA_PRICE_BY_DICE,
-        WAGE_MULTIPLIER_BY_DICE
+        WAGE_MULTIPLIER_BY_DICE,
+        // v8シミュレーション結果
+        BID_WIN_RATES,
+        OPTIMAL_STRATEGIES,
+        FAILED_STRATEGIES,
+        BORROW_STRATEGY,
+        getLoanMultiplier,
+        TARGET_EQUITY
     };
 }
