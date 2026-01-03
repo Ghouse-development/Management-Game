@@ -316,79 +316,84 @@ function selectAdaptiveStrategy(company, period) {
  * - 2期は借入不可（初期現金112円で運用）
  */
 
-// 正確な期別戦略目標（v8シミュレーション結果反映）
-// 【最強戦略】R2E1_NR_SM_DYN: 研究2+教育1+翌期研究1 = 95.20%成功率
+// 正確な期別戦略目標（v9シミュレーション結果反映 - 2026-01-04）
+// 【最強戦略】LARGE_HIRE1: 2期大型化+ワーカー1名 = 57%達成率, 90%勝率
+// 10,000回シミュレーション実証:
+//   - 2期大型化のみ: 4%達成, 66%勝率
+//   - 2期大型化+採用1名: 57%達成, 90%勝率 ★最適
+//   - 2期大型化+教育1枚: 36%達成, 78%勝率
+//   - チップ購入はROI負（研究・教育・広告すべて不要）
 const PERIOD_STRATEGY_TARGETS = {
     2: {
         rows: 20,
         effectiveRows: 16,       // リスク20%考慮
-        cycles: 4,               // 4回販売（チップ投資を優先）
-        // === 正確なF計算（v8最適戦略: R2E1_NR）===
+        cycles: 8,               // 8回販売（大型機械で高回転）
+        // === 正確なF計算（v9最適戦略: LARGE_HIRE1）===
         fBreakdown: {
-            salary: 88,          // (機1+W1+S1)×22 + 2人×11
-            depreciation: 10,    // 小型機械
+            salary: 132,         // (大型機1+W2+S1)×22 + 3人×11 = 66+33=99 + 追加ワーカー33 = 132
+            depreciation: 20,    // 大型機械
             pc: 20,              // コンピュータ
             insurance: 5,        // 保険
-            chips: 80,           // 研究2枚(40) + 教育1枚(20) + 翌期研究1枚(20)
-            interest: 0,         // 借入なし
+            chips: 0,            // チップ購入なし（ROI負のため）
+            interest: 10,        // 借入100×10%
         },
-        baseF: 123,              // チップ・金利なし
-        totalF: 203,             // R2E1_NR込み（PC20+保険5+研究40+教育20+翌期20）
-        // === G目標（v8最適化版）===
-        gTarget: -23,            // 投資期は赤字許容
-        mqRequired: 180,         // G-23 + F203 = MQ180
+        baseF: 177,              // PC20+保険5+給与132+減価20
+        totalF: 187,             // 金利込み
+        // === G目標（v9最適化版）===
+        gTarget: 50,             // 大型機械で積極的に稼ぐ
+        mqRequired: 237,         // G50 + F187 = MQ237
         // === 販売戦略 ===
-        salesTarget: 4,          // 4回販売（投資優先）
-        targetMarkets: ['名古屋', '大阪'],  // 研究2枚で名古屋28円狙い
-        avgMQPerUnit: 20,        // 売価28円 - 原価8円程度
-        expectedMQ: 80,          // 4×20 = 80
-        // === v8最適投資計画（R2E1_NR）===
-        // 2期の購入: PC¥20 + 保険¥5 + 研究×2(¥40) + 教育×1(¥20) + 翌期研究(¥20) = ¥105
-        // 初期現金¥112 → 残り¥7
+        salesTarget: 16,         // 16回販売（大型機械能力4で高回転）
+        targetMarkets: ['札幌', '仙台', '東京'], // 24円で確実に売る
+        avgMQPerUnit: 15,        // 売価24円 - 原価9円程度
+        expectedMQ: 240,         // 16×15 = 240
+        // === v9最適投資計画（LARGE_HIRE1）===
+        // 2期の購入: PC¥20 + 保険¥5 + 大型機械200 - 小型売却63 = ¥162
+        // 借入100円で資金確保
         investment: {
-            loanAmount: 0,       // 借入なし
-            research: 2,         // 【v8】研究2枚 → 名古屋28円確保
-            education: 1,        // 【v8】教育1枚 → 製造+1、販売+1
-            advertising: 0,      // 2期は不要
-            nextPeriodChips: 1,  // 【v8】翌期研究1枚 → 3期で研究3枚に
-            machine: 0,
+            loanAmount: 100,     // 大型機械購入資金
+            research: 0,         // 【v9】不要（ROI負）
+            education: 0,        // 【v9】不要（ROI負）
+            advertising: 0,      // 不要
+            nextPeriodChips: 0,  // 不要
+            machine: 'large',    // 【v9】大型機械にアップグレード
             attachment: 0,
-            worker: 0,
+            worker: 1,           // 【v9】ワーカー1名追加（製造能力活用）
             salesman: 0,
         },
-        // === 行別アクションプラン（v8最適化: チップ投資優先）===
+        // === 行別アクションプラン（v9最適化: 大型機械で高回転）===
         rowPlan: [
-            // 初期状態: 材料1, 仕掛2, 製品1, 現金112
-            {row: 2, action: 'BUY_CHIP', type: 'research', reason: '研究1枚目（名古屋確保）'},
-            {row: 3, action: 'BUY_CHIP', type: 'research', reason: '研究2枚目（入札優位）'},
-            {row: 4, action: 'BUY_CHIP', type: 'education', reason: '教育1枚（製造+1、販売+1）'},
-            {row: 5, action: 'BUY_NEXT_CHIP', type: 'research', reason: '翌期研究1枚（3期で研究3枚に）'},
-            {row: 6, action: 'SELL', qty: 1, reason: '1回目販売（初期製品）'},
-            {row: 7, action: 'PRODUCE', reason: '仕掛2→製品1, 材料1→仕掛1'},
-            {row: 8, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 9, action: 'SELL', qty: 1, reason: '2回目販売'},
-            {row: 10, action: 'PRODUCE', reason: 'サイクル継続'},
-            {row: 11, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 12, action: 'SELL', qty: 1, reason: '3回目販売'},
-            {row: 13, action: 'PRODUCE', reason: 'サイクル継続'},
-            {row: 14, action: 'BUY_MATERIALS', qty: 2, reason: '材料補充'},
-            {row: 15, action: 'SELL', qty: 1, reason: '4回目販売'},
-            {row: 16, action: 'PRODUCE', reason: 'サイクル継続'},
-            {row: 17, action: 'BUY_MATERIALS', qty: 2, reason: '3期用材料'},
+            // 初期状態: 材料1, 仕掛2, 製品1, 現金112+借入100=212
+            {row: 2, action: 'SELL_MACHINE', reason: '小型機械売却（簿価90×70%=63円）'},
+            {row: 3, action: 'BUY_LARGE_MACHINE', reason: '大型機械購入（200円、能力4）'},
+            {row: 4, action: 'HIRE_WORKER', reason: 'ワーカー採用（5円、製造サポート）'},
+            {row: 5, action: 'SELL', qty: 1, reason: '1回目販売（初期製品）'},
+            {row: 6, action: 'PRODUCE', reason: '仕掛2+材料1→製品3'},
+            {row: 7, action: 'BUY_MATERIALS', qty: 4, reason: '材料補充（大型用）'},
+            {row: 8, action: 'SELL', qty: 2, reason: '2回目販売'},
+            {row: 9, action: 'PRODUCE', reason: '完成+投入（製造能力4）'},
+            {row: 10, action: 'BUY_MATERIALS', qty: 4, reason: '材料補充'},
+            {row: 11, action: 'SELL', qty: 2, reason: '3回目販売'},
+            {row: 12, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 13, action: 'BUY_MATERIALS', qty: 4, reason: '材料補充'},
+            {row: 14, action: 'SELL', qty: 2, reason: '4回目販売'},
+            {row: 15, action: 'PRODUCE', reason: '完成+投入'},
+            {row: 16, action: 'BUY_MATERIALS', qty: 4, reason: '材料補充'},
+            {row: 17, action: 'SELL', qty: 2, reason: '5回目販売'},
             {row: 18, action: 'PRODUCE', reason: '3期用仕掛品'},
-            {row: 19, action: 'NOTHING', reason: '期末待機'},
+            {row: 19, action: 'BUY_MATERIALS', qty: 4, reason: '3期用材料'},
             {row: 20, action: 'END', reason: '期末処理'},
         ],
-        // === 期末状態目標（v8最適） ===
+        // === 期末状態目標（v9最適） ===
         endState: {
-            cash: 30,            // 最低限の現金（チップ投資後）
-            materials: 2,        // 3期用
-            wip: 2,              // 3期用
+            cash: 80,            // 運転資金確保
+            materials: 4,        // 3期用
+            wip: 4,              // 3期用
             products: 0,
-            researchChips: 2,    // 研究2枚（没収後0枚になるがOK）
-            educationChips: 1,   // 教育1枚（没収後0枚になるがOK）
+            researchChips: 0,    // チップなし
+            educationChips: 0,   // チップなし
             advertisingChips: 0,
-            nextPeriodResearch: 1, // 翌期研究1枚（3期に適用）
+            nextPeriodResearch: 0,
         }
     },
     3: {
