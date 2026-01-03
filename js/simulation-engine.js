@@ -12,18 +12,26 @@ const MGSimulation = (function() {
     // ゲームルール定数（正確な値）
     // ============================================
     const RULES = {
-        // 初期状態
+        // 初期状態（2期開始時、期首処理後）
         INITIAL: {
-            CASH: 100,
+            CASH: 112,              // 137 - PC20 - 保険5 = 112
             EQUITY: 283,
-            WORKERS: 3,
-            MATERIALS: 3,
-            WIP: 0,
-            PRODUCTS: 0,
+            WORKERS: 1,
+            SALESMEN: 1,
+            MATERIALS: 1,
+            WIP: 2,
+            PRODUCTS: 1,
             MACHINES: [{ type: 'small', attachments: 0 }],
             WAREHOUSES: 0,
             LONG_TERM_LOAN: 0,
-            SHORT_TERM_LOAN: 0
+            SHORT_TERM_LOAN: 0,
+            CHIPS: {
+                computer: 1,        // 期首処理で購入済み
+                insurance: 1,       // 期首処理で購入済み
+                research: 0,
+                education: 0,
+                advertising: 0
+            }
         },
 
         // 容量
@@ -82,21 +90,34 @@ const MGSimulation = (function() {
             MIN_SHORT_REPAY: 0.20
         },
 
-        // 借入限度（自己資本の50%、4期以降で自己資本300超なら100%）
+        // 借入限度
+        // 2期: 長期借入不可（0）
+        // 3期: 自己資本の50%
+        // 4-5期: 自己資本300以下→50%、300超→100%
         getLoanLimit: function(period, equity) {
+            if (period === 2) return 0;  // 2期は長期借入禁止
             const multiplier = (period >= 4 && equity > 300) ? 1.0 : 0.5;
             return Math.floor(equity * multiplier);
         },
 
         // 市場
         MARKETS: [
-            { name: '仙台', buyPrice: 10, sellPrice: 40, maxStock: 3 },
-            { name: '札幌', buyPrice: 11, sellPrice: 36, maxStock: 3 },
-            { name: '福岡', buyPrice: 12, sellPrice: 32, maxStock: 3 },
-            { name: '名古屋', buyPrice: 13, sellPrice: 28, maxStock: 3 },
-            { name: '大阪', buyPrice: 14, sellPrice: 24, maxStock: 3 },
-            { name: '東京', buyPrice: 15, sellPrice: 20, maxStock: 3 }
+            { name: '仙台', buyPrice: 10, sellPrice: 40, maxStock: 3, needsBid: true },
+            { name: '札幌', buyPrice: 11, sellPrice: 36, maxStock: 4, needsBid: true },
+            { name: '福岡', buyPrice: 12, sellPrice: 32, maxStock: 6, needsBid: true },
+            { name: '名古屋', buyPrice: 13, sellPrice: 28, maxStock: 9, needsBid: true },
+            { name: '大阪', buyPrice: 14, sellPrice: 24, maxStock: 13, needsBid: false },
+            { name: '東京', buyPrice: 15, sellPrice: 20, maxStock: 20, needsBid: false },
+            { name: '海外', buyPrice: 16, sellPrice: 16, maxStock: 100, needsBid: false }
         ],
+
+        // 期別・研究チップ別の記帳価格目安（親の場合）
+        TARGET_PRICES: {
+            2: { 0: 24, 1: 26, 2: 28, 3: 30, 4: 32 },
+            3: { 0: 24, 1: 26, 2: 28, 3: 30, 4: 32, 5: 34 },
+            4: { 0: 22, 1: 24, 2: 26, 3: 28, 4: 30, 5: 32 },
+            5: { 0: 21, 1: 23, 2: 25, 3: 27, 4: 29, 5: 31 }
+        },
 
         // 行数上限（期別）
         MAX_ROWS: { 2: 20, 3: 30, 4: 34, 5: 35 },
@@ -105,17 +126,77 @@ const MGSimulation = (function() {
         RISK_PROBABILITY: 0.20,
 
         // 目標自己資本
-        TARGET_EQUITY: 450
+        TARGET_EQUITY: 450,
+
+        // 勝利条件
+        // 自己資本450円達成 かつ 在庫10個以上＋次期繰越チップ3枚以上
+        VICTORY: {
+            TARGET_EQUITY: 450,
+            MIN_INVENTORY: 10,
+            MIN_CARRYOVER_CHIPS: 3
+        },
+
+        // AI戦略タイプ
+        AI_STRATEGIES: {
+            RESEARCH_FOCUSED: {
+                name: '研究開発型',
+                description: '青チップ重視、高価格販売',
+                targetResearchChips: 3,
+                targetEducationChips: 1,
+                targetAdvertisingChips: 0,
+                priceAdjustment: 2,  // 目安価格より高め
+                hirePriority: 'worker'
+            },
+            SALES_FOCUSED: {
+                name: '販売能力型',
+                description: 'セールスマン・広告チップ重視',
+                targetResearchChips: 1,
+                targetEducationChips: 1,
+                targetAdvertisingChips: 2,
+                priceAdjustment: -2,  // 目安価格より安め（量重視）
+                hirePriority: 'salesman'
+            },
+            LOW_CHIP: {
+                name: '低チップ型',
+                description: 'チップ投資を抑え、設備・人員に投資',
+                targetResearchChips: 0,
+                targetEducationChips: 1,
+                targetAdvertisingChips: 0,
+                priceAdjustment: -4,  // 安価販売
+                hirePriority: 'worker'
+            },
+            BALANCED: {
+                name: 'バランス型',
+                description: '状況に応じた柔軟な投資',
+                targetResearchChips: 2,
+                targetEducationChips: 1,
+                targetAdvertisingChips: 1,
+                priceAdjustment: 0,
+                hirePriority: 'balanced'
+            },
+            AGGRESSIVE: {
+                name: '積極投資型',
+                description: '早期に大型機械・人員拡大',
+                targetResearchChips: 2,
+                targetEducationChips: 1,
+                targetAdvertisingChips: 0,
+                priceAdjustment: 0,
+                hirePriority: 'worker',
+                earlyLargeMachine: true
+            }
+        }
     };
 
     // ============================================
     // 会社クラス
     // ============================================
     class Company {
-        constructor(index, name, isPlayer = false) {
+        constructor(index, name, isPlayer = false, strategyType = null) {
             this.index = index;
             this.name = name;
             this.isPlayer = isPlayer;
+            this.strategyType = strategyType;
+            this.strategy = strategyType ? RULES.AI_STRATEGIES[strategyType] : null;
             this.reset();
         }
 
@@ -126,14 +207,14 @@ const MGSimulation = (function() {
             this.wip = init.WIP;
             this.products = init.PRODUCTS;
             this.workers = init.WORKERS;
+            this.salesmen = init.SALESMEN;
             this.machines = JSON.parse(JSON.stringify(init.MACHINES));
             this.warehouses = init.WAREHOUSES;
             this.longTermLoan = init.LONG_TERM_LOAN;
             this.shortTermLoan = init.SHORT_TERM_LOAN;
-            this.chips = { research: 0, education: 0, advertising: 0 };
+            this.chips = JSON.parse(JSON.stringify(init.CHIPS));
             this.nextPeriodChips = { research: 0, education: 0, advertising: 0 };
-            this.insurance = false;
-            this.currentRow = 1;
+            this.currentRow = 2;  // 期首処理で1行使用済み
             this.totalSales = 0;
             this.totalSoldQuantity = 0;
             this.totalF = 0;
@@ -150,8 +231,14 @@ const MGSimulation = (function() {
         }
 
         // 販売能力
+        // セールスマン×2 + min(広告チップ, セールスマン×2)×2 + min(教育チップ, 1)
         getSalesCapacity() {
-            return this.workers + (this.chips.education || 0);
+            if (this.salesmen === 0) return 0;
+            const baseCapacity = this.salesmen * 2;
+            const effectiveAdChips = Math.min(this.chips.advertising || 0, this.salesmen * 2);
+            let capacity = baseCapacity + effectiveAdChips * 2;
+            capacity += Math.min(this.chips.education || 0, 1);
+            return capacity;
         }
 
         // 倉庫容量
@@ -227,10 +314,17 @@ const MGSimulation = (function() {
         }
 
         initCompanies(playerName = 'あなた') {
-            const aiNames = ['A社', 'B社', 'C社', 'D社', 'E社'];
+            // AI戦略タイプを各社に割り当て
+            const aiConfigs = [
+                { name: '研究商事', strategy: 'RESEARCH_FOCUSED' },
+                { name: '販売産業', strategy: 'SALES_FOCUSED' },
+                { name: '堅実工業', strategy: 'LOW_CHIP' },
+                { name: 'バランス物産', strategy: 'BALANCED' },
+                { name: '積極製作所', strategy: 'AGGRESSIVE' }
+            ];
             this.companies = [new Company(0, playerName, true)];
-            aiNames.forEach((name, i) => {
-                this.companies.push(new Company(i + 1, name, false));
+            aiConfigs.forEach((config, i) => {
+                this.companies.push(new Company(i + 1, config.name, false, config.strategy));
             });
         }
 
@@ -417,6 +511,28 @@ const MGSimulation = (function() {
 
             const type = isReferral ? '縁故採用' : '採用';
             company.logAction(type, `${count}人採用`, cost, false);
+
+            return { success: true, cost };
+        },
+
+        /**
+         * セールスマン採用
+         */
+        hireSalesman(company, count) {
+            if (count > 3) {
+                return { success: false, reason: '1行で最大3人まで' };
+            }
+
+            const cost = count * RULES.COST.HIRING;
+            if (company.cash < cost) {
+                return { success: false, reason: '現金不足' };
+            }
+
+            company.cash -= cost;
+            company.salesmen += count;
+            company.totalF += cost;
+
+            company.logAction('セールスマン採用', `${count}人採用`, cost, false);
 
             return { success: true, cost };
         },
@@ -724,28 +840,32 @@ const MGSimulation = (function() {
             const quantity = Math.min(salesCapacity, company.products);
             if (quantity === 0) return null;
 
-            // 最適な市場を選択
+            const period = gameState.period;
             const isParent = gameState.isParent(company.index);
-            const competitiveness = company.getPriceCompetitiveness(isParent);
-
-            // 研究チップに応じた価格設定
             const researchChips = company.chips.research || 0;
-            let targetPrice, targetMarket;
 
-            if (researchChips >= 4) {
-                targetPrice = 32;
-                targetMarket = gameState.markets.find(m => m.sellPrice >= 32);
-            } else if (researchChips >= 2) {
-                targetPrice = 28;
-                targetMarket = gameState.markets.find(m => m.sellPrice >= 28);
-            } else {
-                targetPrice = 24;
-                targetMarket = gameState.markets.find(m => m.sellPrice >= 24);
+            // 期別・研究チップ別の目安価格を取得
+            let basePrice = RULES.TARGET_PRICES[period]?.[Math.min(researchChips, 5)] || 24;
+
+            // 戦略に応じて価格調整
+            const strategy = company.strategy;
+            if (strategy) {
+                basePrice += strategy.priceAdjustment || 0;
             }
 
+            // 親でない場合は2円引き
+            if (!isParent) {
+                basePrice -= 2;
+            }
+
+            // 価格は最低16円（海外）、最高40円（仙台）
+            let targetPrice = Math.max(16, Math.min(40, basePrice));
+
+            // 価格に合う市場を選択
+            let targetMarket = gameState.markets.find(m => m.sellPrice >= targetPrice);
             if (!targetMarket) {
-                targetMarket = gameState.markets[4]; // 大阪
-                targetPrice = 24;
+                targetMarket = gameState.markets[6]; // 海外
+                targetPrice = 16;
             }
 
             const expectedRevenue = targetPrice * quantity;
@@ -832,26 +952,69 @@ const MGSimulation = (function() {
         },
 
         evaluateHiring(company, gameState) {
-            const currentSalesCapacity = company.getSalesCapacity();
-            const products = company.products;
+            const strategy = company.strategy;
+            const hirePriority = strategy?.hirePriority || 'balanced';
 
-            // 販売能力が製品数より少なければ採用を検討
-            if (currentSalesCapacity >= products + 2) return null;
+            // ワーカー採用評価
+            const workerAction = this.evaluateWorkerHiring(company, gameState, hirePriority);
 
-            const hireCount = Math.min(3, Math.max(1, products - currentSalesCapacity + 1));
+            // セールスマン採用評価
+            const salesmanAction = this.evaluateSalesmanHiring(company, gameState, hirePriority);
+
+            // 優先度に基づいて選択
+            if (!workerAction && !salesmanAction) return null;
+            if (!workerAction) return salesmanAction;
+            if (!salesmanAction) return workerAction;
+            return workerAction.score >= salesmanAction.score ? workerAction : salesmanAction;
+        },
+
+        evaluateWorkerHiring(company, gameState, hirePriority) {
+            const mfgCapacity = company.getMfgCapacity();
+            const machines = company.machines.length;
+
+            // ワーカーが機械台数より少ない場合に検討
+            if (company.workers >= machines) return null;
+
+            const hireCount = Math.min(3, machines - company.workers);
             const cost = hireCount * RULES.COST.HIRING;
 
             if (company.cash < cost + 50) return null;
 
-            // スコア: 追加販売できる製品の期待利益
-            const additionalSales = Math.min(hireCount, products);
-            const score = additionalSales * 13 - cost; // M=13想定
+            let score = hireCount * 15;
+            if (hirePriority === 'worker') score += 20;
 
             return {
-                type: 'HIRE',
+                type: 'HIRE_WORKER',
                 score,
-                detail: `${hireCount}人採用`,
-                count: hireCount
+                detail: `ワーカー${hireCount}人採用`,
+                count: hireCount,
+                hireType: 'worker'
+            };
+        },
+
+        evaluateSalesmanHiring(company, gameState, hirePriority) {
+            const currentSalesCapacity = company.getSalesCapacity();
+            const products = company.products;
+            const mfgCapacity = company.getMfgCapacity();
+
+            // 販売能力が製造能力より低い場合に検討
+            if (currentSalesCapacity >= mfgCapacity * 2) return null;
+
+            const hireCount = Math.min(3, 1);  // セールスマンは1人ずつ
+            const cost = hireCount * RULES.COST.HIRING;
+
+            if (company.cash < cost + 50) return null;
+
+            let score = hireCount * 15;
+            if (hirePriority === 'salesman') score += 20;
+            if (currentSalesCapacity < products) score += 30;  // 製品が売れない状態なら優先
+
+            return {
+                type: 'HIRE_SALESMAN',
+                score,
+                detail: `セールスマン${hireCount}人採用`,
+                count: hireCount,
+                hireType: 'salesman'
             };
         },
 
@@ -874,16 +1037,48 @@ const MGSimulation = (function() {
 
         evaluateChipPurchase(company, gameState) {
             const period = gameState.period;
-            const researchChips = company.chips.research || 0;
+            const strategy = company.strategy;
+            if (!strategy) return null;
 
-            // 研究開発チップを優先
-            if (researchChips < 3 && company.cash >= RULES.COST.CHIP_EXPRESS + 50) {
-                const score = (3 - researchChips) * 20;
+            const currentResearch = (company.chips.research || 0) + (company.nextPeriodChips.research || 0);
+            const currentEducation = (company.chips.education || 0) + (company.nextPeriodChips.education || 0);
+            const currentAdvertising = (company.chips.advertising || 0) + (company.nextPeriodChips.advertising || 0);
+
+            const minCash = 80; // 安全マージン
+
+            // 戦略に基づいてチップ購入を評価
+            // 研究開発チップ
+            if (currentResearch < strategy.targetResearchChips && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
+                const score = (strategy.targetResearchChips - currentResearch) * 25;
                 return {
                     type: 'BUY_CHIP',
                     score,
                     detail: '研究開発チップ（特急）購入',
                     chipType: 'research',
+                    isExpress: true
+                };
+            }
+
+            // 教育チップ
+            if (currentEducation < strategy.targetEducationChips && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
+                const score = (strategy.targetEducationChips - currentEducation) * 20;
+                return {
+                    type: 'BUY_CHIP',
+                    score,
+                    detail: '教育チップ（特急）購入',
+                    chipType: 'education',
+                    isExpress: true
+                };
+            }
+
+            // 広告チップ
+            if (currentAdvertising < strategy.targetAdvertisingChips && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
+                const score = (strategy.targetAdvertisingChips - currentAdvertising) * 15;
+                return {
+                    type: 'BUY_CHIP',
+                    score,
+                    detail: '広告チップ（特急）購入',
+                    chipType: 'advertising',
                     isExpress: true
                 };
             }
@@ -1025,53 +1220,33 @@ const MGSimulation = (function() {
             return periodResult;
         },
 
+        /**
+         * リスクカード処理（64種類）
+         */
         processRiskCard(company, gameState) {
-            // 15種類のリスクカード（実際のゲームに基づく）
-            const riskCards = [
-                { id: 1, name: 'クレーム発生', effect: 'F_COST', value: 5 },
-                { id: 2, name: 'クレーム発生', effect: 'F_COST', value: 5 },
-                { id: 3, name: '教育成功', effect: 'EDUCATION_SUCCESS', value: 32 },
-                { id: 4, name: '教育成功', effect: 'EDUCATION_SUCCESS', value: 32 },
-                { id: 5, name: '消費者運動発生', effect: 'NO_SALES', value: 0 },
-                { id: 6, name: '消費者運動発生', effect: 'NO_SALES', value: 0 },
-                { id: 7, name: '得意先倒産', effect: 'CASH_LOSS', value: 30 },
-                { id: 8, name: '得意先倒産', effect: 'CASH_LOSS', value: 30 },
-                { id: 9, name: '研究開発失敗', effect: 'LOSE_CHIP', chipType: 'research' },
-                { id: 10, name: '研究開発失敗', effect: 'LOSE_CHIP', chipType: 'research' },
-                { id: 11, name: '研究開発失敗', effect: 'LOSE_CHIP', chipType: 'research' },
-                { id: 12, name: '広告成功', effect: 'AD_SUCCESS', value: 0 },
-                { id: 13, name: '広告成功', effect: 'AD_SUCCESS', value: 0 },
-                { id: 14, name: '火災発生', effect: 'FIRE', value: 0 },
-                { id: 15, name: '労働争議', effect: 'LABOR_DISPUTE', value: 0 }
-            ];
+            // 64種類のリスクカードからランダムに選択
+            const cardId = Math.floor(Math.random() * 64) + 1;
+            this.applyRiskCard(company, gameState, cardId);
+        },
 
-            const card = riskCards[Math.floor(Math.random() * riskCards.length)];
+        /**
+         * リスクカード効果適用
+         */
+        applyRiskCard(company, gameState, cardId) {
+            const period = gameState.period;
+            const INVENTORY_VALUES = { material: 13, wip: 14, product: 15 };
 
-            switch (card.effect) {
-                case 'F_COST':
-                    company.cash -= card.value;
-                    company.totalF += card.value;
-                    company.logAction('リスクカード', `${card.name} F+${card.value}`, card.value, false);
+            // カードIDに基づいて効果を適用
+            switch (cardId) {
+                // クレーム発生 (1-2): 本社経費▲5
+                case 1: case 2:
+                    company.cash -= 5;
+                    company.totalF += 5;
+                    company.logAction('リスクカード', 'クレーム発生 F+5', 5, false);
                     break;
 
-                case 'CASH_LOSS':
-                    // 2期は免除
-                    if (gameState.period > 2) {
-                        company.cash -= card.value;
-                        company.totalSpecialLoss += card.value;
-                        company.logAction('リスクカード', `${card.name} 特別損失${card.value}`, card.value, false);
-                    }
-                    break;
-
-                case 'LOSE_CHIP':
-                    if (company.chips[card.chipType] > 0) {
-                        company.chips[card.chipType]--;
-                        company.logAction('リスクカード', `${card.name} ${card.chipType}チップ-1`, 0, false);
-                    }
-                    break;
-
-                case 'EDUCATION_SUCCESS':
-                    // 教育チップがあれば32円で販売可能（最大5個）
+                // 教育成功 (3-4): 教育チップで32円販売（最大5個）
+                case 3: case 4:
                     if (company.chips.education > 0 && company.products > 0) {
                         const sellQty = Math.min(5, company.products, company.getSalesCapacity());
                         if (sellQty > 0) {
@@ -1080,44 +1255,312 @@ const MGSimulation = (function() {
                             company.products -= sellQty;
                             company.totalSales += revenue;
                             company.totalSoldQuantity += sellQty;
-                            company.logAction('リスクカード', `${card.name} ¥32×${sellQty}個販売`, revenue, true);
+                            company.logAction('リスクカード', `教育成功 ¥32×${sellQty}個`, revenue, true);
                         }
+                    } else {
+                        company.logAction('リスクカード', '教育成功（効果なし）', 0, false);
                     }
                     break;
 
-                case 'AD_SUCCESS':
-                    // 広告チップ1枚につき2個まで独占販売（最大5個）
+                // 消費者運動発生 (5-6): 販売不可
+                case 5: case 6:
+                    company.logAction('リスクカード', '消費者運動発生 販売不可', 0, false);
+                    break;
+
+                // 得意先倒産 (7-8): 現金▲30（2期免除）
+                case 7: case 8:
+                    if (period > 2) {
+                        company.cash -= 30;
+                        company.totalSpecialLoss += 30;
+                        company.logAction('リスクカード', '得意先倒産 特別損失30', 30, false);
+                    } else {
+                        company.logAction('リスクカード', '得意先倒産（2期免除）', 0, false);
+                    }
+                    break;
+
+                // 研究開発失敗 (9-11): 青チップ1枚返却
+                case 9: case 10: case 11:
+                    if (company.chips.research > 0) {
+                        company.chips.research--;
+                        company.logAction('リスクカード', '研究開発失敗 青チップ-1', 0, false);
+                    } else if (company.nextPeriodChips.research > 0) {
+                        company.nextPeriodChips.research--;
+                        company.logAction('リスクカード', '研究開発失敗 次繰青チップ-1', 0, false);
+                    } else {
+                        company.logAction('リスクカード', '研究開発失敗（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 広告成功 (12-14): 赤チップ1枚につき2個、独占販売（最大5個）
+                case 12: case 13: case 14:
                     if (company.chips.advertising > 0 && company.products > 0) {
                         const maxSell = Math.min(5, company.chips.advertising * 2, company.products);
-                        if (maxSell > 0) {
-                            const revenue = 28 * maxSell; // 平均価格想定
-                            company.cash += revenue;
-                            company.products -= maxSell;
-                            company.totalSales += revenue;
-                            company.totalSoldQuantity += maxSell;
-                            company.logAction('リスクカード', `${card.name} ¥28×${maxSell}個販売`, revenue, true);
+                        const price = RULES.TARGET_PRICES[period]?.[company.chips.research || 0] || 24;
+                        const revenue = price * maxSell;
+                        company.cash += revenue;
+                        company.products -= maxSell;
+                        company.totalSales += revenue;
+                        company.totalSoldQuantity += maxSell;
+                        company.logAction('リスクカード', `広告成功 ¥${price}×${maxSell}個`, revenue, true);
+                    } else {
+                        company.logAction('リスクカード', '広告成功（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 労災発生 (15-16): 生産不可
+                case 15: case 16:
+                    company.logAction('リスクカード', '労災発生 生産不可', 0, false);
+                    break;
+
+                // 広告政策失敗 (17-18): 赤チップ1枚返却
+                case 17: case 18:
+                    if (company.chips.advertising > 0) {
+                        company.chips.advertising--;
+                        company.logAction('リスクカード', '広告政策失敗 赤チップ-1', 0, false);
+                    } else if (company.nextPeriodChips.advertising > 0) {
+                        company.nextPeriodChips.advertising--;
+                        company.logAction('リスクカード', '広告政策失敗 次繰赤チップ-1', 0, false);
+                    } else {
+                        company.logAction('リスクカード', '広告政策失敗（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 特別サービス (19-20): 材料10円で5個まで購入可
+                case 19: case 20:
+                    // シミュレーションでは自動的に購入を試みる
+                    const buyQty = Math.min(5, company.getStorageCapacity() - company.materials - company.products);
+                    if (buyQty > 0 && company.cash >= buyQty * 10) {
+                        company.cash -= buyQty * 10;
+                        company.materials += buyQty;
+                        company.logAction('リスクカード', `特別サービス 材料${buyQty}個@¥10`, buyQty * 10, false);
+                    } else {
+                        company.logAction('リスクカード', '特別サービス（見送り）', 0, false);
+                    }
+                    break;
+
+                // 返品発生 (21-23): 売上-20、製品+1（2期免除）
+                case 21: case 22: case 23:
+                    if (period > 2 && company.totalSoldQuantity > 0) {
+                        company.totalSales -= 20;
+                        company.totalSoldQuantity -= 1;
+                        company.products += 1;
+                        company.logAction('リスクカード', '返品発生 売上-20 製品+1', 20, false);
+                    } else {
+                        company.logAction('リスクカード', '返品発生（2期免除）', 0, false);
+                    }
+                    break;
+
+                // コンピュータートラブル (24-25): 製造経費▲10
+                case 24: case 25:
+                    company.cash -= 10;
+                    company.totalF += 10;
+                    company.logAction('リスクカード', 'コンピュータートラブル F+10', 10, false);
+                    break;
+
+                // 商品の独占販売 (26-28): セールスマン1人につき2個、32円で販売（最大5個）
+                case 26: case 27: case 28:
+                    if (company.products > 0 && company.salesmen > 0) {
+                        const maxSell = Math.min(5, company.salesmen * 2, company.products);
+                        const revenue = 32 * maxSell;
+                        company.cash += revenue;
+                        company.products -= maxSell;
+                        company.totalSales += revenue;
+                        company.totalSoldQuantity += maxSell;
+                        company.logAction('リスクカード', `商品の独占販売 ¥32×${maxSell}個`, revenue, true);
+                    } else {
+                        company.logAction('リスクカード', '商品の独占販売（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 製造ミス発生 (29-30): 仕掛品1個損失、特別損失14
+                case 29: case 30:
+                    if (company.wip > 0) {
+                        company.wip -= 1;
+                        company.totalSpecialLoss += INVENTORY_VALUES.wip;
+                        company.logAction('リスクカード', '製造ミス発生 仕掛品-1 特別損失14', INVENTORY_VALUES.wip, false);
+                    } else {
+                        company.logAction('リスクカード', '製造ミス発生（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 倉庫火災 (31-32): 材料全損、保険あれば8円/個
+                case 31: case 32:
+                    if (company.materials > 0) {
+                        const lostQty = company.materials;
+                        const insurancePayout = company.chips.insurance > 0 ? lostQty * 8 : 0;
+                        const specialLoss = lostQty * INVENTORY_VALUES.material - insurancePayout;
+                        company.materials = 0;
+                        if (insurancePayout > 0) {
+                            company.cash += insurancePayout;
+                            company.chips.insurance = 0;  // 保険消費
                         }
+                        company.totalSpecialLoss += specialLoss;
+                        company.logAction('リスクカード', `倉庫火災 材料${lostQty}個損失 保険${insurancePayout}円`, specialLoss, false);
+                    } else {
+                        company.logAction('リスクカード', '倉庫火災（効果なし）', 0, false);
                     }
                     break;
 
-                case 'NO_SALES':
-                    // 販売できない（シミュレーションでは次のターンまで効果なし扱い）
-                    company.logAction('リスクカード', `${card.name} 販売不可`, 0, false);
+                // 縁故採用 (33-34): 本社経費▲5
+                case 33: case 34:
+                    company.cash -= 5;
+                    company.totalF += 5;
+                    company.logAction('リスクカード', '縁故採用 F+5', 5, false);
                     break;
 
-                case 'FIRE':
-                    // 火災: 保険なしなら製品損失
-                    if (!company.insurance && company.products > 0) {
-                        const loss = Math.min(3, company.products);
-                        company.products -= loss;
-                        company.logAction('リスクカード', `${card.name} 製品${loss}個損失`, 0, false);
+                // 研究開発成功 (35-40): 青チップ1枚につき2個、32円で販売（最大5個、仕入不可）
+                case 35: case 36: case 37: case 38: case 39: case 40:
+                    if (company.chips.research > 0 && company.products > 0) {
+                        const maxSell = Math.min(5, company.chips.research * 2, company.products, company.getSalesCapacity());
+                        const revenue = 32 * maxSell;
+                        company.cash += revenue;
+                        company.products -= maxSell;
+                        company.totalSales += revenue;
+                        company.totalSoldQuantity += maxSell;
+                        company.logAction('リスクカード', `研究開発成功 ¥32×${maxSell}個`, revenue, true);
+                    } else {
+                        company.logAction('リスクカード', '研究開発成功（効果なし）', 0, false);
                     }
                     break;
 
-                case 'LABOR_DISPUTE':
-                    // 労働争議: 生産停止（シミュレーションでは効果なし扱い）
-                    company.logAction('リスクカード', `${card.name}`, 0, false);
+                // 各社共通 (41-42): 全社3個まで12円で購入可（シミュレーションでは自社のみ）
+                case 41: case 42:
+                    const commonBuyQty = Math.min(3, company.getStorageCapacity() - company.materials - company.products);
+                    if (commonBuyQty > 0 && company.cash >= commonBuyQty * 12) {
+                        company.cash -= commonBuyQty * 12;
+                        company.materials += commonBuyQty;
+                        company.logAction('リスクカード', `各社共通 材料${commonBuyQty}個@¥12`, commonBuyQty * 12, false);
+                    } else {
+                        company.logAction('リスクカード', '各社共通（見送り）', 0, false);
+                    }
                     break;
+
+                // ストライキ発生 (43-44): 1回休み
+                case 43: case 44:
+                    company.logAction('リスクカード', 'ストライキ発生 1回休み', 0, false);
+                    break;
+
+                // 盗難発見 (45-46): 製品2個損失、保険あれば10円/個
+                case 45: case 46:
+                    if (company.products > 0) {
+                        const lostQty = Math.min(2, company.products);
+                        const insurancePayout = company.chips.insurance > 0 ? lostQty * 10 : 0;
+                        const specialLoss = lostQty * INVENTORY_VALUES.product - insurancePayout;
+                        company.products -= lostQty;
+                        if (insurancePayout > 0) {
+                            company.cash += insurancePayout;
+                            company.chips.insurance = 0;  // 保険消費
+                        }
+                        company.totalSpecialLoss += specialLoss;
+                        company.logAction('リスクカード', `盗難発見 製品${lostQty}個損失 保険${insurancePayout}円`, specialLoss, false);
+                    } else {
+                        company.logAction('リスクカード', '盗難発見（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 長期労務紛争 (47-48): 2回休み
+                case 47: case 48:
+                    company.logAction('リスクカード', '長期労務紛争 2回休み', 0, false);
+                    break;
+
+                // 設計トラブル発生 (49-50): 製造経費▲10
+                case 49: case 50:
+                    company.cash -= 10;
+                    company.totalF += 10;
+                    company.logAction('リスクカード', '設計トラブル発生 F+10', 10, false);
+                    break;
+
+                // ワーカー退職 (51-52): 労務費▲5、ワーカー-1
+                case 51: case 52:
+                    if (company.workers > 1) {
+                        company.workers -= 1;
+                        company.cash -= 5;
+                        company.totalF += 5;
+                        company.logAction('リスクカード', 'ワーカー退職 F+5 ワーカー-1', 5, false);
+                    } else {
+                        company.logAction('リスクカード', 'ワーカー退職（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 景気変動 (53-54): 逆回り（シミュレーションでは効果なし）
+                case 53: case 54:
+                    company.logAction('リスクカード', '景気変動 逆回り', 0, false);
+                    break;
+
+                // 教育失敗 (55-56): 黄チップ1枚返却
+                case 55: case 56:
+                    if (company.chips.education > 0) {
+                        company.chips.education--;
+                        company.logAction('リスクカード', '教育失敗 黄チップ-1', 0, false);
+                    } else if (company.nextPeriodChips.education > 0) {
+                        company.nextPeriodChips.education--;
+                        company.logAction('リスクカード', '教育失敗 次繰黄チップ-1', 0, false);
+                    } else {
+                        company.logAction('リスクカード', '教育失敗（効果なし）', 0, false);
+                    }
+                    break;
+
+                // セールスマン退職 (57-58): 本社人件費▲5、セールスマン-1
+                case 57: case 58:
+                    if (company.salesmen > 1) {
+                        company.salesmen -= 1;
+                        company.cash -= 5;
+                        company.totalF += 5;
+                        company.logAction('リスクカード', 'セールスマン退職 F+5 セールスマン-1', 5, false);
+                    } else {
+                        company.logAction('リスクカード', 'セールスマン退職（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 社長、病気で倒れる (59-60): 1回休み
+                case 59: case 60:
+                    company.logAction('リスクカード', '社長、病気で倒れる 1回休み', 0, false);
+                    break;
+
+                // 不良在庫発生 (61-62): 総在庫20超過分損失、保険あれば10円/個
+                case 61: case 62:
+                    const totalInventory = company.materials + company.wip + company.products;
+                    if (totalInventory > 20) {
+                        let excess = totalInventory - 20;
+                        let lostValue = 0;
+                        // 製品から順に損失
+                        const lostProducts = Math.min(excess, company.products);
+                        company.products -= lostProducts;
+                        lostValue += lostProducts * INVENTORY_VALUES.product;
+                        excess -= lostProducts;
+                        // 仕掛品
+                        const lostWip = Math.min(excess, company.wip);
+                        company.wip -= lostWip;
+                        lostValue += lostWip * INVENTORY_VALUES.wip;
+                        excess -= lostWip;
+                        // 材料
+                        const lostMaterials = Math.min(excess, company.materials);
+                        company.materials -= lostMaterials;
+                        lostValue += lostMaterials * INVENTORY_VALUES.material;
+
+                        const totalLost = lostProducts + lostWip + lostMaterials;
+                        const insurancePayout = company.chips.insurance > 0 ? totalLost * 10 : 0;
+                        const specialLoss = lostValue - insurancePayout;
+                        if (insurancePayout > 0) {
+                            company.cash += insurancePayout;
+                            company.chips.insurance = 0;
+                        }
+                        company.totalSpecialLoss += specialLoss;
+                        company.logAction('リスクカード', `不良在庫発生 ${totalLost}個損失 特別損失${specialLoss}`, specialLoss, false);
+                    } else {
+                        company.logAction('リスクカード', '不良在庫発生（効果なし）', 0, false);
+                    }
+                    break;
+
+                // 機械故障 (63-64): 製造経費▲5
+                case 63: case 64:
+                    company.cash -= 5;
+                    company.totalF += 5;
+                    company.logAction('リスクカード', '機械故障 F+5', 5, false);
+                    break;
+
+                default:
+                    company.logAction('リスクカード', '効果なし', 0, false);
             }
         },
 
@@ -1180,6 +1623,14 @@ const MGSimulation = (function() {
 
                 case 'HIRE':
                     ActionEngine.hire(company, action.count);
+                    break;
+
+                case 'HIRE_WORKER':
+                    ActionEngine.hire(company, action.count);
+                    break;
+
+                case 'HIRE_SALESMAN':
+                    ActionEngine.hireSalesman(company, action.count);
                     break;
 
                 case 'BUY_LARGE_MACHINE':
