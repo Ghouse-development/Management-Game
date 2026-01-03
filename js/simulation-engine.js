@@ -136,53 +136,70 @@ const MGSimulation = (function() {
             MIN_CARRYOVER_CHIPS: 3
         },
 
-        // AI戦略タイプ
+        // AI戦略タイプ（期別にチップ目標を設定）
         AI_STRATEGIES: {
             RESEARCH_FOCUSED: {
                 name: '研究開発型',
                 description: '青チップ重視、高価格販売',
-                targetResearchChips: 3,
-                targetEducationChips: 1,
-                targetAdvertisingChips: 0,
-                priceAdjustment: 2,  // 目安価格より高め
+                // 期別チップ目標
+                chipTargets: {
+                    2: { research: 2, education: 1, advertising: 0 },
+                    3: { research: 3, education: 1, advertising: 0 },
+                    4: { research: 4, education: 1, advertising: 0 },
+                    5: { research: 5, education: 1, advertising: 0 }
+                },
+                priceAdjustment: 2,
                 hirePriority: 'worker'
             },
             SALES_FOCUSED: {
                 name: '販売能力型',
                 description: 'セールスマン・広告チップ重視',
-                targetResearchChips: 1,
-                targetEducationChips: 1,
-                targetAdvertisingChips: 2,
-                priceAdjustment: -2,  // 目安価格より安め（量重視）
+                chipTargets: {
+                    2: { research: 1, education: 1, advertising: 1 },
+                    3: { research: 1, education: 1, advertising: 2 },
+                    4: { research: 1, education: 1, advertising: 3 },
+                    5: { research: 1, education: 1, advertising: 4 }
+                },
+                priceAdjustment: -2,
                 hirePriority: 'salesman'
             },
             LOW_CHIP: {
                 name: '低チップ型',
                 description: 'チップ投資を抑え、設備・人員に投資',
-                targetResearchChips: 0,
-                targetEducationChips: 1,
-                targetAdvertisingChips: 0,
-                priceAdjustment: -4,  // 安価販売
+                chipTargets: {
+                    2: { research: 0, education: 1, advertising: 0 },
+                    3: { research: 0, education: 1, advertising: 0 },
+                    4: { research: 1, education: 1, advertising: 0 },
+                    5: { research: 1, education: 1, advertising: 0 }
+                },
+                priceAdjustment: -4,
                 hirePriority: 'worker'
             },
             BALANCED: {
                 name: 'バランス型',
                 description: '状況に応じた柔軟な投資',
-                targetResearchChips: 2,
-                targetEducationChips: 1,
-                targetAdvertisingChips: 1,
+                chipTargets: {
+                    2: { research: 1, education: 1, advertising: 0 },
+                    3: { research: 2, education: 1, advertising: 1 },
+                    4: { research: 2, education: 1, advertising: 1 },
+                    5: { research: 3, education: 1, advertising: 1 }
+                },
                 priceAdjustment: 0,
                 hirePriority: 'balanced'
             },
             AGGRESSIVE: {
                 name: '積極投資型',
-                description: '早期に大型機械・人員拡大',
-                targetResearchChips: 2,
-                targetEducationChips: 1,
-                targetAdvertisingChips: 0,
+                description: '3期に大型機械へ移行、人員拡大',
+                chipTargets: {
+                    2: { research: 0, education: 0, advertising: 0 },
+                    3: { research: 1, education: 1, advertising: 0 },
+                    4: { research: 2, education: 1, advertising: 0 },
+                    5: { research: 2, education: 1, advertising: 0 }
+                },
                 priceAdjustment: 0,
                 hirePriority: 'worker',
-                earlyLargeMachine: true
+                earlyLargeMachine: false,  // 3期に大型機械購入（期首借入後）
+                upgradePeriod: 3
             }
         }
     };
@@ -1038,7 +1055,10 @@ const MGSimulation = (function() {
         evaluateChipPurchase(company, gameState) {
             const period = gameState.period;
             const strategy = company.strategy;
-            if (!strategy) return null;
+            if (!strategy || !strategy.chipTargets) return null;
+
+            // 期別のチップ目標を取得
+            const targets = strategy.chipTargets[period] || { research: 0, education: 0, advertising: 0 };
 
             const currentResearch = (company.chips.research || 0) + (company.nextPeriodChips.research || 0);
             const currentEducation = (company.chips.education || 0) + (company.nextPeriodChips.education || 0);
@@ -1048,8 +1068,8 @@ const MGSimulation = (function() {
 
             // 戦略に基づいてチップ購入を評価
             // 研究開発チップ
-            if (currentResearch < strategy.targetResearchChips && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
-                const score = (strategy.targetResearchChips - currentResearch) * 25;
+            if (currentResearch < targets.research && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
+                const score = (targets.research - currentResearch) * 25;
                 return {
                     type: 'BUY_CHIP',
                     score,
@@ -1060,8 +1080,8 @@ const MGSimulation = (function() {
             }
 
             // 教育チップ
-            if (currentEducation < strategy.targetEducationChips && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
-                const score = (strategy.targetEducationChips - currentEducation) * 20;
+            if (currentEducation < targets.education && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
+                const score = (targets.education - currentEducation) * 20;
                 return {
                     type: 'BUY_CHIP',
                     score,
@@ -1072,8 +1092,8 @@ const MGSimulation = (function() {
             }
 
             // 広告チップ
-            if (currentAdvertising < strategy.targetAdvertisingChips && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
-                const score = (strategy.targetAdvertisingChips - currentAdvertising) * 15;
+            if (currentAdvertising < targets.advertising && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
+                const score = (targets.advertising - currentAdvertising) * 15;
                 return {
                     type: 'BUY_CHIP',
                     score,
