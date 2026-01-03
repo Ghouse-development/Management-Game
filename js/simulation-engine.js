@@ -41,11 +41,19 @@ const MGSimulation = (function() {
             ATTACHMENT: { cost: 30, bonus: 1, depreciation: 3 }   // アタッチメント=+1
         },
 
-        // 機械簿価計算（期別）
+        // 機械簿価（期首時点の値）
+        // 1期に購入→1期末に減価償却→2期開始時点の簿価
         BOOK_VALUE: {
-            SMALL: { 2: 100, 3: 80, 4: 60, 5: 40 },
-            LARGE: { 2: 200, 3: 160, 4: 120, 5: 80 },
-            ATTACHMENT: { 2: 30, 3: 24, 4: 18, 5: 12 }
+            SMALL: { 2: 90, 3: 80, 4: 60, 5: 40 },       // 1期末90→2期末80→3期末60→4期末40
+            LARGE: { 2: 180, 3: 160, 4: 120, 5: 80 },    // 1期末180→2期末160→3期末120→4期末80
+            ATTACHMENT: { 2: 27, 3: 24, 4: 18, 5: 12 }   // 1期末27→2期末24→3期末18→4期末12
+        },
+
+        // 減価償却費（期別）
+        DEPRECIATION_BY_PERIOD: {
+            SMALL: { 2: 10, 3: 20, 4: 20, 5: 20 },
+            LARGE: { 2: 20, 3: 40, 4: 40, 5: 40 },
+            ATTACHMENT: { 2: 3, 3: 6, 4: 6, 5: 6 }
         },
 
         // 売却価格 = 簿価 × 70%
@@ -588,11 +596,17 @@ const MGSimulation = (function() {
             company.cash -= result.wage;
             company.totalF += result.wage;
 
-            // 2. 減価償却
+            // 2. 減価償却（期別に異なる）
             company.machines.forEach(m => {
-                const dep = m.type === 'large' ? RULES.MACHINE.LARGE.depreciation : RULES.MACHINE.SMALL.depreciation;
-                result.depreciation += dep;
-                result.depreciation += (m.attachments || 0) * RULES.MACHINE.ATTACHMENT.depreciation;
+                if (m.type === 'large') {
+                    result.depreciation += RULES.DEPRECIATION_BY_PERIOD.LARGE[period] || 40;
+                } else {
+                    result.depreciation += RULES.DEPRECIATION_BY_PERIOD.SMALL[period] || 20;
+                }
+                // アタッチメントの減価償却
+                if (m.attachments > 0) {
+                    result.depreciation += (RULES.DEPRECIATION_BY_PERIOD.ATTACHMENT[period] || 6) * m.attachments;
+                }
             });
             company.totalF += result.depreciation;
 
