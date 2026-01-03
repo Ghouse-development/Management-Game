@@ -302,9 +302,9 @@ function selectAdaptiveStrategy(company, period) {
  * - 次期繰越(20円): 来期使用 → 長期ROI最大
  *
  * ■ 機械投資
- * - 小型(60円): 製造+1 → 減価10円(2期),20円(3期+) → ROI = (MQ増-減価)/60
+ * - 小型(100円): 製造+1 → 減価10円(2期),20円(3期+) → ROI = (MQ増-減価)/100
  * - ｱﾀｯﾁ(30円): 製造+1 → 減価+3(2期),+6(3期+) → ROI高い
- * - 大型(120円): 製造+4 → 減価20円(2期),40円(3期+)
+ * - 大型(200円): 製造+4 → 減価20円(2期),40円(3期+)
  *
  * ■ 採用投資
  * - ワーカー(5円): 機械を動かす → 給与22-28円/期
@@ -724,7 +724,7 @@ const STRATEGY_ROW_PLANS = {
             {row: 20, action: 'END', reason: '期末（研究1広告1→繰越0）'},
         ],
         3: [
-            // 【3期】大型投資: 大型機械(120円)+セールス2名で大量生産・大量販売体制
+            // 【3期】大型投資: 大型機械(200円)+セールス2名で大量生産・大量販売体制
             // 借入100円して投資、製造4・販売7を目指す
             {row: 2, action: 'PRODUCE', reason: '製品化（製品3個に）'},
             {row: 3, action: 'SELL', qty: 2, reason: '資金確保'},
@@ -1632,11 +1632,11 @@ function getRowPlanAction(company, period) {
             break;
 
         case 'BUY_SMALL_MACHINE':
-            // 小型機械購入（60円）
-            if (company.cash >= 90) {
+            // 小型機械購入（100円）
+            if (company.cash >= 100) {
                 return {
                     action: 'BUY_SMALL_MACHINE',
-                    params: { cost: 60 },
+                    params: { cost: 100 },
                     reason: `[行計画] ${plannedAction.reason}`,
                     priority: 'PLANNED'
                 };
@@ -1644,11 +1644,11 @@ function getRowPlanAction(company, period) {
             break;
 
         case 'BUY_LARGE_MACHINE':
-            // 大型機械購入（120円）
-            if (company.cash >= 150) {
+            // 大型機械購入（200円）
+            if (company.cash >= 200) {
                 return {
                     action: 'BUY_LARGE_MACHINE',
-                    params: { cost: 120 },
+                    params: { cost: 200 },
                     reason: `[行計画] ${plannedAction.reason}`,
                     priority: 'PLANNED'
                 };
@@ -1694,7 +1694,7 @@ function getRowPlanAction(company, period) {
             break;
 
         case 'SELL_MACHINE':
-            // 機械売却（小型30円、大型60円）
+            // 機械売却（簿価×70%で売却、差額は特別損失）
             const sellType = plannedAction.type || 'small';
             if (company.machines.length > 1 && company.machines.some(m => m.type === sellType)) {
                 return {
@@ -1707,7 +1707,8 @@ function getRowPlanAction(company, period) {
             break;
 
         case 'BUY_WAREHOUSE':
-            // 倉庫購入（20円）
+            // 倉庫購入（20円）- 2期は購入しない
+            if (period === 2) break;
             if (company.cash >= 40 && company.warehouses < 2) {
                 return {
                     action: 'BUY_WAREHOUSE',
@@ -2195,7 +2196,7 @@ function generateImprovements(company, period, weaknesses) {
                     priority: 'MEDIUM',
                     action: 'ワーカー追加採用',
                     reason: `製造能力不足: ${mfgCap} < 販売${salesCap}`,
-                    costBenefit: '採用30円 + 給与で製造能力向上'
+                    costBenefit: '採用5円 + 給与で製造能力向上'
                 });
             }
         }
@@ -2206,7 +2207,7 @@ function generateImprovements(company, period, weaknesses) {
                 priority: 'HIGH',
                 action: company.salesmen < 2 ? 'セールスマン採用' : '広告チップ購入',
                 reason: `販売能力不足: ${salesCap} < 製造${mfgCap}`,
-                costBenefit: company.salesmen < 2 ? '採用30円' : '投資20円 → 販売能力+2'
+                costBenefit: company.salesmen < 2 ? '採用5円' : '投資20円 → 販売能力+2'
             });
         }
     }
@@ -2775,9 +2776,18 @@ function getDynamicAction(company, companyIndex) {
 // 🛡️ 短期借入回避ヘルパー（全AI購入処理で使用）
 // ============================================
 function aiCanAffordSafely(company, cost) {
+    const period = gameState.currentPeriod;
     const periodEndCost = calculatePeriodPayment(company);
-    const riskCardBuffer = (company.chips.insurance || 0) > 0 ? 15 : 40;
-    const safetyBuffer = 70;  // 安全マージン
+    const riskCardBuffer = (company.chips.insurance || 0) > 0 ? 10 : 30;
+
+    // 期初か期末かで安全バッファを調整
+    // 期初（行数少ない）: 積極投資OK、期末に近い: 慎重に
+    const rowsRemaining = gameState.maxRows - (company.currentRow || 1);
+    const isEarlyPeriod = rowsRemaining > gameState.maxRows * 0.6;
+
+    // 積極的な投資姿勢: 安全バッファを縮小
+    // 期初は30、期末に近いほど50まで上昇
+    const safetyBuffer = isEarlyPeriod ? 30 : Math.min(50, 30 + (10 - rowsRemaining));
     const totalRequired = periodEndCost + riskCardBuffer + safetyBuffer;
 
     // 購入後に期末支払いを賄えるか
@@ -2832,7 +2842,14 @@ function executeChipPurchase(company, companyIndex, chipType, cost, isExpress = 
     }
 
     const icons = { research: '🔬', education: '📚', advertising: '📢', insurance: '🛡️', computer: '💻' };
+    const chipNames = { research: '研究開発', education: '教育', advertising: '広告', insurance: '保険', computer: 'PC' };
     incrementRow(companyIndex);
+
+    // AIチップ購入を行動ログに記録
+    const chipLabel = chipNames[chipType] || chipType;
+    const purchaseType = period === 2 ? '' : (isExpress ? '特急' : '次期繰越');
+    logAction(companyIndex, 'チップ購入', `${chipLabel}チップ${purchaseType ? '(' + purchaseType + ')' : ''}`, -actualCost, true);
+
     showAIActionModal(company, `チップ購入${isExpress ? '(特急)' : ''}`, icons[chipType] || '🎯', `${chipType}チップ購入（改善）`);
 
     console.log(`[チップ購入成功] ${company.name}: ${chipType} (¥${actualCost})`);
@@ -3105,13 +3122,27 @@ function determineStrategicWaitReason(company, originalReason) {
 function aiPurchaseChip(company, chipType, cost) {
     company.chips[chipType]++;
     const period = gameState.currentPeriod;
+    const companyIndex = gameState.companies.indexOf(company);
+
+    // チップ購入タイプの判定
+    let purchaseType = '';
     if (period === 2) {
         company.chipsPurchasedThisPeriod[chipType] = (company.chipsPurchasedThisPeriod[chipType] || 0) + 1;
     } else if (cost === 40) {
         // 3期以降の特急購入
         company.expressChipsPurchased[chipType] = (company.expressChipsPurchased[chipType] || 0) + 1;
+        purchaseType = '特急';
+    } else {
+        // 次期繰越（20円）
+        purchaseType = '次期繰越';
     }
-    // 次期繰越（20円）はnextPeriodChipsで管理されるため、ここではトラッキング不要
+
+    // 行動ログに記録（AI会社のみ）
+    if (companyIndex > 0) {
+        const chipNames = { research: '研究開発', education: '教育', advertising: '広告' };
+        const chipLabel = chipNames[chipType] || chipType;
+        logAction(companyIndex, 'チップ購入', `${chipLabel}チップ${purchaseType ? '(' + purchaseType + ')' : ''}`, -cost, true);
+    }
 }
 
 // ============================================
@@ -3482,7 +3513,7 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
         }
     }
 
-    // === 7. 3期以降：機械投資戦略（戦略別に分岐） ===
+    // === 7. 3期以降：機械投資戦略（大型機械優先） ===
     if (period >= 3 && rowsRemaining > 4) {
         const smallMachines = company.machines.filter(m => m.type === 'small');
         const largeMachines = company.machines.filter(m => m.type === 'large');
@@ -3492,14 +3523,48 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
             return sum + (m.attachments > 0 ? 2 : 1);
         }, 0);
 
+        // 3期: AIの半分以上（3社以上）が大型機械へアップグレード
+        // companyIndexが1,2,3のAIは優先的にアップグレード（インデックス0はプレイヤー）
+        const companyIndex = gameState.companies.indexOf(company);
+        const shouldPrioritizeLarge = period === 3 && companyIndex >= 1 && companyIndex <= 3;
+
+        // 小型機械簿価: 3期=80, 4期=60, 5期=40（減価償却後）
+        const getSmallMachineBookValue = (machine, p) => {
+            // アタッチメント付きは+30（130-減価償却）
+            const base = machine.attachments > 0 ? 130 : 100;
+            if (p === 3) return base - 20;  // 2期分の減価償却（20円）
+            if (p === 4) return base - 40;  // 3期分の減価償却
+            return base - 60;               // 4期分の減価償却
+        };
+
+        // 3期に半分以上のAIが大型機械へアップグレード
+        if (shouldPrioritizeLarge && smallMachines.length > 0 && largeMachines.length === 0) {
+            const smallMachine = smallMachines[0];
+            const bookValue = getSmallMachineBookValue(smallMachine, period);
+            const salePrice = Math.floor(bookValue * 0.7);  // 80×0.7=56
+            // 売却後に200円で大型購入（次ターン）
+            // 必要資金: 200 - 56（売却収入）= 144円 + 安全マージン
+            const netCostAfterSale = 200 - salePrice;
+
+            if (company.cash + salePrice >= 200 + 50) {  // 売却収入込みで200円+余裕50円
+                return {
+                    action: 'UPGRADE_TO_LARGE',
+                    params: {
+                        sellMachineIndex: company.machines.indexOf(smallMachine)
+                    },
+                    reason: `3期戦略：大型機械へアップグレード（売却¥${salePrice}→購入¥200）`
+                };
+            }
+        }
+
         // 戦略別の目標設定
         const strategyMachinePreference = {
             'aggressive': { preferLarge: true, targetCapacity: 5, investThreshold: 50 },
             'tech_focused': { preferLarge: true, targetCapacity: 4, investThreshold: 60 },
-            'balanced': { preferLarge: false, targetCapacity: 4, investThreshold: 70 },
+            'balanced': { preferLarge: true, targetCapacity: 4, investThreshold: 70 },  // balancedも大型優先に
             'conservative': { preferLarge: false, targetCapacity: 3, investThreshold: 100 },
-            'price_focused': { preferLarge: false, targetCapacity: 3, investThreshold: 80 },
-            'unpredictable': { preferLarge: Math.random() > 0.5, targetCapacity: 4, investThreshold: 60 }
+            'price_focused': { preferLarge: true, targetCapacity: 3, investThreshold: 80 },  // price_focusedも大型優先に
+            'unpredictable': { preferLarge: Math.random() > 0.3, targetCapacity: 4, investThreshold: 60 }
         };
 
         const pref = strategyMachinePreference[company.strategy] || strategyMachinePreference['balanced'];
@@ -3508,20 +3573,16 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
 
         // 戦略によって大型機械を優先する会社
         if (pref.preferLarge && smallMachines.length > 0 && largeMachines.length === 0 &&
-            company.workers >= 3 && safeInvestment >= pref.investThreshold) {
+            company.workers >= 2 && safeInvestment >= pref.investThreshold) {
             const smallMachine = smallMachines[0];
-            const bookValue = smallMachine.attachments > 0 ? 40 : 30;
+            const bookValue = getSmallMachineBookValue(smallMachine, period);
             const salePrice = Math.floor(bookValue * 0.7);
-            const netCost = 100 - salePrice;
 
-            if (safeInvestment >= netCost) {
+            if (company.cash + salePrice >= 200 + 30) {
                 return {
                     action: 'UPGRADE_TO_LARGE',
                     params: {
-                        sellMachineIndex: company.machines.indexOf(smallMachine),
-                        salePrice: salePrice,
-                        purchaseCost: 100,
-                        bookValue: bookValue
+                        sellMachineIndex: company.machines.indexOf(smallMachine)
                     },
                     reason: `${company.strategy}戦略：大型機械へ投資（製造+3）`
                 };
@@ -3529,7 +3590,24 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
         }
 
         if (needsMoreCapacity && safeInvestment >= 30) {
-            // オプション1：アタッチメント購入（30円、+1能力）
+            // オプション1：大型機械へのアップグレード（優先）
+            if (smallMachines.length > 0 && largeMachines.length === 0 && company.workers >= 2) {
+                const smallMachine = smallMachines[0];
+                const bookValue = getSmallMachineBookValue(smallMachine, period);
+                const salePrice = Math.floor(bookValue * 0.7);
+
+                if (company.cash + salePrice >= 200 + 30) {
+                    return {
+                        action: 'UPGRADE_TO_LARGE',
+                        params: {
+                            sellMachineIndex: company.machines.indexOf(smallMachine)
+                        },
+                        reason: `設備更新：小型→大型機械（製造+3、長期成長）`
+                    };
+                }
+            }
+
+            // オプション2：アタッチメント購入（30円、+1能力）
             if (attachableMachines.length > 0) {
                 return {
                     action: 'BUY_ATTACHMENT',
@@ -3538,35 +3616,13 @@ function getGMaximizingAction(company, companyIndex, strategyParams = {}) {
                 };
             }
 
-            // オプション2：小型機械購入（50円、+1能力、要ワーカー）
-            if (safeInvestment >= 50 && company.workers > machineCapacity) {
+            // オプション3：小型機械購入（100円、+1能力、要ワーカー）
+            if (safeInvestment >= 100 && company.workers > machineCapacity) {
                 return {
                     action: 'BUY_SMALL_MACHINE',
-                    params: { cost: 50 },
+                    params: { cost: 100 },
                     reason: `製造能力向上：小型機械購入（${mfgCapacity}→${mfgCapacity + 1}）`
                 };
-            }
-
-            // オプション3：大型機械へのアップグレード（売却+購入）
-            if (smallMachines.length > 0 && largeMachines.length === 0 &&
-                company.workers >= 3 && safeInvestment >= 70) {
-                const smallMachine = smallMachines[0];
-                const bookValue = smallMachine.attachments > 0 ? 40 : 30;
-                const salePrice = Math.floor(bookValue * 0.7);
-                const netCost = 100 - salePrice;
-
-                if (safeInvestment >= netCost) {
-                    return {
-                        action: 'UPGRADE_TO_LARGE',
-                        params: {
-                            sellMachineIndex: company.machines.indexOf(smallMachine),
-                            salePrice: salePrice,
-                            purchaseCost: 100,
-                            bookValue: bookValue
-                        },
-                        reason: `設備更新：小型→大型機械（製造+3、長期成長）`
-                    };
-                }
             }
         }
     }
@@ -3711,25 +3767,32 @@ function executeGMaximizingAction(company, companyIndex, action) {
             return false;
 
         case 'UPGRADE_TO_LARGE':
-            // 小型機械を売却して大型機械を購入
+            // 小型機械を売却して大型機械を購入（2ターンプロセス）
+            // 3期の小型機械: 簿価¥80、売却価格¥56、損失¥24
             const machineIndex = action.params.sellMachineIndex;
             if (machineIndex >= 0 && machineIndex < company.machines.length) {
                 const soldMachine = company.machines[machineIndex];
-                const loss = action.params.bookValue - action.params.salePrice;
+
+                // 簿価計算（正確な値）
+                const bookValue = typeof calculateMachineBookValue === 'function'
+                    ? calculateMachineBookValue(soldMachine, period)
+                    : (period === 3 ? 80 : (period === 4 ? 60 : 40));  // 3期=80, 4期=60, 5期=40
+                const salePrice = Math.floor(bookValue * 0.7);  // 3期: 80×0.7=56
+                const loss = bookValue - salePrice;  // 3期: 80-56=24
 
                 // 売却
-                company.cash += action.params.salePrice;
+                company.cash += salePrice;
                 company.machines.splice(machineIndex, 1);
                 company.specialLoss = (company.specialLoss || 0) + loss;
 
-                // 購入
-                company.cash -= action.params.purchaseCost;
-                company.machines.push({ type: 'large', attachments: 0 });
+                // 大型機械購入はフラグを立てて次のターンで実行
+                company.pendingLargeMachinePurchase = true;
 
                 incrementRow(companyIndex);
-                showAIActionModal(company, '設備更新', '🏗️', action.reason, [
-                    { label: '売却収入', value: `¥${action.params.salePrice}` },
-                    { label: '購入費用', value: `¥${action.params.purchaseCost}` },
+                logAction(companyIndex, '機械売却', `小型機械売却 ¥${salePrice}（損失¥${loss}）`, salePrice, true);
+                showAIActionModal(company, '小型機械売却', '💰', `大型機械購入準備: 売却¥${salePrice}、次ターンで大型購入予定`, [
+                    { label: '売却収入', value: `¥${salePrice}` },
+                    { label: '簿価', value: `¥${bookValue}` },
                     { label: '特別損失', value: `¥${loss}` }
                 ]);
                 return true;
@@ -3749,13 +3812,13 @@ function executeGMaximizingAction(company, companyIndex, action) {
             return executeSalesmanHire(company, companyIndex);
 
         case 'BUY_LARGE_MACHINE':
-            // 大型機械購入（120円）
-            if (company.cash >= 120) {
-                company.cash -= 120;
+            // 大型機械購入（200円 - 意思決定カード使用）
+            if (company.cash >= 200) {
+                company.cash -= 200;
                 company.machines.push({ type: 'large', attachments: 0 });
                 incrementRow(companyIndex);
                 showAIActionModal(company, '設備投資', '🏗️', action.reason, [
-                    { label: '投資額', value: '¥120' },
+                    { label: '投資額', value: '¥200' },
                     { label: '効果', value: '製造能力+4（要ワーカー）' }
                 ]);
                 return true;
@@ -3788,6 +3851,11 @@ function executeGMaximizingAction(company, companyIndex, action) {
 
         case 'BUY_WAREHOUSE':
             // 倉庫購入（20円、容量+12）
+            // 2期は倉庫を買わない
+            if (period === 2) {
+                console.log(`[倉庫購入見送り] ${company.name}: 2期は倉庫購入しない`);
+                return false;
+            }
             if (company.cash >= 20 && company.warehouses < 2) {
                 company.cash -= 20;
                 company.warehouses++;
@@ -3853,42 +3921,23 @@ function planAIPeriodStrategy(company, companyIndex) {
     const maxLoanLimit = Math.floor(company.equity * loanMultiplier);
     const borrowableAmount = Math.max(0, maxLoanLimit - currentLoans);
 
-    // === 動的借入判断（v8シミュレーション最強戦略）===
-    // MG_CONSTANTSから借入戦略パラメータを取得
-    const BS = (typeof MG_CONSTANTS !== 'undefined' && MG_CONSTANTS.BORROW_STRATEGY)
-        ? MG_CONSTANTS.BORROW_STRATEGY
-        : { DYNAMIC_THRESHOLD: 60, STAGED_3: 30, STAGED_4: 70 };
-    const DYNAMIC_THRESHOLD = BS.DYNAMIC_THRESHOLD;  // 現金がこれ未満なら借入
-    const STAGED_BORROW_3 = BS.STAGED_3;             // 3期の段階的借入額
-    const STAGED_BORROW_4 = BS.STAGED_4;             // 4期の段階的借入額
+    // === 最大借入戦略（借入限度額まで1円単位で最大借入）===
+    // 期初に長期借入を最大限活用して投資余力を最大化
+    // 特別ルール: 4期以降 かつ 自己資本300超なら 自己資本×1.0まで借入可能
 
     if (period >= 3 && borrowableAmount > 0) {
-        let borrowAmount = 0;
+        // 借入限度額まで最大借入（1円単位）
+        const borrowAmount = borrowableAmount;
 
-        // 動的借入: 現金不足時のみ借りる
-        if (company.cash < DYNAMIC_THRESHOLD) {
-            if (period === 3) {
-                // 3期は少額（段階的借入の1回目）
-                borrowAmount = Math.min(STAGED_BORROW_3, borrowableAmount);
-            } else if (period === 4) {
-                // 4期は追加（段階的借入の2回目）
-                borrowAmount = Math.min(STAGED_BORROW_4, borrowableAmount);
-            } else {
-                // 5期は必要最小限
-                borrowAmount = Math.min(50, borrowableAmount);
-            }
+        if (borrowAmount > 0) {
+            const interestPaid = Math.floor(borrowAmount * INTEREST_RATES.longTerm);
+            company.loans += borrowAmount;
+            company.cash += borrowAmount - interestPaid;
+            company.periodStartInterest = (company.periodStartInterest || 0) + interestPaid;
 
-            if (borrowAmount > 0) {
-                const interestPaid = Math.floor(borrowAmount * INTEREST_RATES.longTerm);
-                company.loans += borrowAmount;
-                company.cash += borrowAmount - interestPaid;
-                company.periodStartInterest = (company.periodStartInterest || 0) + interestPaid;
-
-                console.log(`[動的借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）`);
-                console.log(`  現金: ¥${company.cash - borrowAmount + interestPaid} → ¥${company.cash}（閾値¥${DYNAMIC_THRESHOLD}）`);
-            }
-        } else {
-            console.log(`[借入見送り] ${company.name}: 現金¥${company.cash} >= 閾値¥${DYNAMIC_THRESHOLD}`);
+            console.log(`[最大借入] ${company.name}: ¥${borrowAmount}借入（金利¥${interestPaid}）限度額まで全額借入`);
+            console.log(`  借入限度: 自己資本¥${company.equity} × ${loanMultiplier} = ¥${maxLoanLimit}`);
+            console.log(`  現金: ¥${company.cash - borrowAmount + interestPaid} → ¥${company.cash}`);
         }
     }
 
@@ -4187,8 +4236,10 @@ function getAIFinancialAnalysis(company) {
                               (needsMaterials ? Math.min(3, mfgCapacity) : 0);
     const materialCapacity = getMaterialCapacity(company);
     const productCapacity = getProductCapacity(company);
-    const needsWarehouse = (expectedInventory > 5 && company.warehouses === 0) ||
-                           (expectedInventory > 10 && company.warehouses === 1);
+    // 2期は倉庫を買わない
+    const needsWarehouse = period !== 2 && (
+                           (expectedInventory > 5 && company.warehouses === 0) ||
+                           (expectedInventory > 10 && company.warehouses === 1));
     const warehouseLocation = company.materials > company.products ? 'materials' : 'products';
 
     const chipPriority = [];
@@ -4894,7 +4945,9 @@ function executeAIStrategyByType(company, mfgCapacity, salesCapacity, analysis) 
         const safeBuffer = 70;
         const safeSpend = Math.max(0, company.cash - periodEndCost - riskBuffer - safeBuffer);
         const canAfford = Math.floor(safeSpend / cheapest.buyPrice);
-        const buyQty = Math.min(canStore, cheapest.currentStock, canAfford, mfgCapacity * 2);
+        // 2期は製造能力制限なし、3期以降は製造能力×2が上限
+        const qtyLimit = period === 2 ? canStore : mfgCapacity * 2;
+        const buyQty = Math.min(canStore, cheapest.currentStock, canAfford, qtyLimit);
 
         if (buyQty >= 2 && aiCanAffordSafely(company, buyQty * cheapest.buyPrice)) {
             console.log(`[AI仕入れ] ${company.name}: 安い材料発見！ ${cheapest.name} ¥${cheapest.buyPrice} x ${buyQty}個`);
@@ -6399,9 +6452,25 @@ function executeDefaultSale(company, salesCapacity, priceBase) {
 function executeDefaultMaterialPurchase(company, targetQty) {
     const companyIndex = gameState.companies.indexOf(company);
     const mfgCapacity = getManufacturingCapacity(company);
+    const period = gameState.currentPeriod;
+
+    // 2期は製造能力制限なし → 倉庫容量まで購入可能
+    // 3期以降は製造能力の範囲内
+    const materialCapacity = getMaterialCapacity(company);
+    const canStore = materialCapacity - company.materials;
+    let effectiveTarget = targetQty;
+
+    if (period === 2) {
+        // 2期: 倉庫容量まで購入可能（製造能力制限なし）
+        // 積極的に5-6個購入を目指す
+        effectiveTarget = Math.max(targetQty, Math.min(canStore, 6));
+    } else {
+        // 3期以降: 製造能力×2が上限
+        effectiveTarget = Math.min(targetQty, mfgCapacity * 2);
+    }
 
     // 市場盤を分析して最適な購入戦略を決定
-    const purchasePlan = analyzeMaterialMarkets(company, targetQty);
+    const purchasePlan = analyzeMaterialMarkets(company, effectiveTarget);
 
     if (purchasePlan.strategy === '2MARKET' && purchasePlan.markets.length >= 2) {
         // === 2市場購入（2行使用）===
@@ -6420,6 +6489,12 @@ function executeDefaultMaterialPurchase(company, targetQty) {
         incrementRow(companyIndex);
 
         const detailText = `2市場購入（2行使用）: ${purchaseDetails.join('、')}`;
+
+        // AI材料購入を行動ログに記録（各市場ごとに記録）
+        purchasePlan.markets.forEach((p, idx) => {
+            logAction(companyIndex, '材料購入', `${p.market.name}から¥${p.market.buyPrice}×${p.qty}個`, -p.cost, idx === 0);
+        });
+
         showAIActionModal(company, '材料仕入（2行）', '📦📦', detailText, [
             { label: '購入数', value: `${purchasePlan.totalQty}個` },
             { label: '支払', value: `¥${purchasePlan.totalCost}` },
@@ -6439,6 +6514,10 @@ function executeDefaultMaterialPurchase(company, targetQty) {
         p.market.currentStock -= p.qty;
 
         incrementRow(companyIndex);
+
+        // AI材料購入を行動ログに記録
+        logAction(companyIndex, '材料購入', `${p.market.name}から¥${p.market.buyPrice}×${p.qty}個`, -p.cost, true);
+
         showAIActionModal(company, '材料仕入', '📦', `${p.market.name}から${p.qty}個購入`, [
             { label: '仕入価格', value: `¥${p.market.buyPrice}/個` },
             { label: '支払', value: `¥${p.cost}` }

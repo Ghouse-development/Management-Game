@@ -259,14 +259,23 @@ function showFBreakdown(companyIndex) {
     const stats = fb ? fb.stats : (company.endOfPeriodStats || {
         machines: company.machines.length,
         workers: company.workers,
-        salesmen: company.salesmen
+        salesmen: company.salesmen,
+        retiredWorkers: company.retiredWorkers || 0,
+        retiredSalesmen: company.retiredSalesmen || 0
     });
     const machineSalary = fb ? fb.machineSalary : (stats.machines * unitCost);
     const workerSalary = fb ? fb.workerSalary : (stats.workers * unitCost);
     const salesmenSalary = fb ? fb.salesmenSalary : (stats.salesmen * unitCost);
+
+    // 退職者の給与（0.5人分）
+    const retiredWorkers = fb ? (fb.retiredWorkers || 0) : (stats.retiredWorkers || 0);
+    const retiredSalesmen = fb ? (fb.retiredSalesmen || 0) : (stats.retiredSalesmen || 0);
+    const retiredWorkerSalary = Math.round(retiredWorkers * 0.5 * unitCost);
+    const retiredSalesmenSalary = Math.round(retiredSalesmen * 0.5 * unitCost);
+
     const maxPersonnel = fb ? fb.maxPersonnel : (company.maxPersonnel || (stats.workers + stats.salesmen));
     const maxPersonnelCost = fb ? fb.maxPersonnelCost : (maxPersonnel * halfCost);
-    const totalSalary = fb ? fb.totalSalary : (machineSalary + workerSalary + salesmenSalary + maxPersonnelCost);
+    const totalSalary = fb ? fb.totalSalary : (machineSalary + workerSalary + salesmenSalary + retiredWorkerSalary + retiredSalesmenSalary + maxPersonnelCost);
 
     // 減価償却
     const depreciation = fb ? fb.depreciation : calculateDepreciation(company, period);
@@ -340,9 +349,21 @@ function showFBreakdown(companyIndex) {
     content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 3px 0;">
         <span>ワーカー（${stats.workers}人×¥${unitCost}）</span><span>¥${workerSalary}</span>
     </div>`;
+    // 退職ワーカー（0.5人分）
+    if (retiredWorkers > 0) {
+        content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 3px 0; color: #dc2626;">
+            <span>　退職W（${retiredWorkers}人×0.5×¥${unitCost}）</span><span>¥${retiredWorkerSalary}</span>
+        </div>`;
+    }
     content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 3px 0;">
         <span>セールス（${stats.salesmen}人×¥${unitCost}）</span><span>¥${salesmenSalary}</span>
     </div>`;
+    // 退職セールスマン（0.5人分）
+    if (retiredSalesmen > 0) {
+        content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 3px 0; color: #dc2626;">
+            <span>　退職S（${retiredSalesmen}人×0.5×¥${unitCost}）</span><span>¥${retiredSalesmenSalary}</span>
+        </div>`;
+    }
     content += `<div style="font-size: 11px; display: flex; justify-content: space-between; padding: 3px 0;">
         <span>期中最大（${maxPersonnel}人×¥${halfCost}）</span><span>¥${maxPersonnelCost}</span>
     </div>`;
@@ -522,7 +543,16 @@ function showFinancialSummary(financialData) {
                 style += value >= 0 ? ' color: #16a34a; font-weight: bold;' : ' color: #dc2626; font-weight: bold;';
             }
 
-            html += `<td style="${style}">${formatted}</td>`;
+            // PQ, VQ, Fはクリックで詳細表示可能にする
+            const clickableKeys = ['pq', 'vq', 'f'];
+            if (clickableKeys.includes(item.key)) {
+                const clickHandler = item.key === 'pq' ? `showPQBreakdown(${index})` :
+                                    item.key === 'vq' ? `showVQBreakdown(${index})` :
+                                    `showFBreakdown(${index})`;
+                html += `<td style="${style} cursor: pointer; text-decoration: underline;" onclick="${clickHandler}" title="クリックで明細表示">${formatted}</td>`;
+            } else {
+                html += `<td style="${style}">${formatted}</td>`;
+            }
         });
         html += '</tr>';
     });
@@ -619,6 +649,9 @@ function proceedToNextPeriod() {
         company.newLoanInterest = 0;
     });
     gameState.currentRow = 1;
+
+    // 期末処理フラグをクリア
+    gameState.periodEnding = false;
 
     // 行動ログをリセット
     resetActionLog();

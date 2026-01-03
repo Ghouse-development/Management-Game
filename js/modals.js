@@ -2,6 +2,358 @@
 // modals.js - モーダル表示モジュール
 // ==============================================
 
+// AIアドバイス表示（ゲーム中）- 1行ずつ行動提案
+function showAIAdviceForCurrentState() {
+    const company = gameState.companies[0];
+    const period = gameState.currentPeriod;
+    const currentRow = company.currentRow || 1;
+    const maxRows = gameState.maxRows || MAX_ROWS_BY_PERIOD[period] || 20;
+    const remainingRows = maxRows - currentRow;
+
+    // 能力計算
+    const mfgCapacity = getManufacturingCapacity(company);
+    const salesCapacity = getSalesCapacity(company);
+    const researchChips = company.chips?.research || 0;
+    const priceBonus = researchChips * 2;
+
+    // サイコロ想定（3期以降: サイコロ4を想定）
+    const assumedDice = 4;
+    const assumedWageMultiplier = period >= 3 ? 1.2 : 1.0;  // サイコロ4以上 = ×1.2
+    const assumedOsakaMax = period >= 3 ? 24 : 28;  // 20 + サイコロ4
+    const closedMarkets = period >= 3 ? ['仙台', '札幌'] : [];  // サイコロ4以上 = 仙台・札幌閉鎖
+
+    // 5の倍数行でリスクカード
+    const isRiskRow = (currentRow % 5 === 0);
+    const nextRiskRow = Math.ceil(currentRow / 5) * 5;
+    const rowsToNextRisk = nextRiskRow - currentRow;
+
+    // 現在の状況を分析
+    let recommendation = '';
+    let recommendedAction = '';
+    let actionColor = '#3b82f6';
+    let actionIcon = '🎯';
+
+    // 2期専用パターン（参考: 理想的な行動順序）
+    const period2Reference = {
+        2:  { action: '教育チップ購入', icon: '📚', color: '#8b5cf6', detail: '販売能力+1（2→3）', type: 'chip_edu' },
+        3:  { action: '材料5個購入', icon: '📦', color: '#6366f1', detail: '12円×5推奨、無理なら13円×5', type: 'buy_mat', qty: 5 },
+        4:  { action: '完成・投入', icon: '🏭', color: '#3b82f6', detail: '3個完成＋3個投入', type: 'produce' },
+        5:  { action: 'リスクカード', icon: '⚠️', color: '#dc2626', detail: '5の倍数行', type: 'risk' },
+        6:  { action: '研究開発チップ購入', icon: '🔬', color: '#2563eb', detail: '価格競争力+2', type: 'chip_res' },
+        7:  { action: '商品販売', icon: '💰', color: '#22c55e', detail: '29円×3個（高く売れればOK）', type: 'sell', price: 29 },
+        8:  { action: '完成・投入', icon: '🏭', color: '#3b82f6', detail: '3個完成＋3個投入', type: 'produce' },
+        9:  { action: '研究開発チップ購入', icon: '🔬', color: '#2563eb', detail: '価格競争力+4', type: 'chip_res' },
+        10: { action: 'リスクカード', icon: '⚠️', color: '#dc2626', detail: '5の倍数行', type: 'risk' },
+        11: { action: '研究開発チップ購入', icon: '🔬', color: '#2563eb', detail: '価格競争力+6', type: 'chip_res' },
+        12: { action: '研究開発チップ購入', icon: '🔬', color: '#2563eb', detail: '価格競争力+8（4枚目）', type: 'chip_res' },
+        13: { action: '商品販売', icon: '💰', color: '#22c55e', detail: '32円×3個（高く売れればOK）', type: 'sell', price: 32 },
+        14: { action: '材料6個購入', icon: '📦', color: '#6366f1', detail: '12円×6推奨、無理なら13-14円', type: 'buy_mat', qty: 6 },
+        15: { action: 'リスクカード', icon: '⚠️', color: '#dc2626', detail: '5の倍数行', type: 'risk' },
+        16: { action: '完成・投入', icon: '🏭', color: '#3b82f6', detail: '3個完成＋3個投入', type: 'produce' },
+        17: { action: '商品販売', icon: '💰', color: '#22c55e', detail: '32円×3個（高く売れればOK）', type: 'sell', price: 32 },
+        18: { action: '教育チップ購入', icon: '📚', color: '#8b5cf6', detail: '販売能力+1（3→4）', type: 'chip_edu' },
+        19: { action: '完成・投入', icon: '🏭', color: '#3b82f6', detail: '3個完成＋3個投入', type: 'produce' },
+        20: { action: 'リスクカード', icon: '⚠️', color: '#dc2626', detail: '5の倍数行（期末）', type: 'risk' }
+    };
+
+    // 2期の状況適応型アドバイス
+    if (period === 2) {
+        const ref = period2Reference[currentRow];
+        let adjusted = false;
+        let adjustReason = '';
+
+        if (isRiskRow) {
+            // 5の倍数行はリスクカード（絶対）
+            recommendedAction = 'リスクカードを引く';
+            recommendation = `${currentRow}行目（5の倍数）です`;
+            actionColor = '#dc2626';
+            actionIcon = '⚠️';
+        } else if (ref) {
+            // 参考パターンに基づき、状況を考慮して調整
+            switch (ref.type) {
+                case 'chip_edu':
+                    if (company.cash < 20) {
+                        // 現金不足：先に販売か製造
+                        if (company.products > 0) {
+                            recommendedAction = '商品販売（現金確保）';
+                            recommendation = `現金¥${company.cash}で教育チップ購入困難。先に販売を`;
+                            actionColor = '#22c55e'; actionIcon = '💰';
+                        } else {
+                            recommendedAction = ref.action + '（次行以降）';
+                            recommendation = `現金¥${company.cash}不足。カードを引いて機会を待つ`;
+                            actionColor = '#64748b'; actionIcon = '🎴';
+                        }
+                        adjusted = true;
+                    } else {
+                        recommendedAction = ref.action;
+                        recommendation = ref.detail;
+                        actionColor = ref.color; actionIcon = ref.icon;
+                    }
+                    break;
+
+                case 'chip_res':
+                    if (company.cash < 20) {
+                        if (company.products > 0) {
+                            recommendedAction = '商品販売（現金確保）';
+                            recommendation = `現金¥${company.cash}。研究チップより先に販売`;
+                            actionColor = '#22c55e'; actionIcon = '💰';
+                        } else if (company.wip > 0 || company.materials > 0) {
+                            recommendedAction = '完成・投入';
+                            recommendation = '現金不足。製造を進めて販売準備';
+                            actionColor = '#3b82f6'; actionIcon = '🏭';
+                        } else {
+                            recommendedAction = 'カードを引く';
+                            recommendation = `現金¥${company.cash}不足。機会を待つ`;
+                            actionColor = '#64748b'; actionIcon = '🎴';
+                        }
+                        adjusted = true;
+                    } else {
+                        recommendedAction = ref.action;
+                        recommendation = ref.detail + `（現在${researchChips}枚）`;
+                        actionColor = ref.color; actionIcon = ref.icon;
+                    }
+                    break;
+
+                case 'buy_mat':
+                    const matCapacity = getMaterialCapacity(company);
+                    const canBuy = matCapacity - company.materials;
+                    if (canBuy <= 0) {
+                        recommendedAction = '完成・投入（倉庫満杯）';
+                        recommendation = `材料${company.materials}個で満杯。先に製造を`;
+                        actionColor = '#3b82f6'; actionIcon = '🏭';
+                        adjusted = true;
+                    } else if (company.cash < 50) {
+                        const affordQty = Math.floor(company.cash / 12);
+                        if (affordQty > 0) {
+                            recommendedAction = `材料${Math.min(affordQty, canBuy)}個購入`;
+                            recommendation = `現金¥${company.cash}。買える分だけ購入`;
+                            actionColor = ref.color; actionIcon = ref.icon;
+                        } else {
+                            recommendedAction = '販売優先';
+                            recommendation = '現金不足で材料購入困難';
+                            actionColor = '#22c55e'; actionIcon = '💰';
+                        }
+                        adjusted = true;
+                    } else {
+                        recommendedAction = ref.action;
+                        recommendation = ref.detail;
+                        actionColor = ref.color; actionIcon = ref.icon;
+                    }
+                    break;
+
+                case 'produce':
+                    if (company.wip === 0 && company.materials === 0) {
+                        recommendedAction = '材料仕入れ';
+                        recommendation = '材料・仕掛品なし。先に材料購入';
+                        actionColor = '#6366f1'; actionIcon = '📦';
+                        adjusted = true;
+                    } else {
+                        const canComplete = Math.min(company.wip, mfgCapacity);
+                        const canStart = Math.min(company.materials, mfgCapacity);
+                        recommendedAction = ref.action;
+                        recommendation = `${canComplete}個完成＋${canStart}個投入`;
+                        actionColor = ref.color; actionIcon = ref.icon;
+                    }
+                    break;
+
+                case 'sell':
+                    if (company.products === 0) {
+                        if (company.wip > 0) {
+                            recommendedAction = '完成・投入（製品なし）';
+                            recommendation = '製品がない。先に完成させる';
+                            actionColor = '#3b82f6'; actionIcon = '🏭';
+                        } else {
+                            recommendedAction = 'カードを引く';
+                            recommendation = '製品なし。製造を進める';
+                            actionColor = '#64748b'; actionIcon = '🎴';
+                        }
+                        adjusted = true;
+                    } else {
+                        const sellQty = Math.min(company.products, salesCapacity);
+                        recommendedAction = `商品販売（${sellQty}個）`;
+                        recommendation = `${ref.price}円以上で${sellQty}個販売`;
+                        actionColor = ref.color; actionIcon = ref.icon;
+                    }
+                    break;
+
+                default:
+                    recommendedAction = ref.action;
+                    recommendation = ref.detail;
+                    actionColor = ref.color; actionIcon = ref.icon;
+            }
+
+            // 調整があった場合、参考パターンも表示
+            if (adjusted) {
+                recommendation += `\n【参考】${ref.action}: ${ref.detail}`;
+            }
+        } else {
+            // パターン外の行（1行目など）
+            recommendedAction = 'カードを引く';
+            recommendation = '意思決定カードを引いて行動を選択';
+            actionColor = '#64748b';
+            actionIcon = '🎴';
+        }
+    } else if (isRiskRow) {
+        // 5の倍数行はリスクカード
+        recommendedAction = 'リスクカードを引く';
+        recommendation = `${currentRow}行目（5の倍数）です。リスクカードを引いてください。`;
+        actionColor = '#dc2626';
+        actionIcon = '⚠️';
+    } else {
+        // 3期以降は状況に応じた推奨
+        // AIBrainからの推奨を取得
+        let brainAdvice = null;
+        if (typeof AIBrain !== 'undefined' && AIBrain.getRecommendedAction) {
+            brainAdvice = AIBrain.getRecommendedAction(company, 0);
+        }
+
+        if (brainAdvice && brainAdvice.priority === 'high') {
+            recommendedAction = brainAdvice.action === 'SELL_TO_REDUCE_RISK' ? '販売（在庫リスク回避）' :
+                               brainAdvice.action === 'SELL_FOR_CASH' ? '販売（現金確保）' :
+                               brainAdvice.action;
+            recommendation = brainAdvice.reason;
+            actionColor = '#f59e0b';
+            actionIcon = '⚡';
+        } else if (company.products > 0 && salesCapacity > 0) {
+            const sellQty = Math.min(company.products, salesCapacity);
+            recommendedAction = `販売（${sellQty}個）`;
+            recommendation = `製品${company.products}個あり。販売能力${salesCapacity}で${sellQty}個販売可能。`;
+            actionColor = '#22c55e';
+            actionIcon = '💰';
+        } else if (company.wip > 0 || company.materials > 0) {
+            recommendedAction = '完成・投入';
+            const canComplete = Math.min(company.wip, mfgCapacity);
+            const canStart = Math.min(company.materials, mfgCapacity);
+            recommendation = `仕掛品${company.wip}個→製品${canComplete}個完成、材料${company.materials}個→仕掛品${canStart}個投入`;
+            actionColor = '#3b82f6';
+            actionIcon = '🏭';
+        } else if (company.materials === 0 && company.cash >= 20) {
+            const maxBuy = Math.min(10, Math.floor(company.cash / 10));
+            const suggestedQty = Math.min(mfgCapacity * 2, maxBuy);
+            recommendedAction = `材料仕入（${suggestedQty}個）`;
+            recommendation = `材料なし。${suggestedQty}個購入推奨（¥${suggestedQty * 10}）`;
+            actionColor = '#8b5cf6';
+            actionIcon = '📦';
+        } else if (researchChips < 3 && company.cash >= 40) {
+            recommendedAction = '研究開発チップ購入';
+            recommendation = `青チップ${researchChips}枚。価格競争力+${priceBonus}→+${priceBonus + 2}へ`;
+            actionColor = '#6366f1';
+            actionIcon = '🎰';
+        } else {
+            recommendedAction = 'カードを引く';
+            recommendation = '意思決定カードを引いて行動を選択';
+            actionColor = '#64748b';
+            actionIcon = '🎴';
+        }
+    }
+
+    // 今後の5行分の提案を生成
+    let futureActions = [];
+    let simState = JSON.parse(JSON.stringify(company));
+    for (let i = 0; i < 5 && (currentRow + i) <= maxRows; i++) {
+        const row = currentRow + i;
+        const isRisk = (row % 5 === 0);
+
+        if (isRisk) {
+            futureActions.push({ row, action: 'リスクカード', icon: '⚠️', color: '#dc2626' });
+        } else if (simState.products > 0 && salesCapacity > 0) {
+            const qty = Math.min(simState.products, salesCapacity);
+            futureActions.push({ row, action: `販売 ${qty}個`, icon: '💰', color: '#22c55e' });
+            simState.products -= qty;
+        } else if (simState.wip > 0 || simState.materials > 0) {
+            futureActions.push({ row, action: '完成・投入', icon: '🏭', color: '#3b82f6' });
+            const complete = Math.min(simState.wip, mfgCapacity);
+            const start = Math.min(simState.materials, mfgCapacity);
+            simState.products += complete;
+            simState.wip = simState.wip - complete + start;
+            simState.materials -= start;
+        } else if (simState.materials === 0) {
+            futureActions.push({ row, action: '材料仕入 5個', icon: '📦', color: '#8b5cf6' });
+            simState.materials = 5;
+        } else {
+            futureActions.push({ row, action: 'チップ購入', icon: '🎰', color: '#6366f1' });
+        }
+    }
+
+    let futureHtml = futureActions.map(a => `
+        <div style="display: flex; align-items: center; padding: 6px 10px; background: ${a.color}15; border-radius: 6px; margin: 4px 0; border-left: 3px solid ${a.color};">
+            <span style="font-size: 12px; color: #666; width: 35px;">${a.row}行</span>
+            <span style="font-size: 16px; margin-right: 8px;">${a.icon}</span>
+            <span style="font-size: 13px; color: #333;">${a.action}</span>
+        </div>
+    `).join('');
+
+    // サイコロ想定情報（3期以降のみ表示）
+    const diceInfoHtml = period >= 3 ? `
+        <div style="background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); border-radius: 10px; padding: 10px; margin-bottom: 15px; color: white;">
+            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">🎲 サイコロ${assumedDice}想定</div>
+            <div style="display: flex; justify-content: space-around; font-size: 10px;">
+                <div style="text-align: center;">
+                    <div style="opacity: 0.8;">閉鎖</div>
+                    <div style="font-weight: bold;">仙台・札幌</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="opacity: 0.8;">人件費</div>
+                    <div style="font-weight: bold;">×${assumedWageMultiplier}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="opacity: 0.8;">大阪上限</div>
+                    <div style="font-weight: bold;">¥${assumedOsakaMax}</div>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
+    const content = `
+        <div style="padding: 10px;">
+            ${diceInfoHtml}
+            <!-- 現在の状況 -->
+            <div style="background: #f8fafc; border-radius: 10px; padding: 12px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="text-align: center; flex: 1;">
+                        <div style="font-size: 10px; color: #64748b;">現在行</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #1e40af;">${currentRow}/${maxRows}</div>
+                    </div>
+                    <div style="text-align: center; flex: 1;">
+                        <div style="font-size: 10px; color: #64748b;">現金</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #059669;">¥${company.cash}</div>
+                    </div>
+                    <div style="text-align: center; flex: 1;">
+                        <div style="font-size: 10px; color: #64748b;">次リスク</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #dc2626;">${rowsToNextRisk === 0 ? '今！' : rowsToNextRisk + '行後'}</div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 10px; font-size: 11px;">
+                    <span style="background: #e0e7ff; padding: 3px 8px; border-radius: 4px;">材料 ${company.materials}</span>
+                    <span style="background: #fae8ff; padding: 3px 8px; border-radius: 4px;">仕掛 ${company.wip}</span>
+                    <span style="background: #dbeafe; padding: 3px 8px; border-radius: 4px;">製品 ${company.products}</span>
+                    <span style="background: #dcfce7; padding: 3px 8px; border-radius: 4px;">青 ${researchChips}</span>
+                </div>
+            </div>
+
+            <!-- 推奨アクション -->
+            <div style="background: linear-gradient(135deg, ${actionColor} 0%, ${actionColor}dd 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px; color: white; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">${actionIcon}</div>
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">${recommendedAction}</div>
+                <div style="font-size: 12px; opacity: 0.9;">${recommendation}</div>
+            </div>
+
+            <!-- 今後5行の予定 -->
+            <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; font-weight: bold;">📋 今後5行の提案</div>
+                ${futureHtml}
+                <div style="font-size: 10px; color: #999; margin-top: 8px; text-align: center;">
+                    ※5の倍数行でリスクカードを引きます
+                </div>
+            </div>
+
+            <button class="submit-btn" onclick="closeModal()" style="margin-top: 15px;">閉じる</button>
+        </div>
+    `;
+
+    showModal('🤖 AIアドバイス', content);
+}
+
 // AIアドバイス表示（ゲーム中）
 function showCurrentGameAIAdvice() {
     if (typeof showAIAdviceForCurrentState === 'function') {
@@ -86,6 +438,54 @@ function showActionLogModal() {
     `;
 
     showModal('行動ログ', content);
+}
+
+// サイコロ結果詳細モーダル
+function showDiceResultModal() {
+    if (!gameState.diceRoll) {
+        showToast('サイコロ情報がありません', 'error');
+        return;
+    }
+
+    const diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    const diceEmoji = diceEmojis[gameState.diceRoll - 1];
+
+    // 閉鎖市場の判定
+    const closedMarkets = gameState.diceRoll <= 3 ? '仙台のみ' : '仙台・札幌';
+    const closedColor = gameState.diceRoll <= 3 ? '#f59e0b' : '#dc2626';
+
+    const content = `
+        <div style="text-align: center; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 16px; padding: 25px; color: white; margin-bottom: 20px;">
+                <div style="font-size: 72px; margin-bottom: 15px;">${diceEmoji}</div>
+                <div style="font-size: 36px; font-weight: bold; margin-bottom: 10px;">出目：${gameState.diceRoll}</div>
+            </div>
+
+            <div style="display: grid; gap: 15px; margin-bottom: 20px;">
+                <div style="background: ${closedColor}; color: white; padding: 15px; border-radius: 12px;">
+                    <div style="font-size: 12px; opacity: 0.9;">閉鎖市場</div>
+                    <div style="font-size: 20px; font-weight: bold;">${closedMarkets}</div>
+                    <div style="font-size: 11px; opacity: 0.8; margin-top: 5px;">販売・仕入不可</div>
+                </div>
+
+                <div style="background: #2563eb; color: white; padding: 15px; border-radius: 12px;">
+                    <div style="font-size: 12px; opacity: 0.9;">人件費倍率</div>
+                    <div style="font-size: 20px; font-weight: bold;">×${gameState.wageMultiplier}</div>
+                    <div style="font-size: 11px; opacity: 0.8; margin-top: 5px;">期末給与計算時に適用</div>
+                </div>
+
+                <div style="background: #059669; color: white; padding: 15px; border-radius: 12px;">
+                    <div style="font-size: 12px; opacity: 0.9;">大阪販売上限価格</div>
+                    <div style="font-size: 20px; font-weight: bold;">¥${gameState.osakaMaxPrice || (20 + gameState.diceRoll)}</div>
+                    <div style="font-size: 11px; opacity: 0.8; margin-top: 5px;">入札上限・記帳価格</div>
+                </div>
+            </div>
+
+            <button class="submit-btn" onclick="closeModal()" style="width: 100%;">閉じる</button>
+        </div>
+    `;
+
+    showModal(`第${gameState.currentPeriod}期 サイコロ結果`, content);
 }
 
 // Show period payment breakdown

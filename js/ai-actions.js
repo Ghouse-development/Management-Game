@@ -546,6 +546,13 @@ function closeAIActionModal() {
         window.currentAITurnTimeout = null;
     }
     document.getElementById('modalContainer').innerHTML = '';
+
+    // 期末処理中の場合は次のターンへ進まない
+    if (gameState.periodEnding) {
+        console.log('Period is ending - not proceeding to next turn');
+        return;
+    }
+
     nextTurn();
 }
 
@@ -559,7 +566,22 @@ function executeAITurn() {
         console.warn('executeAITurn called during player turn - aborting');
         return;
     }
+
+    // 期末処理中の場合は実行しない
+    if (gameState.periodEnding) {
+        console.log('Period is ending - AI turn skipped');
+        return;
+    }
+
     const company = gameState.companies[gameState.currentPlayerIndex];
+
+    // AIがすでに規定行数に達している場合は期を終了
+    if (company.currentRow >= gameState.maxRows) {
+        console.log(`${company.name}は既に規定行数に達しています。期末処理を開始します。`);
+        gameState.periodEnding = true;
+        showPeriodEndAnnouncement(company);
+        return;
+    }
 
     // フリーズ防止タイムアウト（15秒後に強制的に次のターンへ）
     const aiTurnTimeout = setTimeout(() => {
@@ -578,6 +600,28 @@ function executeAITurn() {
         window.currentAITurnTimeout = null;
         nextTurn();
         return;
+    }
+
+    // ペンディング大型機械購入（前ターンで小型売却済み）
+    if (company.pendingLargeMachinePurchase) {
+        if (company.cash >= 200) {
+            company.cash -= 200;
+            company.machines.push({ type: 'large', attachments: 0 });
+            company.pendingLargeMachinePurchase = false;
+            incrementRow(gameState.companies.indexOf(company));
+            logAction(gameState.companies.indexOf(company), '大型機械購入', '大型機械購入 ¥200（意思決定カード）', -200, true);
+            showAIActionModal(company, '大型機械購入', '🏗️', '小型売却後の大型機械購入完了', [
+                { label: '投資額', value: '¥200' },
+                { label: '製造能力', value: '+4' }
+            ]);
+            clearTimeout(aiTurnTimeout);
+            window.currentAITurnTimeout = null;
+            return;
+        } else {
+            // 現金不足で購入できない場合はフラグをクリア
+            console.log(`${company.name}: 現金不足(¥${company.cash})で大型機械購入見送り`);
+            company.pendingLargeMachinePurchase = false;
+        }
     }
 
     // カードデッキから引く（プレイヤーと同様）

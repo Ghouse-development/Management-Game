@@ -23,11 +23,15 @@
     <script src="js/ai-actions.js?v=20260101h"></script>
     <script src="js/risk-effects.js?v=20260101h"></script>
     <script src="js/cards.js?v=20260101h"></script>
-    <script src="js/ai-brain.js?v=20260102"></script>
-    <script src="js/ai-strategies.js?v=20260102"></script>
-    <script src="js/ai-simulation.js?v=20260102"></script>
-    <script src="js/ai-optimizer.js?v=20260102"></script>
-    <script src="js/modals.js?v=20260101h"></script>
+    <script src="js/ai-brain.js?v=20260103"></script>
+    <script src="js/ai-strategies.js?v=20260103"></script>
+    <script src="js/ai-simulation.js?v=20260103"></script>
+    <script src="js/ai-optimizer.js?v=20260103"></script>
+    <!-- 新シミュレーション・評価エンジン -->
+    <script src="js/simulation-engine.js?v=20260103"></script>
+    <script src="js/action-evaluator.js?v=20260103"></script>
+    <script src="js/strategy-optimizer.js?v=20260103"></script>
+    <script src="js/modals.js?v=20260103"></script>
     <script src="js/custom-modes.js?v=20260101h"></script>
     <script src="js/turns.js?v=20260101h"></script>
 </head>
@@ -66,6 +70,11 @@
                     <div class="info-badge period">
                         <span class="info-badge-label">期</span>
                         <span class="info-badge-value" id="currentPeriod">2</span>
+                    </div>
+                    <!-- サイコロ結果（3期以降） -->
+                    <div class="info-badge dice" id="diceBadge" style="display: none;" onclick="showDiceResultModal()">
+                        <span class="info-badge-label">🎲</span>
+                        <span class="info-badge-value" id="diceResult">-</span>
                     </div>
                     <div class="info-badge row">
                         <span class="info-badge-label">行</span>
@@ -876,19 +885,19 @@ function applyRiskCard(cardId) {
                 rowUsed = false;
             }
             break;
-        case 9: // 研究開発失敗
+        case 9: // 研究開発失敗（現金の動きなし→行を使わない）
         case 10:
         case 11:
             if (company.chips.research > 0) {
                 company.chips.research--;
-                alert('研究開発失敗！\n青チップ1枚返却');
+                alert('研究開発失敗！\n青チップ1枚返却\n（現金移動なし→行を使わない）');
             } else if (company.nextPeriodChips.research > 0) {
                 company.nextPeriodChips.research--;
-                alert('研究開発失敗！\n次繰盤の青チップ1枚返却');
+                alert('研究開発失敗！\n次繰盤の青チップ1枚返却\n（現金移動なし→行を使わない）');
             } else {
                 alert('研究開発失敗！\n（青チップがないため効果なし）');
-                rowUsed = false;
             }
+            rowUsed = false;  // 現金の動きがないので行を使わない
             break;
         case 12: // 広告成功（仕入れ可）
         case 13:

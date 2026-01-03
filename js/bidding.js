@@ -3,8 +3,10 @@
  *
  * 入札勝者決定の優先順位:
  * 1. コール価格が低い方が勝ち（第一優先）
- * 2. コール価格が同じなら、研究開発チップ枚数が多い方が勝ち
- * 3. それでも同じなら、親が勝ち
+ * 2. コール価格が同じなら、研究チップ枚数が多い方が勝ち
+ * 3. それでも同じなら、親が勝ち（第二順位）
+ * 4. 親以外同士で全て同じ場合、再入札（先の入札価格未満で再勝負）
+ *    → シミュレーションではランダムで決定
  *
  * 価格競争力 = 研究チップ × 2 + 親ボーナス(2)
  * コール価格 = プライスカード - 価格競争力
@@ -40,7 +42,9 @@ const BiddingSystem = {
      * 優先順位:
      * 1. コール価格が低い方が勝ち（第一優先）
      * 2. コール価格が同じなら、研究チップ枚数が多い方が勝ち
-     * 3. それでも同じなら、親が勝ち
+     * 3. それでも同じなら、親が勝ち（第二順位）
+     * 4. 親以外同士で全て同じ場合、ランダムで決定
+     *    （実際のゲームでは再入札するが、シミュレーションでは簡略化）
      *
      * @param {Array} bids - 入札配列 [{company, price, displayPrice, quantity}, ...]
      * @param {Object} gameState - ゲーム状態
@@ -65,13 +69,15 @@ const BiddingSystem = {
                 return bResearch - aResearch;  // 多い方が先（降順）
             }
 
-            // 3. それでも同じなら、親が勝ち
+            // 3. それでも同じなら、親が勝ち（第二順位）
             const aIsParent = (parentCompany === a.company);
             const bIsParent = (parentCompany === b.company);
             if (aIsParent && !bIsParent) return -1;
             if (!aIsParent && bIsParent) return 1;
 
-            return 0;
+            // 4. 親以外同士で全て同じ場合、ランダムで決定
+            //    （実際のゲームでは再入札するが、シミュレーションでは簡略化）
+            return Math.random() - 0.5;
         });
     },
 

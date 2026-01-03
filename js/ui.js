@@ -14,6 +14,25 @@ function updateDisplay() {
     document.getElementById('playerCash').textContent = `¥${player.cash}`;
     document.getElementById('equity').textContent = `¥${player.equity}`;
 
+    // サイコロ結果表示（3期以降）
+    const diceBadge = document.getElementById('diceBadge');
+    if (diceBadge) {
+        if (gameState.currentPeriod >= 3 && gameState.diceRoll) {
+            diceBadge.style.display = 'flex';
+            document.getElementById('diceResult').textContent = gameState.diceRoll;
+            // 人件費倍率に応じて色を変える
+            if (gameState.wageMultiplier >= 1.2) {
+                diceBadge.style.background = '#dc2626';  // 赤（高倍率）
+            } else if (gameState.wageMultiplier >= 1.1) {
+                diceBadge.style.background = '#f59e0b';  // オレンジ（中倍率）
+            } else {
+                diceBadge.style.background = '#22c55e';  // 緑（通常）
+            }
+        } else {
+            diceBadge.style.display = 'none';
+        }
+    }
+
     // カードセクション
     const cardSection = document.getElementById('cardDrawSection');
     const turnInfo = document.getElementById('turnInfo');

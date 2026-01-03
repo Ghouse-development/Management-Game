@@ -185,6 +185,7 @@ function incrementRow(companyIndex) {
 
     if (company.currentRow >= gameState.maxRows) {
         console.log(`${company.name}が行数上限（${gameState.maxRows}行）に達しました！期末処理を開始します。`);
+        gameState.periodEnding = true; // 期末処理フラグを立てる
         showPeriodEndAnnouncement(company);
         return true;
     }

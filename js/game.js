@@ -53,6 +53,7 @@ function initializeCompanies() {
         rowsUsed: 0,
         decisionCard: null,
         totalSales: 0,
+        totalSoldQuantity: 0,  // 売上個数Q
         totalMaterialCost: 0,
         totalProductionCost: 0,
         extraLaborCost: 0,
