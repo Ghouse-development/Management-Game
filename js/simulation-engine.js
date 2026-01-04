@@ -173,6 +173,977 @@ const MGSimulation = (function() {
     };
 
     // ============================================
+    // GameActionTracker: 完全自動ルール強制システム
+    // 全てのアクションはこのシステムを通じて実行される
+    // フラグにより全ての状態変化を追跡・検証
+    // ============================================
+    const GameActionTracker = {
+        // デバッグモード（詳細ログ出力）
+        debugMode: false,
+
+        /**
+         * 会社の全フラグを初期化
+         */
+        initAllFlags(company) {
+            company.gameFlags = {
+                // ===== 期間フラグ =====
+                period: {
+                    current: 2,
+                    phase: 'PERIOD_START',  // PERIOD_START, MID_PERIOD, PERIOD_END
+                    row: 0,
+                    isFirstRound: true
+                },
+
+                // ===== 人員フラグ =====
+                personnel: {
+                    workers: { count: 1, hireHistory: [], maxThisPeriod: 1 },
+                    salesmen: { count: 1, hireHistory: [], maxThisPeriod: 1 },
+                    maxPersonnel: 0  // 期中最大（ワーカー+セールス）
+                },
+
+                // ===== 機械フラグ =====
+                machines: {
+                    list: [],  // { type, attachments, purchasedPeriod, bookValue }
+                    purchaseHistory: [],
+                    saleHistory: []
+                },
+
+                // ===== チップフラグ =====
+                chips: {
+                    pc: { owned: false, purchasedThisPeriod: false },
+                    insurance: { owned: false, purchasedThisPeriod: false },
+                    research: { count: 0, purchaseHistory: [], carryover: 0 },
+                    education: { count: 0, purchaseHistory: [], carryover: 0 },
+                    advertising: { count: 0, purchaseHistory: [], carryover: 0 },
+                    purchasedThisTurn: false  // ルール②: 1行1枚制限
+                },
+
+                // ===== 在庫フラグ =====
+                inventory: {
+                    materials: { count: 1, purchaseHistory: [], consumeHistory: [] },
+                    wip: { count: 2, inputHistory: [], completeHistory: [] },
+                    products: { count: 1, produceHistory: [], saleHistory: [] },
+                    maxCapacity: { materials: 10, products: 10, wip: 10 }
+                },
+
+                // ===== 販売フラグ =====
+                sales: {
+                    history: [],  // { market, quantity, price, revenue, row, won }
+                    totalRevenue: 0,
+                    totalQuantity: 0,
+                    marketVolumes: {}  // 市場別販売済み数
+                },
+
+                // ===== 借入フラグ =====
+                loans: {
+                    longTerm: { balance: 0, history: [] },
+                    shortTerm: { balance: 0, history: [] },
+                    interestPaid: 0,
+                    repaymentHistory: []
+                },
+
+                // ===== 現金フラグ =====
+                cash: {
+                    balance: 112,
+                    history: [],  // { row, action, amount, reason, balanceAfter }
+                    totalIncome: 0,
+                    totalExpense: 0
+                },
+
+                // ===== リスクカードフラグ =====
+                riskCards: {
+                    drawn: [],  // { cardNumber, row, effect }
+                    pendingEffects: []
+                },
+
+                // ===== F計算フラグ =====
+                fCosts: {
+                    wage: { workers: 0, machines: 0, salesmen: 0, maxPersonnel: 0 },
+                    depreciation: 0,
+                    chips: { pc: 0, insurance: 0, research: 0, education: 0, advertising: 0 },
+                    warehouse: 0,
+                    interest: { longTerm: 0, shortTerm: 0 },
+                    total: 0
+                },
+
+                // ===== 特別損失フラグ =====
+                specialLosses: {
+                    list: [],  // { reason, amount, row }
+                    total: 0
+                },
+
+                // ===== 期首処理フラグ =====
+                periodStart: {
+                    completed: false,
+                    interestPaid: 0,
+                    taxPaid: 0,
+                    dividendPaid: 0,
+                    purchases: []  // PC, 保険, 倉庫など
+                },
+
+                // ===== 期末処理フラグ =====
+                periodEnd: {
+                    completed: false,
+                    calculations: null  // PQ, VQ, MQ, F, G
+                },
+
+                // ===== 学習トラッキングフラグ =====
+                learning: {
+                    initialized: true,
+                    qValuesUpdated: 0,
+                    decisionsLogged: [],
+                    strategyAdjustments: [],
+                    explorationRate: 0.25
+                },
+
+                // ===== 自己資本成長追跡 =====
+                equityTracking: {
+                    initial: 300,  // 初期自己資本
+                    current: 300,
+                    target: 450,   // 目標自己資本
+                    history: [],   // { period, endEquity, growth, rank }
+                    bestEquity: 300,
+                    worstEquity: 300,
+                    growthRate: 0,
+                    isGrowing: false
+                },
+
+                // ===== システム状態フラグ =====
+                system: {
+                    flagsInitialized: true,
+                    lastValidation: null,
+                    validationErrors: [],
+                    totalActions: 0,
+                    ruleViolations: []
+                }
+            };
+        },
+
+        /**
+         * フラグが初期化されているかチェック（必須）
+         * フラグなしでは行動できない
+         */
+        requireFlags(company, actionName = 'action') {
+            if (!company.gameFlags) {
+                throw new Error(`[MANDATORY] ${company.name}のgameFlagsが未初期化。${actionName}を実行できません。`);
+            }
+            if (!company.gameFlags.system?.flagsInitialized) {
+                throw new Error(`[MANDATORY] ${company.name}のフラグシステムが不完全。${actionName}を実行できません。`);
+            }
+            // アクション数を記録
+            company.gameFlags.system.totalActions++;
+            return true;
+        },
+
+        /**
+         * 学習決定をログに記録
+         */
+        logLearningDecision(company, state, action, reward, nextState) {
+            if (!company.gameFlags?.learning) return;
+
+            company.gameFlags.learning.decisionsLogged.push({
+                state,
+                action,
+                reward,
+                nextState,
+                timestamp: Date.now(),
+                period: company.gameFlags.period?.current || company.period
+            });
+        },
+
+        /**
+         * Q値更新を記録
+         */
+        flagQValueUpdate(company, count = 1) {
+            if (!company.gameFlags?.learning) return;
+            company.gameFlags.learning.qValuesUpdated += count;
+        },
+
+        /**
+         * 戦略調整を記録
+         */
+        flagStrategyAdjustment(company, adjustment) {
+            if (!company.gameFlags?.learning) return;
+            company.gameFlags.learning.strategyAdjustments.push({
+                ...adjustment,
+                timestamp: Date.now()
+            });
+        },
+
+        /**
+         * 自己資本を更新
+         */
+        updateEquity(company, newEquity, period = null) {
+            if (!company.gameFlags?.equityTracking) return;
+
+            const tracking = company.gameFlags.equityTracking;
+            const currentPeriod = period || company.period;
+            const growth = newEquity - tracking.current;
+
+            tracking.current = newEquity;
+            tracking.isGrowing = growth > 0;
+            tracking.growthRate = ((newEquity - tracking.initial) / tracking.initial * 100).toFixed(1);
+
+            // ベスト/ワースト更新
+            if (newEquity > tracking.bestEquity) {
+                tracking.bestEquity = newEquity;
+            }
+            if (newEquity < tracking.worstEquity) {
+                tracking.worstEquity = newEquity;
+            }
+
+            // 履歴に追加
+            tracking.history.push({
+                period: currentPeriod,
+                endEquity: newEquity,
+                growth: growth,
+                growthRate: tracking.growthRate,
+                timestamp: Date.now()
+            });
+
+            if (this.debugMode) {
+                console.log(`[EQUITY] ${company.name}: ${newEquity} (${growth >= 0 ? '+' : ''}${growth})`);
+            }
+        },
+
+        /**
+         * ルール違反を記録
+         */
+        flagRuleViolation(company, ruleId, description) {
+            if (!company.gameFlags?.system) return;
+
+            company.gameFlags.system.ruleViolations.push({
+                ruleId,
+                description,
+                period: company.period,
+                row: company.currentRow,
+                timestamp: Date.now()
+            });
+
+            console.error(`[RULE VIOLATION] ${ruleId}: ${description}`);
+        },
+
+        /**
+         * システム検証を実行
+         */
+        runSystemValidation(company) {
+            if (!company.gameFlags?.system) return { valid: true };
+
+            const errors = [];
+            const flags = company.gameFlags;
+
+            // 現金整合性
+            if (flags.cash && Math.abs(flags.cash.balance - company.cash) > 0.01) {
+                errors.push(`現金不整合: フラグ${flags.cash.balance} vs 実際${company.cash}`);
+            }
+
+            // 在庫整合性
+            if (flags.inventory?.materials && flags.inventory.materials.count !== company.materials) {
+                errors.push(`材料不整合`);
+            }
+
+            flags.system.lastValidation = Date.now();
+            flags.system.validationErrors = errors;
+
+            return { valid: errors.length === 0, errors };
+        },
+
+        // ===== 現金変化追跡（全ての現金変動はここを通す）=====
+        trackCashChange(company, amount, reason, row = null) {
+            const flags = company.gameFlags;
+            const actualRow = row || company.currentRow;
+
+            flags.cash.balance += amount;
+            flags.cash.history.push({
+                row: actualRow,
+                action: amount >= 0 ? 'INCOME' : 'EXPENSE',
+                amount: amount,
+                reason: reason,
+                balanceAfter: flags.cash.balance,
+                timestamp: Date.now()
+            });
+
+            if (amount >= 0) {
+                flags.cash.totalIncome += amount;
+            } else {
+                flags.cash.totalExpense += Math.abs(amount);
+            }
+
+            // 現金と実際の値を同期
+            company.cash = flags.cash.balance;
+
+            if (this.debugMode) {
+                console.log(`[CASH] ${reason}: ${amount >= 0 ? '+' : ''}${amount} → 残高${flags.cash.balance}`);
+            }
+
+            return flags.cash.balance;
+        },
+
+        // ===== 材料購入フラグ =====
+        flagMaterialPurchase(company, market, quantity, cost) {
+            const flags = company.gameFlags;
+            const maxCapacity = flags.inventory.maxCapacity.materials;
+
+            // ルール検証: 在庫上限チェック
+            if (flags.inventory.materials.count + quantity > maxCapacity) {
+                throw new Error(`材料購入不可: 在庫上限超過(${flags.inventory.materials.count}+${quantity}>${maxCapacity})`);
+            }
+
+            flags.inventory.materials.count += quantity;
+            flags.inventory.materials.purchaseHistory.push({
+                market: market.name,
+                quantity,
+                unitPrice: market.buyPrice,
+                cost,
+                row: company.currentRow
+            });
+
+            // 現金追跡
+            this.trackCashChange(company, -cost, `材料購入(${market.name}×${quantity})`);
+
+            // 実際の値と同期
+            company.materials = flags.inventory.materials.count;
+
+            return true;
+        },
+
+        // ===== 生産フラグ（投入）=====
+        flagProduction_Input(company, quantity) {
+            const flags = company.gameFlags;
+
+            // ルール検証: 材料チェック
+            if (flags.inventory.materials.count < quantity) {
+                throw new Error(`投入不可: 材料不足(${flags.inventory.materials.count}<${quantity})`);
+            }
+            // ルール検証: 仕掛品上限チェック
+            if (flags.inventory.wip.count + quantity > flags.inventory.maxCapacity.wip) {
+                throw new Error(`投入不可: 仕掛品上限超過`);
+            }
+
+            flags.inventory.materials.count -= quantity;
+            flags.inventory.materials.consumeHistory.push({
+                type: 'INPUT',
+                quantity,
+                row: company.currentRow
+            });
+
+            flags.inventory.wip.count += quantity;
+            flags.inventory.wip.inputHistory.push({
+                quantity,
+                row: company.currentRow
+            });
+
+            // 加工費
+            const cost = quantity * RULES.COST.PROCESSING;
+            this.trackCashChange(company, -cost, `投入加工費×${quantity}`);
+
+            // 実際の値と同期
+            company.materials = flags.inventory.materials.count;
+            company.wip = flags.inventory.wip.count;
+
+            return true;
+        },
+
+        // ===== 生産フラグ（完成）=====
+        flagProduction_Complete(company, quantity) {
+            const flags = company.gameFlags;
+
+            // ルール検証: 仕掛品チェック
+            if (flags.inventory.wip.count < quantity) {
+                throw new Error(`完成不可: 仕掛品不足(${flags.inventory.wip.count}<${quantity})`);
+            }
+            // ルール検証: 製品上限チェック
+            if (flags.inventory.products.count + quantity > flags.inventory.maxCapacity.products) {
+                throw new Error(`完成不可: 製品上限超過`);
+            }
+
+            flags.inventory.wip.count -= quantity;
+            flags.inventory.wip.completeHistory.push({
+                quantity,
+                row: company.currentRow
+            });
+
+            flags.inventory.products.count += quantity;
+            flags.inventory.products.produceHistory.push({
+                quantity,
+                row: company.currentRow
+            });
+
+            // 加工費
+            const cost = quantity * RULES.COST.PROCESSING;
+            this.trackCashChange(company, -cost, `完成加工費×${quantity}`);
+
+            // 実際の値と同期
+            company.wip = flags.inventory.wip.count;
+            company.products = flags.inventory.products.count;
+
+            return true;
+        },
+
+        // ===== 販売フラグ =====
+        flagSale(company, market, quantity, price, revenue, won) {
+            const flags = company.gameFlags;
+
+            if (won) {
+                // ルール検証: 製品チェック
+                if (flags.inventory.products.count < quantity) {
+                    throw new Error(`販売不可: 製品不足(${flags.inventory.products.count}<${quantity})`);
+                }
+
+                // 市場ボリューム追跡
+                const marketName = market.name || market;
+                flags.sales.marketVolumes[marketName] = (flags.sales.marketVolumes[marketName] || 0) + quantity;
+
+                flags.inventory.products.count -= quantity;
+                flags.inventory.products.saleHistory.push({
+                    market: marketName,
+                    quantity,
+                    price,
+                    revenue,
+                    row: company.currentRow
+                });
+
+                flags.sales.totalRevenue += revenue;
+                flags.sales.totalQuantity += quantity;
+
+                // 現金追跡
+                this.trackCashChange(company, revenue, `販売(${marketName}×${quantity}@${price})`);
+
+                // 実際の値と同期
+                company.products = flags.inventory.products.count;
+            }
+
+            flags.sales.history.push({
+                market: market.name || market,
+                quantity,
+                price,
+                revenue: won ? revenue : 0,
+                row: company.currentRow,
+                won
+            });
+
+            return true;
+        },
+
+        // ===== リスクカードフラグ =====
+        flagRiskCard(company, cardNumber, effect, row) {
+            const flags = company.gameFlags;
+
+            flags.riskCards.drawn.push({
+                cardNumber,
+                effect,
+                row,
+                timestamp: Date.now()
+            });
+
+            if (this.debugMode) {
+                console.log(`[RISK] カード${cardNumber}: ${effect}`);
+            }
+
+            return true;
+        },
+
+        // ===== 汎用雇用フラグ =====
+        flagHire(company, type, count, period) {
+            if (type === 'worker') {
+                return this.flagWorkerHire(company, period, count);
+            } else if (type === 'salesman') {
+                return this.flagSalesmanHire(company, period, count);
+            }
+            return true;
+        },
+
+        // ===== ワーカー雇用フラグ =====
+        flagWorkerHire(company, period, count) {
+            // gameFlagsが存在しない場合はスキップ（後方互換性）
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.personnel?.workers) {
+                flags.personnel.workers.count = (flags.personnel.workers.count || 0) + count;
+                flags.personnel.workers.hireHistory.push({
+                    count,
+                    period,
+                    row: company.currentRow,
+                    cost: count * RULES.COST.HIRING
+                });
+
+                // 最大人員更新
+                const currentPersonnel = (flags.personnel.workers.count || 0) + (flags.personnel.salesmen?.count || 0);
+                flags.personnel.maxPersonnel = Math.max(flags.personnel.maxPersonnel || 0, currentPersonnel);
+            }
+
+            return true;
+        },
+
+        // ===== セールスマン雇用フラグ =====
+        flagSalesmanHire(company, period, count) {
+            // gameFlagsが存在しない場合はスキップ（後方互換性）
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.personnel?.salesmen) {
+                flags.personnel.salesmen.count = (flags.personnel.salesmen.count || 0) + count;
+                flags.personnel.salesmen.hireHistory.push({
+                    count,
+                    period,
+                    row: company.currentRow,
+                    cost: count * RULES.COST.HIRING
+                });
+
+                // 最大人員更新
+                const currentPersonnel = (flags.personnel.workers?.count || 0) + (flags.personnel.salesmen.count || 0);
+                flags.personnel.maxPersonnel = Math.max(flags.personnel.maxPersonnel || 0, currentPersonnel);
+            }
+
+            return true;
+        },
+
+        // ===== 機械購入フラグ =====
+        flagMachinePurchase(company, period, machineType) {
+            // gameFlagsが存在しない場合はスキップ
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.machines) {
+                flags.machines.list.push({
+                    type: machineType,
+                    attachments: 0,
+                    purchasedPeriod: period,
+                    bookValue: machineType === 'large' ? RULES.MACHINE.LARGE.cost : RULES.MACHINE.SMALL.cost
+                });
+
+                flags.machines.purchaseHistory.push({
+                    type: machineType,
+                    cost: machineType === 'large' ? RULES.MACHINE.LARGE.cost : RULES.MACHINE.SMALL.cost,
+                    period,
+                    row: company.currentRow
+                });
+            }
+
+            return true;
+        },
+
+        // ===== 機械売却フラグ =====
+        flagMachineSale(company, period, machineIndex, salePrice, loss) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (!flags.machines?.list || machineIndex >= flags.machines.list.length) {
+                return true;  // 機械リストがない場合はスキップ
+            }
+
+            const machine = flags.machines.list[machineIndex];
+            if (flags.machines.saleHistory) {
+                flags.machines.saleHistory.push({
+                    type: machine.type,
+                    salePrice,
+                    loss,
+                    period,
+                    row: company.currentRow
+                });
+            }
+
+            flags.machines.list.splice(machineIndex, 1);
+
+            // 特別損失追跡
+            if (loss > 0) {
+                this.flagSpecialLoss(company, '機械売却損', loss);
+            }
+
+            return true;
+        },
+
+        // ===== 倉庫購入フラグ =====
+        flagWarehousePurchase(company, period) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.inventory?.maxCapacity) {
+                flags.inventory.maxCapacity.materials += RULES.CAPACITY.WAREHOUSE_BONUS;
+                flags.inventory.maxCapacity.products += RULES.CAPACITY.WAREHOUSE_BONUS;
+            }
+
+            return true;
+        },
+
+        // ===== PCチップ購入フラグ =====
+        flagPCPurchase(company) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.chips?.pc) {
+                flags.chips.pc.owned = true;
+                flags.chips.pc.purchasedThisPeriod = true;
+            }
+            if (flags.fCosts?.chips) {
+                flags.fCosts.chips.pc = RULES.COST.PC;
+            }
+
+            return true;
+        },
+
+        // ===== 保険チップ購入フラグ =====
+        flagInsurancePurchase(company) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.chips?.insurance) {
+                flags.chips.insurance.owned = true;
+                flags.chips.insurance.purchasedThisPeriod = true;
+            }
+            if (flags.fCosts?.chips) {
+                flags.fCosts.chips.insurance = RULES.COST.INSURANCE;
+            }
+
+            return true;
+        },
+
+        // ===== 研究/教育/広告チップ購入フラグ =====
+        flagChipPurchase(company, chipType, isExpress) {
+            // gameFlagsが存在しない場合は初期化（後方互換性）
+            if (!company.gameFlags) {
+                this.initAllFlags(company);
+            }
+            const flags = company.gameFlags;
+            const period = flags.period?.current || company.period || 2;
+
+            // ルール①: 2期は特急なし（ActionValidatorで既にチェック済みだが二重チェック）
+            // 注: isExpressが既にfalseに修正されている場合があるので静かに処理
+            if (period === 2 && isExpress) {
+                // 警告は冗長なので抑制（正常な動作）
+                isExpress = false;
+            }
+
+            // ルール②: 1行1枚まで（chipsBoughtThisTurnは別で管理されている）
+            // ここではフラグ記録のみ行い、制限チェックはActionValidatorで実施
+
+            const cost = isExpress ? RULES.COST.CHIP_EXPRESS : RULES.COST.CHIP_NORMAL;
+
+            if (flags.chips[chipType]) {
+                flags.chips[chipType].count = (flags.chips[chipType].count || 0) + 1;
+                flags.chips[chipType].purchaseHistory.push({
+                    isExpress,
+                    cost,
+                    period,
+                    row: company.currentRow
+                });
+            }
+
+            // 注: 現金追跡はActionEngine.buyChipで既に行われているため、
+            // ここでは二重追跡しない（company.cashは既に減少済み）
+
+            return true;
+        },
+
+        // ===== 短期借入フラグ =====
+        flagShortTermLoan(company, amount) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+            const interest = Math.floor(amount * RULES.LOAN.SHORT_TERM_RATE);
+
+            if (flags.loans?.shortTerm) {
+                flags.loans.shortTerm.balance = (flags.loans.shortTerm.balance || 0) + amount;
+                flags.loans.shortTerm.history.push({
+                    amount,
+                    interest,
+                    netAmount: amount - interest,
+                    row: company.currentRow
+                });
+            }
+            if (flags.fCosts?.interest) {
+                flags.fCosts.interest.shortTerm = (flags.fCosts.interest.shortTerm || 0) + interest;
+            }
+
+            return true;
+        },
+
+        // ===== 長期借入フラグ =====
+        flagLongTermLoan(company, amount) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+            const interest = Math.floor(amount * RULES.LOAN.LONG_TERM_RATE);
+
+            if (flags.loans?.longTerm) {
+                flags.loans.longTerm.balance = (flags.loans.longTerm.balance || 0) + amount;
+                flags.loans.longTerm.history.push({
+                    amount,
+                    interest,
+                    netAmount: amount - interest,
+                    row: company.currentRow
+                });
+            }
+
+            return true;
+        },
+
+        // ===== 特別損失フラグ =====
+        flagSpecialLoss(company, reason, amount) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.specialLosses) {
+                flags.specialLosses.list.push({
+                    reason,
+                    amount,
+                    row: company.currentRow
+                });
+                flags.specialLosses.total = (flags.specialLosses.total || 0) + amount;
+            }
+
+            return true;
+        },
+
+        // ===== リスクカードフラグ =====
+        flagRiskCard(company, cardId, effect) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.riskCards) {
+                flags.riskCards.drawn.push({
+                    cardNumber: cardId,
+                    row: company.currentRow,
+                    period: company.period,
+                    effect: effect,
+                    timestamp: Date.now()
+                });
+            }
+
+            if (this.debugMode) {
+                console.log(`[RISK CARD] #${cardId}: ${effect.type} - ${effect.description}`);
+            }
+
+            return true;
+        },
+
+        // ===== 期首処理フラグ =====
+        flagPeriodStart(company, period) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.period) {
+                flags.period.current = period;
+                flags.period.phase = 'PERIOD_START';
+                flags.period.row = 0;
+            }
+            if (flags.periodStart) {
+                flags.periodStart.completed = false;
+            }
+
+            // 最大人員リセット
+            if (flags.personnel?.workers && flags.personnel?.salesmen) {
+                flags.personnel.maxPersonnel = flags.personnel.workers.count + flags.personnel.salesmen.count;
+            }
+
+            return true;
+        },
+
+        // ===== 期末処理フラグ =====
+        flagPeriodEnd(company, calculations) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.period) {
+                flags.period.phase = 'PERIOD_END';
+            }
+            if (flags.periodEnd) {
+                flags.periodEnd.completed = true;
+                flags.periodEnd.calculations = calculations;
+            }
+
+            return true;
+        },
+
+        // ===== 行進行フラグ =====
+        flagRowAdvance(company) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            if (flags.period) {
+                flags.period.row += 1;
+                flags.period.phase = 'MID_PERIOD';
+            }
+            if (flags.chips) {
+                flags.chips.purchasedThisTurn = false;  // ルール②リセット
+            }
+
+            return true;
+        },
+
+        // ===== 期末にフラグをリセット =====
+        resetForNewPeriod(company) {
+            if (!company.gameFlags) return true;
+            const flags = company.gameFlags;
+
+            // チップ繰越処理
+            const period = flags.period?.current || 2;
+            if (flags.chips) {
+                if (period === 2) {
+                    // 2期末: PC・保険返却、研究・教育・広告は-1して最大3枚繰越
+                    if (flags.chips.pc) flags.chips.pc.owned = false;
+                    if (flags.chips.insurance) flags.chips.insurance.owned = false;
+                    ['research', 'education', 'advertising'].forEach(type => {
+                        if (flags.chips[type]) {
+                            const current = flags.chips[type].count || 0;
+                            flags.chips[type].carryover = Math.min(Math.max(0, current - 1), 3);
+                            flags.chips[type].count = flags.chips[type].carryover;
+                        }
+                    });
+                } else {
+                    // 3期以降末: 全チップ没収
+                    if (flags.chips.pc) flags.chips.pc.owned = false;
+                    if (flags.chips.insurance) flags.chips.insurance.owned = false;
+                    ['research', 'education', 'advertising'].forEach(type => {
+                        if (flags.chips[type]) {
+                            flags.chips[type].count = 0;
+                            flags.chips[type].carryover = 0;
+                        }
+                    });
+                }
+            }
+
+            // F計算リセット
+            flags.fCosts = {
+                wage: { workers: 0, machines: 0, salesmen: 0, maxPersonnel: 0 },
+                depreciation: 0,
+                chips: { pc: 0, insurance: 0, research: 0, education: 0, advertising: 0 },
+                warehouse: 0,
+                interest: { longTerm: 0, shortTerm: 0 },
+                total: 0
+            };
+
+            // 期首処理フラグリセット
+            flags.periodStart = {
+                completed: false,
+                interestPaid: 0,
+                taxPaid: 0,
+                dividendPaid: 0,
+                purchases: []
+            };
+
+            // 期末処理フラグリセット
+            flags.periodEnd = {
+                completed: false,
+                calculations: null
+            };
+
+            // 販売履歴は維持（累計用）
+
+            return true;
+        },
+
+        // ===== フラグからF合計を計算 =====
+        calculateFFromFlags(company, period) {
+            if (!company.gameFlags) return 0;
+            const flags = company.gameFlags;
+            const wage = RULES.WAGE[period] || 22;
+            const halfWage = Math.floor(wage / 2);
+
+            let totalF = 0;
+
+            // 1. 人件費
+            if (flags.personnel?.workers) {
+                totalF += flags.personnel.workers.count * wage;
+            }
+            if (flags.machines?.list) {
+                totalF += flags.machines.list.length * wage;
+            }
+            if (flags.personnel?.salesmen) {
+                totalF += flags.personnel.salesmen.count * wage;
+            }
+            if (flags.personnel) {
+                totalF += (flags.personnel.maxPersonnel || 0) * halfWage;
+            }
+
+            // 2. 減価償却
+            if (flags.machines?.list) {
+                flags.machines.list.forEach(m => {
+                    const depTable = m.type === 'large'
+                        ? RULES.DEPRECIATION_BY_PERIOD.LARGE
+                        : RULES.DEPRECIATION_BY_PERIOD.SMALL;
+                    totalF += depTable[period] || 20;
+                });
+            }
+
+            // 3. PC・保険
+            if (flags.chips?.pc?.owned) totalF += RULES.COST.PC;
+            if (flags.chips?.insurance?.owned) totalF += RULES.COST.INSURANCE;
+
+            // 4. チップ
+            if (flags.chips) {
+                ['research', 'education', 'advertising'].forEach(type => {
+                    if (flags.chips[type]?.purchaseHistory) {
+                        flags.chips[type].purchaseHistory
+                            .filter(h => h.period === period)
+                            .forEach(h => {
+                                totalF += h.cost;
+                            });
+                    }
+                });
+            }
+
+            // 5. 利息
+            if (flags.fCosts?.interest) {
+                totalF += flags.fCosts.interest.shortTerm || 0;
+            }
+
+            return totalF;
+        },
+
+        // ===== 全フラグの整合性チェック =====
+        validateAllFlags(company) {
+            if (!company.gameFlags) return { valid: true };
+            const flags = company.gameFlags;
+            const errors = [];
+
+            // 現金整合性
+            if (flags.cash && Math.abs((flags.cash.balance || 0) - (company.cash || 0)) > 0.01) {
+                errors.push(`現金不整合: フラグ${flags.cash.balance} vs 実際${company.cash}`);
+            }
+
+            // 在庫整合性
+            if (flags.inventory?.materials && flags.inventory.materials.count !== company.materials) {
+                errors.push(`材料不整合: フラグ${flags.inventory.materials.count} vs 実際${company.materials}`);
+            }
+            if (flags.inventory?.products && flags.inventory.products.count !== company.products) {
+                errors.push(`製品不整合: フラグ${flags.inventory.products.count} vs 実際${company.products}`);
+            }
+
+            // 人員整合性
+            if (flags.personnel?.workers && flags.personnel.workers.count !== company.workers) {
+                errors.push(`ワーカー不整合: フラグ${flags.personnel.workers.count} vs 実際${company.workers}`);
+            }
+            if (flags.personnel?.salesmen && flags.personnel.salesmen.count !== company.salesmen) {
+                errors.push(`セールス不整合: フラグ${flags.personnel.salesmen.count} vs 実際${company.salesmen}`);
+            }
+
+            if (errors.length > 0) {
+                console.error('[GameActionTracker] 整合性エラー:', errors);
+                return { valid: false, errors };
+            }
+
+            return { valid: true };
+        }
+    };
+
+    // 後方互換性のためImmediateFTrackerをGameActionTrackerのエイリアスとして定義
+    const ImmediateFTracker = {
+        initFlags: (company) => GameActionTracker.initAllFlags(company),
+        flagWorkerHire: (company, period, count) => GameActionTracker.flagWorkerHire(company, period, count),
+        flagSalesmanHire: (company, period, count) => GameActionTracker.flagSalesmanHire(company, period, count),
+        flagMachinePurchase: (company, period, type) => GameActionTracker.flagMachinePurchase(company, period, type),
+        flagWarehousePurchase: (company, period) => GameActionTracker.flagWarehousePurchase(company, period),
+        flagPCPurchase: (company) => GameActionTracker.flagPCPurchase(company),
+        flagInsurancePurchase: (company) => GameActionTracker.flagInsurancePurchase(company),
+        flagChipPurchase: (company, chipType, isExpress) => GameActionTracker.flagChipPurchase(company, chipType, isExpress),
+        flagShortTermLoan: (company, amount) => GameActionTracker.flagShortTermLoan(company, amount),
+        flagLongTermLoan: (company, amount) => GameActionTracker.flagLongTermLoan(company, amount),
+        flagSpecialLoss: (company, reason, amount) => GameActionTracker.flagSpecialLoss(company, reason, amount),
+        resetForNewPeriod: (company) => GameActionTracker.resetForNewPeriod(company),
+        calculateFFromFlags: (company, period) => GameActionTracker.calculateFFromFlags(company, period)
+    };
+
+    // ============================================
     // アクション検証システム（単一ゲートウェイ）
     // すべてのアクションはこの検証を通過しないと実行不可能
     // ============================================
@@ -195,6 +1166,12 @@ const MGSimulation = (function() {
                     return this.validateSale(params, company, gameState, period);
                 case 'BUY_MATERIALS':
                     return this.validateMaterialPurchase(params, company, gameState, period);
+                // ===== 新規: 投入（材料→仕掛品）と完成（仕掛品→製品）を分離 =====
+                case 'INPUT':
+                    return this.validateInput(params, company, gameState);
+                case 'COMPLETE':
+                    return this.validateComplete(params, company, gameState);
+                // ===== 旧: PRODUCE（後方互換性のため残存）=====
                 case 'PRODUCE':
                     return this.validateProduction(params, company, gameState);
                 case 'HIRE':
@@ -207,7 +1184,7 @@ const MGSimulation = (function() {
                 case 'SELL_MACHINE':
                     return this.validateMachineSale(params, company, gameState, period);
                 case 'DO_NOTHING':
-                    return { valid: true };
+                    return { valid: true, consumesRow: false };  // 行を消費しない
                 default:
                     // 未知のアクションタイプは拒否（安全側に倒す）
                     return { valid: false, reason: `未知のアクションタイプ: ${actionType}` };
@@ -303,11 +1280,65 @@ const MGSimulation = (function() {
             return { valid: true };
         },
 
-        // ルール④: 生産の検証
+        // ===== 投入の検証（材料→仕掛品のみ）=====
+        // ルール: 1行で投入OR完成のどちらか一方のみ実行可能
+        validateInput(params, company, gameState) {
+            const quantity = params.quantity || 0;
+            if (quantity <= 0) {
+                return { valid: false, reason: '投入数量が0' };
+            }
+            // 材料チェック
+            if (quantity > company.materials) {
+                return { valid: false, reason: `材料不足(${company.materials}<${quantity})` };
+            }
+            // 仕掛品容量チェック
+            const newWip = company.wip + quantity;
+            if (newWip > RULES.CAPACITY.WIP) {
+                return { valid: false, reason: `仕掛品容量オーバー(${newWip}/${RULES.CAPACITY.WIP})` };
+            }
+            // 加工費チェック
+            const cost = quantity * RULES.COST.PROCESSING;
+            if (company.cash < cost) {
+                return { valid: false, reason: `加工費不足(現金${company.cash}<費用${cost})` };
+            }
+            return { valid: true };
+        },
+
+        // ===== 完成の検証（仕掛品→製品のみ）=====
+        // ルール: 1行で投入OR完成のどちらか一方のみ実行可能
+        validateComplete(params, company, gameState) {
+            const quantity = params.quantity || 0;
+            if (quantity <= 0) {
+                return { valid: false, reason: '完成数量が0' };
+            }
+            // 仕掛品チェック
+            if (quantity > company.wip) {
+                return { valid: false, reason: `仕掛品不足(${company.wip}<${quantity})` };
+            }
+            // 製品容量チェック
+            const maxProducts = RULES.CAPACITY.PRODUCT_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+            if (company.products + quantity > maxProducts) {
+                return { valid: false, reason: `製品在庫上限超過(${company.products + quantity}/${maxProducts})` };
+            }
+            // 製造能力チェック
+            const mfgCapacity = company.getMfgCapacity ? company.getMfgCapacity() : 1;
+            if (quantity > mfgCapacity) {
+                return { valid: false, reason: `製造能力不足(能力${mfgCapacity}<完成${quantity})` };
+            }
+            // 加工費チェック
+            const cost = quantity * RULES.COST.PROCESSING;
+            if (company.cash < cost) {
+                return { valid: false, reason: `加工費不足(現金${company.cash}<費用${cost})` };
+            }
+            return { valid: true };
+        },
+
+        // ルール④: 生産の検証（後方互換性のため残存、非推奨）
+        // 注意: 新規コードではINPUT/COMPLETEを使用すること
         validateProduction(params, company, gameState) {
             const input = params.materialToWip || 0;
             const complete = params.wipToProduct || 0;
-            // ルール④: 投入1完成1禁止
+            // ルール④: 投入1完成1禁止（旧実装）
             if (input === 1 && complete === 1) {
                 return { valid: false, reason: 'ルール④: 投入1完成1は禁止' };
             }
@@ -504,6 +1535,18 @@ const MGSimulation = (function() {
             MIN_SHORT_REPAY: 0.20
         },
 
+        // ★★★ 期首処理の行番号（システム化・変更禁止）★★★
+        // フラグによる厳密管理 - 二度と手動で変更しない
+        PERIOD_START_ROWS: {
+            INTEREST_TAX_DIVIDEND: 0,  // 0行目: 金利支払・納税・配当
+            PC_INSURANCE: 1,           // 1行目: PCチップ・保険
+            LOAN_WAREHOUSE: 2,         // 2行目: 長期借入・倉庫購入
+            DECISION_START: 3          // 意思決定は3行目から開始
+        },
+
+        // ★★★ 期末処理の行番号（行数にカウントしない）★★★
+        PERIOD_END_ROW: -1,  // 期末処理は行数にカウントしない（-1で表示）
+
         // 借入限度
         // 2期: 長期借入不可（0）
         // 3期: 自己資本の50%
@@ -605,7 +1648,7 @@ const MGSimulation = (function() {
                     2: { research: 0, education: 1, advertising: 0 },
                     3: { research: 0, education: 1, advertising: 0 },
                     4: { research: 1, education: 1, advertising: 0 },
-                    5: { research: 1, education: 1, advertising: 0 }
+                    5: { research: 1, education: 1, advertising: 1 }  // ★勝利条件: 3枚以上必須
                 },
                 priceAdjustment: -4,
                 hirePriority: 'worker'
@@ -626,14 +1669,14 @@ const MGSimulation = (function() {
                 name: '積極投資型',
                 description: '3期に大型機械へ移行、人員拡大',
                 chipTargets: {
-                    2: { research: 0, education: 0, advertising: 0 },
-                    3: { research: 1, education: 1, advertising: 0 },
-                    4: { research: 2, education: 1, advertising: 0 },
-                    5: { research: 2, education: 1, advertising: 0 }
+                    2: { research: 1, education: 1, advertising: 0 },  // 教育1で販売能力+1
+                    3: { research: 2, education: 1, advertising: 0 },
+                    4: { research: 3, education: 1, advertising: 0 },
+                    5: { research: 3, education: 1, advertising: 0 }
                 },
                 priceAdjustment: 0,
                 hirePriority: 'worker',
-                earlyLargeMachine: false,  // 3期に大型機械購入（期首借入後）
+                earlyLargeMachine: false,
                 upgradePeriod: 3
             },
             PLAYER: {
@@ -686,7 +1729,7 @@ const MGSimulation = (function() {
             this.chips = JSON.parse(JSON.stringify(init.CHIPS));
             this.nextPeriodChips = { research: 0, education: 0, advertising: 0 };
             this.period = 2;  // 現在の期
-            this.currentRow = 2;  // 期首処理で1行使用済み
+            this.currentRow = RULES.PERIOD_START_ROWS.INTEREST_TAX_DIVIDEND;  // 0行目（期首処理開始）
             this.totalSales = 0;
             this.totalSoldQuantity = 0;
             this.totalF = 0;
@@ -703,6 +1746,9 @@ const MGSimulation = (function() {
             this.chipsBoughtThisTurn = false;
             // 期首処理履歴
             this.periodStartActions = [];
+
+            // 即時F追跡システムのフラグを初期化
+            ImmediateFTracker.initFlags(this);
         }
 
         // 製造能力
@@ -817,8 +1863,10 @@ const MGSimulation = (function() {
             if (!autoType) {
                 if (action.includes('リスクカード')) {
                     autoType = 'リスク';
-                } else if (action.includes('期末処理') || action.includes('期首')) {
+                } else if (action.includes('期末処理')) {
                     autoType = '期末';
+                } else if (action.includes('期首')) {
+                    autoType = '期首';
                 } else {
                     autoType = '意思決定';
                 }
@@ -1197,7 +2245,68 @@ const MGSimulation = (function() {
         },
 
         /**
-         * 完成・投入
+         * ===== 投入（材料→仕掛品）=====
+         * ルール: 1行で投入のみ実行（完成とは別の行動）
+         * ActionValidatorで検証済み
+         */
+        input(company, quantity) {
+            // ActionValidatorで事前検証
+            const validation = ActionValidator.canExecute('INPUT', { quantity }, company, {});
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
+            }
+
+            const cost = quantity * RULES.COST.PROCESSING;
+
+            // 検証済みなので実行
+            company.materials -= quantity;
+            company.wip += quantity;
+            company.cash -= cost;
+
+            // ★フラグ追跡: 投入を記録
+            GameActionTracker.flagInput(company, quantity);
+
+            company.logAction('投入', `材料${quantity}個→仕掛品（加工費¥${cost}）`, cost, false);
+
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, '投入後');
+
+            return { success: true, cost, quantity };
+        },
+
+        /**
+         * ===== 完成（仕掛品→製品）=====
+         * ルール: 1行で完成のみ実行（投入とは別の行動）
+         * ActionValidatorで検証済み
+         */
+        complete(company, quantity) {
+            // ActionValidatorで事前検証
+            const validation = ActionValidator.canExecute('COMPLETE', { quantity }, company, {});
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
+            }
+
+            const cost = quantity * RULES.COST.PROCESSING;
+
+            // 検証済みなので実行
+            company.wip -= quantity;
+            company.products += quantity;
+            company.cash -= cost;
+
+            // ★フラグ追跡: 完成を記録
+            GameActionTracker.flagComplete(company, quantity);
+
+            company.logAction('完成', `仕掛品${quantity}個→製品（加工費¥${cost}）`, cost, false);
+
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, '完成後');
+
+            return { success: true, cost, quantity };
+        },
+
+        /**
+         * 完成・投入（旧実装、後方互換性のため残存）
+         * 注意: 新規コードではinput/completeを使用すること
          * ルール: 材料→投入(¥1)→仕掛品→完成(¥1)→製品
          * ActionValidatorで検証済み
          */
@@ -1252,6 +2361,9 @@ const MGSimulation = (function() {
             company.workers += count;
             company.totalF += cost;
 
+            // ★即時F追跡: ワーカー雇用時にフラグ設定（人件費¥22/期がかかる）
+            ImmediateFTracker.flagWorkerHire(company, company.period || 2, count);
+
             // 最大人員を更新
             const currentPersonnel = company.workers + company.salesmen;
             if (currentPersonnel > company.maxPersonnel) {
@@ -1283,6 +2395,9 @@ const MGSimulation = (function() {
             company.cash -= cost;
             company.salesmen += count;
             company.totalF += cost;
+
+            // ★即時F追跡: セールスマン雇用時にフラグ設定（人件費¥22/期がかかる）
+            ImmediateFTracker.flagSalesmanHire(company, company.period || 2, count);
 
             // 最大人員を更新
             const currentPersonnel = company.workers + company.salesmen;
@@ -1333,6 +2448,11 @@ const MGSimulation = (function() {
 
             company.cash -= machineInfo.cost;
             company.machines.push({ type, attachments: 0 });
+
+            // ★即時F追跡: 機械購入時にフラグ設定（減価償却+人件費がかかる）
+            const period = gameState?.period || company.period || 2;
+            ImmediateFTracker.flagMachinePurchase(company, period, type);
+
             company.logAction('機械購入', `${type === 'large' ? '大型' : '小型'}機械購入`, machineInfo.cost, false);
 
             // ルール強制チェック
@@ -1410,6 +2530,9 @@ const MGSimulation = (function() {
                 company.chipPurchaseHistory[chipType].normal += 1;
             }
 
+            // ★即時F追跡: チップ購入時にフラグ設定
+            ImmediateFTracker.flagChipPurchase(company, chipType, isExpress);
+
             const chipNames = { research: '研究開発', education: '教育', advertising: '広告' };
             // 2期は「特急」という言葉を使わない
             const typeStr = period === 2 ? '' : (isExpress ? '特急' : '次期');
@@ -1433,6 +2556,10 @@ const MGSimulation = (function() {
 
             company.cash -= RULES.COST.WAREHOUSE;
             company.warehouses += 1;
+
+            // ★即時F追跡: 倉庫購入時にフラグ設定（期末にF¥20がかかる）
+            ImmediateFTracker.flagWarehousePurchase(company, company.period || 2);
+
             // 倉庫費用は期末処理でFに計上される（ここでは計上しない）
             company.logAction('倉庫購入', '倉庫購入', RULES.COST.WAREHOUSE, false);
 
@@ -1460,7 +2587,8 @@ const MGSimulation = (function() {
             company.cash += netAmount;
             company.totalF += interest;
 
-            company.logAction('長期借入', `${amount}円借入（利息${interest}円差引）`, netAmount, true);
+            // ★期首処理として記録（2行目で実行）
+            company.logAction('期首', `長期借入${amount}円（利息${interest}円差引、手取${netAmount}円）`, netAmount, true);
 
             return { success: true, amount, interest, netAmount };
         }
@@ -1495,6 +2623,9 @@ const MGSimulation = (function() {
         },
 
         processCompany(company, period, gameState) {
+            // ★★★ 期末処理は行数にカウントしない ★★★
+            company.currentRow = RULES.PERIOD_END_ROW;  // -1で期末処理を表す
+
             const result = {
                 companyIndex: company.index,
                 wage: 0,
@@ -1523,19 +2654,11 @@ const MGSimulation = (function() {
             const halfWage = Math.round(adjustedWage / 2);
 
             // 1. 人件費
-            // 2期（ジュニア）: ワーカー × 単価 のみ
-            // 3期以降（シニア）: ワーカー + 機械 + セールスマン + 最大人員×0.5
+            // 全期共通: (ワーカー + 機械 + セールス) × 単価 + 最大人員 × 半額
             result.wageWorker = company.workers * adjustedWage;
-            if (period >= 3) {
-                result.wageMachine = company.machines.length * adjustedWage;
-                result.wageSalesman = company.salesmen * adjustedWage;
-                result.wageMaxPersonnel = company.maxPersonnel * halfWage;
-            } else {
-                // 2期はワーカーのみ
-                result.wageMachine = 0;
-                result.wageSalesman = 0;
-                result.wageMaxPersonnel = 0;
-            }
+            result.wageMachine = company.machines.length * adjustedWage;
+            result.wageSalesman = company.salesmen * adjustedWage;
+            result.wageMaxPersonnel = company.maxPersonnel * halfWage;
             result.wage = result.wageWorker + result.wageMachine + result.wageSalesman + result.wageMaxPersonnel;
 
             company.cash -= result.wage;
@@ -1655,9 +2778,43 @@ const MGSimulation = (function() {
             }
 
             result.totalF = result.wage + result.depreciation + result.pcCost + result.insuranceCost + result.chipCost + result.warehouseCost + result.shortTermInterest;
+
+            // 8. 現金マイナス時の自動処理（PE-013）
+            // ステップ1: 材料売却（¥10/個で売却）
+            if (company.cash < 0 && company.materials > 0) {
+                const materialsToSell = Math.min(
+                    company.materials,
+                    Math.ceil(Math.abs(company.cash) / 10)
+                );
+                const materialSaleAmount = materialsToSell * 10;
+                company.materials -= materialsToSell;
+                company.cash += materialSaleAmount;
+                company.logAction('期末処理', `現金不足のため材料${materialsToSell}個売却（+¥${materialSaleAmount}）`, 0, false);
+            }
+
+            // ステップ2: それでも現金マイナスなら短期借入発生
+            if (company.cash < 0) {
+                const shortfall = Math.abs(company.cash) + 10; // 余裕を持たせる
+                const loanAmount = Math.ceil(shortfall / 0.8) * 1; // 手取り80%なので逆算
+                const interest = Math.floor(loanAmount * 0.20);
+                const netAmount = loanAmount - interest;
+                company.shortTermLoan += loanAmount;
+                company.cash += netAmount;
+                company.totalF += interest;
+                result.shortTermInterest += interest;
+
+                // ★即時F追跡: 短期借入発生時にフラグ設定（返済・金利が必要）
+                ImmediateFTracker.flagShortTermLoan(company, loanAmount);
+
+                company.logAction('期末処理', `現金不足のため短期借入¥${loanAmount}発生（金利¥${interest}、手取り¥${netAmount}）`, interest, false);
+            }
+
             result.equityAfter = company.calculateEquity(period + 1);
 
-            // 8. 期中最大人員をリセット
+            // ★自己資本追跡: 期末の自己資本を記録
+            GameActionTracker.updateEquity(company, result.equityAfter, period);
+
+            // 9. 期中最大人員をリセット
             company.maxPersonnel = 0;
 
             // 9. チップ購入履歴をリセット（次期用）
@@ -1670,6 +2827,9 @@ const MGSimulation = (function() {
             company.logAction('期末処理',
                 `人件費${result.wage}(W${result.wageWorker}+M${result.wageMachine}+S${result.wageSalesman}+Max${result.wageMaxPersonnel}) 減価償却${result.depreciation} PC${result.pcCost} 保険${result.insuranceCost} チップ${result.chipCost} 税${result.tax}`,
                 result.totalF + result.tax, false);
+
+            // ★即時F追跡: 期末処理完了後に次期用フラグをリセット
+            ImmediateFTracker.resetForNewPeriod(company);
 
             return result;
         }
@@ -1960,24 +3120,26 @@ const MGSimulation = (function() {
 
         evaluateWorkerHiring(company, gameState, hirePriority) {
             // ============================================
-            // ワーカー採用（ActionValidator経由で100%システム化）
+            // ワーカー採用（機械台数に合わせて採用）
             // ============================================
-            const machines = company.machines.length;
+            const period = gameState.period;
+            const machineCount = company.machines.length;
 
             // ワーカーが機械台数より少ない場合に検討
-            if (company.workers >= machines) return null;
+            if (company.workers >= machineCount) return null;
 
-            const hireCount = Math.min(3, machines - company.workers);
+            const hireCount = Math.min(3, machineCount - company.workers);
+            if (hireCount <= 0) return null;
 
             // ActionValidatorで検証
             const validation = ActionValidator.canExecute('HIRE', { count: hireCount }, company, gameState);
             if (!validation.valid) return null;
 
             const cost = hireCount * RULES.COST.HIRING;
-            if (company.cash < cost + 50) return null;
+            if (company.cash < cost + 30) return null;
 
-            let score = hireCount * 15;
-            if (hirePriority === 'worker') score += 20;
+            let score = hireCount * 40;
+            if (hirePriority === 'worker') score += 30;
 
             return {
                 type: 'HIRE_WORKER',
@@ -1990,14 +3152,17 @@ const MGSimulation = (function() {
 
         evaluateSalesmanHiring(company, gameState, hirePriority) {
             // ============================================
-            // セールスマン採用（ActionValidator経由で100%システム化）
+            // セールスマン採用（販売能力拡大）
             // ============================================
+            const period = gameState.period;
             const currentSalesCapacity = company.getSalesCapacity();
-            const products = company.products;
             const mfgCapacity = company.getMfgCapacity();
 
-            // 販売能力が製造能力より低い場合に検討
-            if (currentSalesCapacity >= mfgCapacity * 2) return null;
+            // 2期はセールスマン2人を目標（販売能力4+α）
+            // 3期以降は製造能力に合わせる
+            const targetSalesmen = period === 2 ? 2 : Math.ceil(mfgCapacity / 2);
+
+            if (company.salesmen >= targetSalesmen) return null;
 
             const hireCount = 1;  // セールスマンは1人ずつ
 
@@ -2006,11 +3171,13 @@ const MGSimulation = (function() {
             if (!validation.valid) return null;
 
             const cost = hireCount * RULES.COST.HIRING;
-            if (company.cash < cost + 50) return null;
+            if (company.cash < cost + 30) return null;
 
-            let score = hireCount * 15;
-            if (hirePriority === 'salesman') score += 20;
-            if (currentSalesCapacity < products) score += 30;  // 製品が売れない状態なら優先
+            // 2期はセールスマン採用を優先（スコア大幅UP）
+            let score = 50;
+            if (period === 2 && company.salesmen < 2) score += 80;  // 2期でセールス不足なら優先
+            if (hirePriority === 'salesman') score += 30;
+            if (currentSalesCapacity < company.products) score += 50;  // 製品が売れない状態なら優先
 
             return {
                 type: 'HIRE_SALESMAN',
@@ -2050,25 +3217,32 @@ const MGSimulation = (function() {
 
             // 戦略に基づくチップ目標を取得
             const strategy = company.strategy;
-            if (!strategy || !strategy.chipTargets || !strategy.chipTargets[period]) {
-                return null;
-            }
+            const targets = (strategy && strategy.chipTargets && strategy.chipTargets[period]) ||
+                           { research: 0, education: 0, advertising: 0 };
 
-            const targets = strategy.chipTargets[period];
             const currentResearch = company.chips.research || 0;
             const currentEducation = company.chips.education || 0;
             const currentAdvertising = company.chips.advertising || 0;
+            const nextResearch = company.nextPeriodChips?.research || 0;
+            const nextEducation = company.nextPeriodChips?.education || 0;
+            const nextAdvertising = company.nextPeriodChips?.advertising || 0;
+
+            // ★★★ 5期勝利条件チェック: 総チップ数が3枚未満なら購入必須 ★★★
+            const totalCurrentChips = currentResearch + currentEducation + currentAdvertising +
+                                     nextResearch + nextEducation + nextAdvertising;
+            const needsChipsForVictory = period === 5 && totalCurrentChips < RULES.VICTORY.MIN_CARRYOVER_CHIPS;
 
             // チップ種類と優先度を定義
             const chipOptions = [
-                { type: 'research', current: currentResearch, target: targets.research || 0, score: 60 },
-                { type: 'education', current: currentEducation, target: targets.education || 0, score: 55 },
-                { type: 'advertising', current: currentAdvertising, target: targets.advertising || 0, score: 50 }
+                { type: 'research', current: currentResearch + nextResearch, target: targets.research || 0, score: 60 },
+                { type: 'education', current: currentEducation + nextEducation, target: targets.education || 0, score: 55 },
+                { type: 'advertising', current: currentAdvertising + nextAdvertising, target: targets.advertising || 0, score: 50 }
             ];
 
             // 各チップタイプをActionValidatorで検証
             for (const opt of chipOptions) {
-                if (opt.current >= opt.target) continue;
+                // 通常は目標未達の場合のみ購入、5期勝利条件未達なら常に購入試行
+                if (!needsChipsForVictory && opt.current >= opt.target) continue;
 
                 // 2期は特急なし（ルール①）
                 const isExpress = period !== 2;
@@ -2229,29 +3403,90 @@ const MGSimulation = (function() {
             }
 
             const maxRows = gameState.getMaxRows();
+            const PSR = RULES.PERIOD_START_ROWS;  // 期首処理行番号定数
 
-            // 期首処理2: 最大人員を初期化 & 期を設定
+            // ★★★ 期首処理: 行番号システム化（変更禁止）★★★
+            // 0行目: 金利支払・納税・配当
+            // 1行目: PCチップ・保険
+            // 2行目: 長期借入・倉庫購入
+            // 3行目以降: 意思決定フェーズ
+
+            // 期首処理: 最大人員を初期化 & 期を設定
             gameState.companies.forEach(company => {
                 company.period = period;  // 各会社の期を更新
                 company.maxPersonnel = company.workers + company.salesmen;
+                company.currentRow = PSR.INTEREST_TAX_DIVIDEND;  // 0行目開始
             });
 
-            // 期首処理3: 長期借入（PS-006）
-            const turnOrder = gameState.getTurnOrder();  // 親から順番
-            turnOrder.forEach(companyIndex => {
-                const company = gameState.companies[companyIndex];
-                if (!company.isPlayer || options.autoPlayer) {
-                    const equity = company.calculateEquity(period);
-                    const limit = RULES.getLoanLimit(period, equity);
-                    const available = limit - company.longTermLoan;
-                    // より積極的に借入（投資資金確保）
-                    if (available > 0 && company.cash < 300) {
-                        ActionEngine.borrowLongTerm(company, available, period, equity);
+            // ===== 0行目: 金利支払・納税・配当 =====
+            gameState.companies.forEach(company => {
+                company.currentRow = PSR.INTEREST_TAX_DIVIDEND;  // 0行目
+                // 3期以降、前期からの借入金利支払い（ここでは借入時に控除済みなので表示のみ）
+                // 納税・配当は期末処理で計算済み
+            });
+
+            // ===== 1行目: PCチップ・保険 =====
+            gameState.companies.forEach(company => {
+                company.currentRow = PSR.PC_INSURANCE;  // 1行目
+
+                // 3期以降の必須購入処理
+                if (period >= 3) {
+                    // 特別ルール: PC+保険を買えない場合（現金<25）、先に¥100長期借入（2行目扱い）
+                    if (company.cash < 25) {
+                        const savedRow = company.currentRow;
+                        company.currentRow = PSR.LOAN_WAREHOUSE;  // 2行目で借入
+                        const specialLoanAmount = 100;
+                        const specialInterest = Math.floor(specialLoanAmount * 0.10);
+                        const specialNetAmount = specialLoanAmount - specialInterest;
+                        company.longTermLoan += specialLoanAmount;
+                        company.cash += specialNetAmount;
+                        ImmediateFTracker.flagLongTermLoan(company, specialLoanAmount);
+                        company.logAction('期首', `特別長期借入¥${specialLoanAmount}（金利¥${specialInterest}）`, specialNetAmount, true);
+                        company.currentRow = savedRow;  // 1行目に戻す
+                    }
+
+                    // PS-004: PCチップ購入（¥20）- 1行目
+                    if (company.cash >= 20) {
+                        company.cash -= 20;
+                        company.chips.computer = 1;
+                        ImmediateFTracker.flagPCPurchase(company);
+                        company.logAction('期首', 'PCチップ購入 = -¥20', 20, false);
+                    }
+
+                    // PS-005: 保険購入（¥5）- 1行目
+                    if (company.cash >= 5) {
+                        company.cash -= 5;
+                        company.chips.insurance = 1;
+                        ImmediateFTracker.flagInsurancePurchase(company);
+                        company.logAction('期首', '保険チップ購入 = -¥5', 5, false);
                     }
                 }
             });
 
-            // 期首処理4: AI投資戦略（チップ・機械・人員）
+            // ===== 2行目: 長期借入・倉庫購入 =====
+            const turnOrder = gameState.getTurnOrder();  // 親から順番
+            turnOrder.forEach(companyIndex => {
+                const company = gameState.companies[companyIndex];
+                company.currentRow = PSR.LOAN_WAREHOUSE;  // 2行目
+
+                if (!company.isPlayer || options.autoPlayer) {
+                    const equity = company.calculateEquity(period);
+                    const limit = RULES.getLoanLimit(period, equity);
+                    const available = limit - company.longTermLoan;
+
+                    // 長期借入（3期以降）- borrowLongTerm内でログ記録済み
+                    if (available > 0 && period >= 3) {
+                        const borrowAmount = available;
+                        ActionEngine.borrowLongTerm(company, borrowAmount, period, equity);
+                        // ※ログはActionEngine.borrowLongTerm内で記録済み
+                    }
+
+                    // 倉庫購入（必要に応じて）- 2行目
+                    // ※倉庫購入ロジックはexecuteAIInvestmentStrategyに含まれる
+                }
+            });
+
+            // ===== 意思決定前のAI投資戦略 =====
             turnOrder.forEach(companyIndex => {
                 const company = gameState.companies[companyIndex];
                 if (!company.isPlayer || options.autoPlayer) {
@@ -2259,15 +3494,25 @@ const MGSimulation = (function() {
                 }
             });
 
+            // ★★★ 期首処理完了 → 意思決定フェーズ開始（3行目から）★★★
+            gameState.companies.forEach(c => c.currentRow = PSR.DECISION_START);
+
             // 1周目フラグ（ACT-002用）
             gameState.isFirstRound = true;
             let roundCount = 0;
+            const MAX_ITERATIONS = 1000;  // 無限ループ防止
 
             // ターン実行
             let continueSimulation = true;
             while (continueSimulation) {
                 gameState.turn++;
                 roundCount++;
+
+                // 無限ループ防止（1000ターン以上は異常）
+                if (roundCount > MAX_ITERATIONS) {
+                    console.warn(`警告: 期${period}で${MAX_ITERATIONS}ターン超過、強制終了`);
+                    break;
+                }
 
                 // 1周終了で1周目フラグをオフ（6社なので6ターン後）
                 if (roundCount > gameState.companies.length) {
@@ -2291,7 +3536,11 @@ const MGSimulation = (function() {
 
                     if (isRisk) {
                         // リスクカード処理
-                        this.processRiskCard(company, gameState);
+                        const riskResult = this.processRiskCard(company, gameState);
+                        // ★ルール: お金が動かないリスクカードは行を消費しない
+                        if (riskResult && riskResult.moneyMoved === false) {
+                            rowConsumed = false;
+                        }
                     } else {
                         // 意思決定
                         if (!company.isPlayer || options.autoPlayer) {
@@ -2338,7 +3587,8 @@ const MGSimulation = (function() {
             periodResult.periodEndResults = PeriodEndEngine.process(gameState);
 
             // 行数リセット、順番逆転リセット
-            gameState.companies.forEach(c => c.currentRow = 1);
+            // 期末処理後、次期用に行番号リセット（期首は行0から開始）
+            gameState.companies.forEach(c => c.currentRow = RULES.PERIOD_START_ROWS.INTEREST_TAX_DIVIDEND);
             gameState.isReversed = false;
 
             return periodResult;
@@ -2347,23 +3597,86 @@ const MGSimulation = (function() {
         /**
          * リスクカード処理（64種類）
          * デッキから1枚引く（同じカードは山札がなくなるまで出ない）
+         * @returns {{ moneyMoved: boolean }} お金が動いたかどうか
          */
         processRiskCard(company, gameState) {
             // Q学習: リスクカード前の現金を記録
             const cashBefore = company.cash;
+            const productsBefore = company.products;
+            const materialsBefore = company.materials;
 
             // デッキから1枚引く
             const cardId = gameState.drawRiskCard();
             this.applyRiskCard(company, gameState, cardId);
 
+            // ★リスクカードフラグ: カード効果を記録
+            const cashChange = company.cash - cashBefore;
+            const productsChange = company.products - productsBefore;
+            const materialsChange = company.materials - materialsBefore;
+
+            // ★ルール: お金が動いたかどうかを判定
+            // お金が動く = 現金の増減がある場合
+            const moneyMoved = cashChange !== 0;
+
+            GameActionTracker.flagRiskCard(company, cardId, {
+                type: this.getRiskCardType(cardId),
+                description: this.getRiskCardDescription(cardId),
+                cashChange,
+                productsChange,
+                materialsChange,
+                moneyMoved,  // ★フラグ追加
+                rowConsumed: moneyMoved  // ★行消費フラグ追加
+            });
+
             // Q学習v2.0: リスクカードの効果を学習（現金変化を報酬として）
             if (IntelligentLearning) {
-                const cashChange = company.cash - cashBefore;
                 IntelligentLearning.recordRiskCard(company, gameState, cardId, cashChange);
             }
 
             // ルール強制チェック（リスクカード後も状態が有効か確認）
             RuntimeRuleEnforcer.enforce(company, gameState, `リスクカード(${cardId})後`);
+
+            // ★戻り値: お金が動いたかどうかを返す
+            return {
+                cardId,
+                moneyMoved,
+                cashChange,
+                productsChange,
+                materialsChange
+            };
+        },
+
+        // リスクカードの種類を取得（rules-checklist.jsonに基づく）
+        getRiskCardType(cardId) {
+            // ラッキーカード: 教育成功(3-4), 広告成功(12-14), 独占販売(26-28), 研究成功(35-40)
+            if ([3,4,12,13,14,26,27,28,35,36,37,38,39,40].includes(cardId)) return 'LUCKY';
+            // ダメージカード: 得意先倒産(7-8), 製造ミス(29-30), 倉庫火災(31-32), 盗難発見(45-46)
+            if ([7,8,29,30,31,32,45,46].includes(cardId)) return 'DAMAGE';
+            // 制限カード: 労災発生(15-16), 景気変動(53-54)
+            if ([15,16,53,54].includes(cardId)) return 'RESTRICTION';
+            // その他: 機械故障(63-64), 不良在庫(61-62)
+            return 'OTHER';
+        },
+
+        // リスクカードの説明を取得（rules-checklist.jsonに記載のカードのみ）
+        getRiskCardDescription(cardId) {
+            // rules-checklist.json RISK-001～RISK-011, LUCKY-001～003に基づく
+            const confirmedCards = {
+                3: '教育成功', 4: '教育成功',           // LUCKY-003
+                7: '得意先倒産', 8: '得意先倒産',       // RISK-006
+                12: '広告成功', 13: '広告成功', 14: '広告成功',  // その他
+                15: '労災発生', 16: '労災発生',         // RISK-003
+                26: '独占販売', 27: '独占販売', 28: '独占販売',  // LUCKY-001
+                29: '製造ミス', 30: '製造ミス',         // RISK-004
+                31: '倉庫火災', 32: '倉庫火災',         // RISK-005
+                35: '研究開発成功', 36: '研究開発成功', 37: '研究開発成功',  // RISK-008/LUCKY-002
+                38: '研究開発成功', 39: '研究開発成功', 40: '研究開発成功',
+                45: '盗難発見', 46: '盗難発見',         // RISK-007
+                53: '景気変動', 54: '景気変動',         // RISK-010
+                61: '不良在庫', 62: '不良在庫',         // RISK-009
+                63: '機械故障', 64: '機械故障'          // RISK-002
+            };
+            return confirmedCards[cardId] || `その他カード${cardId}`;
         },
 
         /**
@@ -2709,33 +4022,18 @@ const MGSimulation = (function() {
 
         /**
          * AI投資戦略を実行（期首処理で呼ばれる）
-         * PC/保険購入、チップ購入、機械購入、人員採用を行う
+         * 機械購入、人員採用を行う（2行目）
+         * ※PC/保険購入は1行目でrunPeriod内で処理済み
          */
         executeAIInvestmentStrategy(company, period, gameState) {
+            const PSR = RULES.PERIOD_START_ROWS;
             // 期首処理履歴をリセット
             company.periodStartActions = [];
 
-            // 1. PC購入（3期以降、現金があれば必ず購入）
-            if (period >= 3 && company.cash >= 20) {
-                company.cash -= 20;
-                company.chips.computer = 1;
-                company.periodStartActions.push({
-                    type: 'PC購入',
-                    detail: 'PCチップ購入（¥20）',
-                    amount: 20
-                });
-            }
+            // ★★★ 2行目（長期借入・倉庫購入）で機械・人員投資も実行 ★★★
+            company.currentRow = PSR.LOAN_WAREHOUSE;  // 2行目
 
-            // 2. 保険購入（3期以降、現金があれば必ず購入）
-            if (period >= 3 && company.cash >= 5) {
-                company.cash -= 5;
-                company.chips.insurance = 1;
-                company.periodStartActions.push({
-                    type: '保険購入',
-                    detail: '保険チップ購入（¥5）',
-                    amount: 5
-                });
-            }
+            // ※PC/保険購入は1行目でrunPeriod内で既に処理済み（重複削除）
 
             // ルール⑨: チップは期首購入不可（意思決定カードで購入）
             // チップ購入はここでは行わない - AIDecisionEngine.evaluateChipPurchaseで処理
@@ -2772,15 +4070,46 @@ const MGSimulation = (function() {
                 }
             }
 
-            // 5. セールスマン採用（販売能力が足りない場合）
+            // 5. ワーカー採用（機械2台以上になったら採用）
+            // ルール: ワーカーは機械が2台になるまで採用不要
+            const machineCount = company.machines.length;
+            if (machineCount >= 2 && company.workers < machineCount && company.cash >= 15) {
+                const neededWorkers = machineCount - company.workers;
+                const hireWorkerCount = Math.min(3, neededWorkers, Math.floor((company.cash - 10) / 5));
+                if (hireWorkerCount > 0) {
+                    const workerCost = hireWorkerCount * 5;
+                    company.cash -= workerCost;
+                    company.workers += hireWorkerCount;
+
+                    // ★即時F追跡: ワーカー雇用時にフラグ設定
+                    ImmediateFTracker.flagWorkerHire(company, period, hireWorkerCount);
+
+                    // ★フラグ: 人員変動を記録
+                    GameActionTracker.flagHire(company, 'worker', hireWorkerCount, period);
+
+                    company.periodStartActions.push({
+                        type: '採用',
+                        detail: `ワーカー${hireWorkerCount}名採用（¥${workerCost}）`,
+                        amount: workerCost
+                    });
+                }
+            }
+
+            // 6. セールスマン採用（販売能力が足りない場合）
             const salesCapacity = company.getSalesCapacity();
             const mfgCapacity = company.getMfgCapacity();
-            if (salesCapacity < mfgCapacity && company.cash >= 10) {
-                const hireCount = Math.min(2, Math.floor(company.cash / 5));
+            // セールスマンは最低2人（販売能力4+教育1=5個/回）
+            const targetSalesmen = period >= 4 ? 3 : 2;  // 4期以降は3人目標
+            if (company.salesmen < targetSalesmen && salesCapacity < mfgCapacity && company.cash >= 10) {
+                const hireCount = Math.min(targetSalesmen - company.salesmen, Math.floor(company.cash / 5), 3);
                 if (hireCount > 0) {
                     const cost = hireCount * 5;
                     company.cash -= cost;
                     company.salesmen += hireCount;
+
+                    // ★即時F追跡: セールスマン雇用時にフラグ設定
+                    ImmediateFTracker.flagSalesmanHire(company, period, hireCount);
+
                     company.periodStartActions.push({
                         type: '採用',
                         detail: `セールスマン${hireCount}名採用（¥${cost}）`,
@@ -2825,6 +4154,17 @@ const MGSimulation = (function() {
 
             switch (action.type) {
                 case 'SELL':
+                    // ★マーケットボリューム強制チェック（販売前に必ず確認）
+                    const targetMarket = action.market || gameState.markets.find(m => m.name === action.marketName);
+                    if (targetMarket) {
+                        const remainingVolume = targetMarket.maxStock - (targetMarket.currentStock || 0);
+                        if (remainingVolume < action.quantity) {
+                            // マーケットボリューム不足 - 販売不可
+                            company.logAction('販売失敗', `市場ボリューム不足（残り${remainingVolume}個）`, 0, false);
+                            return { consumedRow: false };
+                        }
+                    }
+
                     // 6社競争をシミュレート
                     const isParent = gameState.isParent(company.index);
                     const myChips = company.chips.research || 0;
@@ -2863,6 +4203,12 @@ const MGSimulation = (function() {
                         company.products -= action.quantity;
                         company.totalSales += revenue;
                         company.totalSoldQuantity += action.quantity;
+
+                        // ★マーケットボリューム更新（販売成功時に必ず更新）
+                        if (targetMarket) {
+                            targetMarket.currentStock = (targetMarket.currentStock || 0) + action.quantity;
+                        }
+
                         company.logAction('販売', action.detail, revenue, true);
 
                         // ルール強制チェック（販売後の状態確認）
@@ -2888,7 +4234,18 @@ const MGSimulation = (function() {
                     ActionEngine.buyMaterials(company, action.quantity, action.market, gameState);
                     break;
 
+                case 'INPUT':
+                    // ===== 投入（材料→仕掛品）=====
+                    ActionEngine.input(company, action.quantity);
+                    break;
+
+                case 'COMPLETE':
+                    // ===== 完成（仕掛品→製品）=====
+                    ActionEngine.complete(company, action.quantity);
+                    break;
+
                 case 'PRODUCE':
+                    // 投入+完成を1行で（旧形式）
                     ActionEngine.produce(company, action.materialToWip, action.wipToProduct);
                     break;
 
@@ -2915,8 +4272,17 @@ const MGSimulation = (function() {
                     break;
 
                 case 'DO_NOTHING':
+                    // ===== 何もしない（行を消費しない）=====
+                    company.logAction('様子見', '何もしない（行消費なし）', 0, false);
+                    // ★DO_NOTHINGは行を消費しない
+                    const doNothingResult = { consumedRow: false };
+                    if (IntelligentLearning) {
+                        IntelligentLearning.recordAction(company, gameState, action, doNothingResult);
+                    }
+                    return doNothingResult;
+
                 default:
-                    company.logAction('様子見', '何もしない', 0, false);
+                    company.logAction('不明', `不明な行動: ${action?.type}`, 0, false);
                     break;
             }
 
@@ -2928,7 +4294,7 @@ const MGSimulation = (function() {
                 IntelligentLearning.recordAction(company, gameState, action, defaultResult);
             }
 
-            // デフォルト: 行を消費する（入札負け以外）
+            // デフォルト: 行を消費する（入札負け・DO_NOTHING以外）
             return defaultResult;
         }
     };

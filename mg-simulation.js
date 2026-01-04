@@ -278,6 +278,20 @@ class SimulationManager {
 
         const company = result.finalEquities.find(e => e.companyIndex === companyIndex);
 
+        // 期別の自己資本を取得（periodEndResultsから）
+        const periodEquities = { 2: 0, 3: 0, 4: 0, 5: 0 };
+        if (result.periods) {
+            result.periods.forEach((periodResult, index) => {
+                const period = index + 2;  // 0 = 2期, 1 = 3期, etc.
+                if (periodResult.periodEndResults) {
+                    const companyResult = periodResult.periodEndResults.find(r => r.companyIndex === companyIndex);
+                    if (companyResult) {
+                        periodEquities[period] = companyResult.equityAfter;
+                    }
+                }
+            });
+        }
+
         // 期別に分類
         const periodActions = { 2: [], 3: [], 4: [], 5: [] };
         const periodStats = {
@@ -324,7 +338,8 @@ class SimulationManager {
 
         // 期別サマリー行（データは期末処理から取得）
         for (const period of [2, 3, 4, 5]) {
-            const periodEnd = periodActions[period].find(a => a.action === '期末処理');
+            // 人件費を含む期末処理を検索（短期借入の記録ではなく本体の期末処理）
+            const periodEnd = periodActions[period].find(a => a.action === '期末処理' && a.detail.includes('人件費'));
             const stats = periodStats[period];
 
             // 期末処理から情報を抽出
@@ -338,7 +353,9 @@ class SimulationManager {
                 if (depMatch) fTotal += parseInt(depMatch[1]);
             }
 
-            console.log(`  | ${period}期 | ¥${String(stats.sales).padStart(4)} | ${String(stats.soldQty).padStart(4)}個 | ¥${String(fTotal).padStart(3)} | ¥${String(specialLoss).padStart(6)} | ¥${String(company.equity).padStart(10)} |`);
+            // 期末自己資本（periodEquitiesから取得、なければ最終値を使用）
+            const endEquity = periodEquities[period] || company.equity;
+            console.log(`  | ${period}期 | ¥${String(stats.sales).padStart(4)} | ${String(stats.soldQty).padStart(4)}個 | ¥${String(fTotal).padStart(3)} | ¥${String(specialLoss).padStart(6)} | ¥${String(endEquity).padStart(10)} |`);
         }
         console.log('');
 
@@ -368,17 +385,23 @@ class SimulationManager {
             console.log('  | 行  | 種別     | 行動                                    | 結果                       |');
             console.log('  |-----|----------|-----------------------------------------|----------------------------|');
 
-            // 各行を出力
-            let rowNum = 1;
+            // 各行を出力（実際の行番号を使用）
             actions.forEach((a) => {
-                // 期末処理は別扱い
-                if (a.action === '期末処理') return;
+                // 期首処理・期末処理も表示する（行番号で区別）
 
                 const type = (a.type || '意思決定').padEnd(8);
+                // ★★★ 行番号表示: -1は「末」、それ以外は数字 ★★★
+                const rowNum = a.row === -1 ? '末' : (a.row || 0);  // 期末は「末」表示
 
                 // 行動の整形
                 let actionText = '';
-                if (a.action === 'リスクカード') {
+                if (a.action === '期末処理') {
+                    // ★期末処理は給料・減価償却等を含む
+                    actionText = `期末: ${a.detail.substring(0, 35)}`;
+                } else if (a.action === '期首' || a.type === '期首') {
+                    // ★期首処理（PC購入、保険、長期借入等）
+                    actionText = `期首: ${a.detail}`;
+                } else if (a.action === 'リスクカード') {
                     actionText = a.detail;
                 } else if (a.action === '販売失敗') {
                     actionText = `販売失敗(入札負け): ${a.detail.replace('入札に負け: ', '')}`;
@@ -388,10 +411,13 @@ class SimulationManager {
                     actionText = `生産: ${a.detail} = -¥${a.amount}`;
                 } else if (a.action === '材料購入') {
                     actionText = `材料購入: ${a.detail} = -¥${a.amount}`;
+                } else if (a.action === 'チップ購入') {
+                    // ②チップ種別を表示
+                    actionText = `${a.detail} = -¥${a.amount}`;
                 } else if (a.isIncome) {
                     actionText = `${a.action} = +¥${a.amount}`;
                 } else if (a.amount > 0) {
-                    actionText = `${a.action} = -¥${a.amount}`;
+                    actionText = `${a.action}: ${a.detail} = -¥${a.amount}`;
                 } else {
                     actionText = a.detail || a.action;
                 }
@@ -402,13 +428,12 @@ class SimulationManager {
                 const resultText = `現金¥${String(state.cash).padStart(4)} 材料${state.materials} 仕掛${state.wip} 製品${state.products}`;
 
                 console.log(`  | ${String(rowNum).padStart(3)} | ${type} | ${actionText} | ${resultText} |`);
-                rowNum++;
             });
 
             console.log('');
 
-            // F明細
-            const periodEnd = actions.find(a => a.action === '期末処理');
+            // F明細（人件費を含む期末処理を検索）
+            const periodEnd = actions.find(a => a.action === '期末処理' && a.detail.includes('人件費'));
             if (periodEnd) {
                 console.log(`  ${period}期 F明細`);
                 console.log('');
