@@ -1,11 +1,17 @@
 # Credentials and sensitive files
 credentials.txt
 
-# Development notes
+# Development notes (keep important docs)
 *.md
 !README.md
 !DEV_RULES.md
-!開発記録*.md
+!CLAUDE.md
+!GAME_RULES.md
+!docs/**/*.md
+
+# Simulation output (temporary)
+simulation-output.txt
+simulation-*-output.txt
 
 # Reference materials
 sankoushiryou/

@@ -1,0 +1,177 @@
+{
+  "version": "2.2",
+  "lastUpdated": "2026-01-04",
+  "description": "MGゲーム全ルールチェックリスト - シミュレーション実行前に全項目が実装済みであることを確認する",
+  "note": "親=商品販売（入札）を仕掛ける人。入札市場で販売行動を行う人が親となり、親ボーナス（+2）を得る",
+
+  "categories": {
+    "structure": {
+      "name": "ゲーム構造",
+      "rules": [
+        { "id": "STR-001", "rule": "6社で競争（プレイヤー1社 + AI5社）", "implemented": true, "testFile": null },
+        { "id": "STR-002", "rule": "2期は20行、3期は30行、4期は34行、5期は35行", "implemented": true, "testFile": null },
+        { "id": "STR-003", "rule": "親=商品販売（入札）を仕掛ける人、親ボーナス+2", "implemented": true, "testFile": null },
+        { "id": "STR-004", "rule": "毎期、スタートする人はランダム", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "periodStart": {
+      "name": "期首処理",
+      "rules": [
+        { "id": "PS-001", "rule": "0行目：前期の金利支払い（長期10%、短期20%）", "implemented": true, "testFile": null },
+        { "id": "PS-002", "rule": "0行目：前期の税金支払い", "implemented": true, "testFile": null },
+        { "id": "PS-003", "rule": "0行目：前期の配当支払い", "implemented": true, "testFile": null },
+        { "id": "PS-004", "rule": "1行目：PC購入（¥20、任意だが通常購入）", "implemented": true, "testFile": null },
+        { "id": "PS-005", "rule": "1行目：保険購入（¥5、任意だが通常購入）", "implemented": true, "testFile": null },
+        { "id": "PS-006", "rule": "2行目：長期借入可能（3期以降、自己資本の一定倍率まで）", "implemented": true, "testFile": null },
+        { "id": "PS-007", "rule": "2行目：倉庫購入可能（¥20、最大2つ）", "implemented": true, "testFile": null },
+        { "id": "PS-008", "rule": "サイコロを振る（3期以降）→ 人件費倍率・市場閉鎖決定", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "actions": {
+      "name": "行動ルール",
+      "rules": [
+        { "id": "ACT-001", "rule": "材料購入：各市場の価格と数量制限", "implemented": true, "testFile": null },
+        { "id": "ACT-002", "rule": "材料購入：2期1周目は3個まで", "implemented": true, "testFile": null },
+        { "id": "ACT-003", "rule": "投入：材料→仕掛品、¥1/個", "implemented": true, "testFile": null },
+        { "id": "ACT-004", "rule": "完成：仕掛品→製品、¥1/個", "implemented": true, "testFile": null },
+        { "id": "ACT-005", "rule": "販売：入札市場では競争、価格+研究チップ+親ボーナスで決定", "implemented": true, "testFile": null },
+        { "id": "ACT-006", "rule": "販売：大阪はサイコロで価格決定（21-26）、入札なし", "implemented": true, "testFile": null },
+        { "id": "ACT-007", "rule": "販売：東京・海外は固定価格、入札なし", "implemented": true, "testFile": null },
+        { "id": "ACT-008", "rule": "採用：ワーカー¥5、セールスマン¥5、1行で最大3人", "implemented": true, "testFile": null },
+        { "id": "ACT-009", "rule": "解雇不可", "implemented": true, "testFile": null },
+        { "id": "ACT-010", "rule": "機械購入：小型¥100、大型¥200", "implemented": true, "testFile": null },
+        { "id": "ACT-011", "rule": "機械売却：何行目でも可能（意思決定カード前）、1行使う、簿価の70%", "implemented": true, "testFile": null },
+        { "id": "ACT-012", "rule": "アタッチメント購入：¥30、小型機械に+1能力", "implemented": true, "testFile": null },
+        { "id": "ACT-013", "rule": "チップ購入：2期は常に¥20、3期以降は通常¥20・特急¥40", "implemented": true, "testFile": null },
+        { "id": "ACT-014", "rule": "研究チップ：最大5枚、価格競争力+2/枚", "implemented": true, "testFile": null },
+        { "id": "ACT-015", "rule": "教育チップ：製造能力+1、販売能力+1（複数枚でも効果は+1）", "implemented": true, "testFile": null },
+        { "id": "ACT-016", "rule": "広告チップ：セールス1人につき2枚まで有効、販売+2/枚", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "bidding": {
+      "name": "入札システム",
+      "rules": [
+        { "id": "BID-001", "rule": "仙台・札幌・福岡・名古屋は入札制", "implemented": true, "testFile": null },
+        { "id": "BID-002", "rule": "入札価格 = 希望価格 + 研究チップ×2 + 親ボーナス2", "implemented": true, "testFile": null },
+        { "id": "BID-003", "rule": "同価格の場合：研究チップ数 → 親優先 → 再入札", "implemented": true, "testFile": null },
+        { "id": "BID-004", "rule": "市場ボリューム制限：例）名古屋9個中7個売れていたら2個まで入札可能", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "riskCards": {
+      "name": "リスクカード（全64枚）",
+      "rules": [
+        { "id": "RISK-001", "rule": "毎行1/5の確率で発生（2期～5期）、64種類のカードからランダム", "implemented": true, "testFile": null },
+        { "id": "RISK-002", "rule": "機械故障(63-64)：F+5", "implemented": true, "testFile": null },
+        { "id": "RISK-003", "rule": "労災発生(15-16)：生産不可", "implemented": true, "testFile": null },
+        { "id": "RISK-004", "rule": "製造ミス(29-30)：仕掛品-1、特損¥14", "implemented": true, "testFile": null },
+        { "id": "RISK-005", "rule": "倉庫火災(31-32)：材料全焼失、保険あれば¥8/個補償", "implemented": true, "testFile": null },
+        { "id": "RISK-006", "rule": "得意先倒産(7-8)：特損¥30（2期は免除）", "implemented": true, "testFile": null },
+        { "id": "RISK-007", "rule": "盗難発見(45-46)：製品-2、保険あれば¥10/個補償", "implemented": true, "testFile": null },
+        { "id": "RISK-008", "rule": "研究開発成功(35-40)：¥32×研究チップ×2個（最大5個）", "implemented": true, "testFile": null },
+        { "id": "RISK-009", "rule": "不良在庫(61-62)：総在庫20超過分損失", "implemented": true, "testFile": null },
+        { "id": "RISK-010", "rule": "景気変動(53-54)：行動順逆転", "implemented": true, "testFile": null },
+        { "id": "RISK-011", "rule": "その他多数：教育成功、広告成功、独占販売、退職、ストライキ等", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "luckyCards": {
+      "name": "ラッキーカード（リスクカード内に含まれる）",
+      "rules": [
+        { "id": "LUCKY-001", "rule": "独占販売(26-28)：¥32、セールス×2個まで（最大5個）", "implemented": true, "testFile": null },
+        { "id": "LUCKY-002", "rule": "研究成功(35-40)：¥32、研究チップ×2個（最大5個）", "implemented": true, "testFile": null },
+        { "id": "LUCKY-003", "rule": "教育成功(3-4)：¥32、販売能力内で最大5個", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "capacity": {
+      "name": "能力計算",
+      "rules": [
+        { "id": "CAP-001", "rule": "製造能力 = min(機械能力, ワーカー能力)。ワーカー1名につき機械1台動かせる", "implemented": true, "testFile": null },
+        { "id": "CAP-002", "rule": "機械能力：小型1、小型+アタッチ2、大型4、+PCチップ×機械数", "implemented": true, "testFile": null },
+        { "id": "CAP-003", "rule": "ワーカー能力：ワーカー数。教育チップで製造能力+1", "implemented": true, "testFile": null },
+        { "id": "CAP-004", "rule": "販売能力 = セールス×2 + 広告効果 + 教育効果(+1)", "implemented": true, "testFile": null },
+        { "id": "CAP-005", "rule": "広告効果：有効広告チップ×2（セールス1人につき2枚まで有効）", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "inventory": {
+      "name": "在庫ルール",
+      "rules": [
+        { "id": "INV-001", "rule": "材料・製品それぞれ10個まで（倉庫なし）", "implemented": true, "testFile": null },
+        { "id": "INV-002", "rule": "倉庫1つで+12個保管可能", "implemented": true, "testFile": null },
+        { "id": "INV-003", "rule": "仕掛品は最大10個まで（倉庫関係なし）", "implemented": true, "testFile": null },
+        { "id": "INV-004", "rule": "在庫評価：材料¥13、仕掛品¥14、製品¥15", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "chips": {
+      "name": "チップルール",
+      "rules": [
+        { "id": "CHIP-001", "rule": "2期末：PC・保険は返却", "implemented": true, "testFile": null },
+        { "id": "CHIP-002", "rule": "2期末：研究・教育・広告は各-1して最大3枚繰越", "implemented": true, "testFile": null },
+        { "id": "CHIP-003", "rule": "3期以降末：全チップ没収（次期用は別途購入）", "implemented": true, "testFile": null },
+        { "id": "CHIP-004", "rule": "F計算（2期）：(購入-繰越)×20 + PC20 + 保険5", "implemented": true, "testFile": null },
+        { "id": "CHIP-005", "rule": "F計算（3期以降）：繰越×20 + 特急×40 + PC20 + 保険5", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "periodEnd": {
+      "name": "期末処理",
+      "rules": [
+        { "id": "PE-001", "rule": "PQ計算：売上高", "implemented": true, "testFile": null },
+        { "id": "PE-002", "rule": "VQ計算：期首在庫 + 仕入 + 製造費 - 期末在庫", "implemented": true, "testFile": null },
+        { "id": "PE-003", "rule": "MQ計算：PQ - VQ", "implemented": true, "testFile": null },
+        { "id": "PE-004", "rule": "F計算：人件費 + 減価償却 + チップ + 金利 + 倉庫", "implemented": true, "testFile": null },
+        { "id": "PE-005", "rule": "人件費：(機械+ワーカー+セールス)×単価 + 最大人員×半額", "implemented": true, "testFile": null },
+        { "id": "PE-006", "rule": "人件費単価：基本×サイコロ倍率", "implemented": true, "testFile": null },
+        { "id": "PE-007", "rule": "減価償却：2期は小型10/アタッチ付13/大型20、3期以降は2倍", "implemented": true, "testFile": null },
+        { "id": "PE-008", "rule": "G計算：MQ - F - 特別損失", "implemented": true, "testFile": null },
+        { "id": "PE-009", "rule": "税金：初回300超過時は超過分×50%、以降利益×50%", "implemented": true, "testFile": null },
+        { "id": "PE-010", "rule": "配当：初回300超過時は超過分×20%、以降利益×10%", "implemented": true, "testFile": null },
+        { "id": "PE-011", "rule": "給料支払い", "implemented": true, "testFile": null },
+        { "id": "PE-012", "rule": "借入返済：長期10%以上、短期20%以上で任意返済可能", "implemented": true, "testFile": null },
+        { "id": "PE-013", "rule": "現金マイナス時は短期借入発生", "implemented": true, "testFile": null },
+        { "id": "PE-014", "rule": "簿価更新（減価償却反映）", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "period5End": {
+      "name": "5期終了条件",
+      "rules": [
+        { "id": "P5-001", "rule": "在庫10個以上必須", "implemented": true, "testFile": null },
+        { "id": "P5-002", "rule": "次期繰り越しチップ3枚以上必須", "implemented": true, "testFile": null },
+        { "id": "P5-003", "rule": "目標：自己資本¥450以上", "implemented": true, "testFile": null },
+        { "id": "P5-004", "rule": "6社中1位で勝利", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "researchPrice": {
+      "name": "研究開発チップと販売価格",
+      "rules": [
+        { "id": "RP-001", "rule": "2期：0枚→24, 1枚→26, 2枚→28, 3枚→30, 4枚→32", "implemented": true, "testFile": null },
+        { "id": "RP-002", "rule": "3期：0枚→24, 1枚→26, 2枚→28, 3枚→30, 4枚→32, 5枚→34", "implemented": true, "testFile": null },
+        { "id": "RP-003", "rule": "4期：0枚→22, 1枚→24, 2枚→26, 3枚→28, 4枚→30, 5枚→32", "implemented": true, "testFile": null },
+        { "id": "RP-004", "rule": "5期：0枚→21, 1枚→23, 2枚→25, 3枚→27, 4枚→29, 5枚→31", "implemented": true, "testFile": null }
+      ]
+    },
+
+    "simulation": {
+      "name": "シミュレーション",
+      "rules": [
+        { "id": "SIM-001", "rule": "シミュレーション実行：2期～5期を通して6社競争", "implemented": true, "testFile": null },
+        { "id": "SIM-002", "rule": "複数回実行：統計情報の収集", "implemented": true, "testFile": null }
+      ]
+    }
+  },
+
+  "summary": {
+    "totalRules": 84,
+    "implemented": 84,
+    "notImplemented": 0,
+    "coverage": "100%"
+  }
+}

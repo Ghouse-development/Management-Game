@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-01-04T01:29:13.149Z",
+  "totalSimulations": 100,
+  "strategyStats": {
+    "PLAYER": {
+      "totalGames": 100,
+      "totalWins": 41,
+      "winRate": 41,
+      "avgEquity": 68,
+      "maxEquity": 184
+    },
+    "AGGRESSIVE": {
+      "totalGames": 100,
+      "totalWins": 14,
+      "winRate": 14,
+      "avgEquity": 34,
+      "maxEquity": 151
+    },
+    "BALANCED": {
+      "totalGames": 100,
+      "totalWins": 12,
+      "winRate": 12,
+      "avgEquity": 26,
+      "maxEquity": 130
+    },
+    "RESEARCH_FOCUSED": {
+      "totalGames": 100,
+      "totalWins": 27,
+      "winRate": 27,
+      "avgEquity": 48,
+      "maxEquity": 203
+    },
+    "SALES_FOCUSED": {
+      "totalGames": 100,
+      "totalWins": 6,
+      "winRate": 6,
+      "avgEquity": 15,
+      "maxEquity": 124
+    },
+    "LOW_CHIP": {
+      "totalGames": 100,
+      "totalWins": 0,
+      "winRate": 0,
+      "avgEquity": -44,
+      "maxEquity": 40
+    }
+  },
+  "bestPatterns": [
+    {
+      "equity": 203,
+      "strategy": "RESEARCH_FOCUSED",
+      "name": "研究商事",
+      "date": "2026-01-04"
+    }
+  ],
+  "insights": [
+    "最強戦略: RESEARCH_FOCUSED (勝率27%)",
+    "平均自己資本最高: RESEARCH_FOCUSED",
+    "総シミュレーション回数: 100回"
+  ]
+}
