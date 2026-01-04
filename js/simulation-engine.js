@@ -80,6 +80,85 @@ const MGSimulation = (function() {
     };
 
     // ============================================
+    // 実行時ルール強制システム（RuntimeRuleEnforcer）
+    // 全ての状態変更後に自動でルール検証を行う
+    // 違反があれば即座にエラーをスロー
+    // ============================================
+    const RuntimeRuleEnforcer = {
+        enabled: true,  // 本番では常にtrue
+        violations: [],
+
+        /**
+         * 会社の状態がルールに違反していないかチェック
+         * 違反があればエラーをスロー
+         */
+        enforce(company, gameState, context = '') {
+            if (!this.enabled) return;
+
+            this.violations = [];
+            const period = gameState?.period || company.period || 2;
+
+            // ルール①: 2期に特急チップがあってはならない
+            if (period === 2) {
+                const history = company.chipPurchaseHistory;
+                if (history) {
+                    const expressCount = (history.research?.express || 0) +
+                                        (history.education?.express || 0) +
+                                        (history.advertising?.express || 0);
+                    if (expressCount > 0) {
+                        this.violations.push(`ルール①違反: 2期に特急チップ購入(${expressCount}枚)`);
+                    }
+                }
+            }
+
+            // ルール⑥: セールス0で販売していないかチェック（販売履歴で確認）
+            // これは販売時にチェックするため、状態では検証困難
+
+            // ルール⑦: 在庫上限チェック
+            const maxMaterials = RULES.CAPACITY.MATERIAL_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+            const maxProducts = RULES.CAPACITY.PRODUCT_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+            if (company.materials > maxMaterials) {
+                this.violations.push(`ルール⑦違反: 材料在庫超過(${company.materials}/${maxMaterials})`);
+            }
+            if (company.products > maxProducts) {
+                this.violations.push(`ルール⑦違反: 製品在庫超過(${company.products}/${maxProducts})`);
+            }
+            if (company.wip > RULES.CAPACITY.WIP) {
+                this.violations.push(`ルール⑦違反: 仕掛品超過(${company.wip}/${RULES.CAPACITY.WIP})`);
+            }
+
+            // 違反があればエラー
+            if (this.violations.length > 0) {
+                const errorMsg = `[RuntimeRuleEnforcer] ${context}\n` + this.violations.join('\n');
+                console.error(errorMsg);
+                throw new Error(errorMsg);
+            }
+        },
+
+        /**
+         * 5期終了条件チェック（警告のみ）
+         */
+        checkEndConditions(company, period) {
+            if (period !== 5) return { valid: true };
+
+            const warnings = [];
+            const inventory = company.materials + company.wip + company.products;
+            const chips = (company.chips.research || 0) + (company.chips.education || 0) +
+                         (company.chips.advertising || 0) + (company.nextPeriodChips?.research || 0) +
+                         (company.nextPeriodChips?.education || 0) + (company.nextPeriodChips?.advertising || 0);
+
+            if (inventory < RULES.VICTORY.MIN_INVENTORY) {
+                warnings.push(`在庫不足: ${inventory}/${RULES.VICTORY.MIN_INVENTORY}`);
+            }
+            if (chips < RULES.VICTORY.MIN_CARRYOVER_CHIPS) {
+                warnings.push(`チップ不足: ${chips}/${RULES.VICTORY.MIN_CARRYOVER_CHIPS}`);
+            }
+
+            return { valid: warnings.length === 0, warnings };
+        }
+    };
+
+    // ============================================
     // アクション検証システム（単一ゲートウェイ）
     // すべてのアクションはこの検証を通過しないと実行不可能
     // ============================================
@@ -222,9 +301,15 @@ const MGSimulation = (function() {
             if (input > company.materials) {
                 return { valid: false, reason: '材料不足' };
             }
-            // 仕掛品容量チェック
-            if (company.wip + input > 10) {
+            // 仕掛品容量チェック（投入後の仕掛品 - 完成分）
+            const newWip = company.wip + input - complete;
+            if (newWip > RULES.CAPACITY.WIP) {
                 return { valid: false, reason: '仕掛品容量オーバー' };
+            }
+            // 製品容量チェック
+            const maxProducts = RULES.CAPACITY.PRODUCT_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+            if (company.products + complete > maxProducts) {
+                return { valid: false, reason: `製品在庫上限超過(${company.products + complete}/${maxProducts})` };
             }
             // 製造能力チェック
             const mfgCapacity = company.getMfgCapacity ? company.getMfgCapacity() : 1;
@@ -558,12 +643,17 @@ const MGSimulation = (function() {
     // 会社クラス
     // ============================================
     class Company {
-        constructor(index, name, isPlayer = false, strategyType = null) {
+        constructor(index, name, isPlayer = false, strategyType = null, useLearning = true) {
             this.index = index;
             this.name = name;
             this.isPlayer = isPlayer;
             this.strategyType = strategyType;
-            this.strategy = strategyType ? RULES.AI_STRATEGIES[strategyType] : null;
+            // 学習システムから最適化されたパラメータを取得
+            if (strategyType && useLearning && LearningSystem.data) {
+                this.strategy = LearningSystem.getOptimizedParams(strategyType);
+            } else {
+                this.strategy = strategyType ? RULES.AI_STRATEGIES[strategyType] : null;
+            }
             this.reset();
         }
 
@@ -1035,6 +1125,9 @@ const MGSimulation = (function() {
                 });
 
                 company.logAction('販売', `${market.name}に¥${bid.displayPrice}×${actualQty}個（入札勝利）`, revenue, true);
+
+                // ルール強制チェック
+                RuntimeRuleEnforcer.enforce(company, gameState, '入札販売後');
             }
 
             return results;
@@ -1083,6 +1176,9 @@ const MGSimulation = (function() {
             company.materials += quantity;
             company.logAction('材料購入', `${market.name}から¥${market.buyPrice}×${quantity}個`, cost, false);
 
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, gameState, '材料購入後');
+
             return { success: true, cost, quantity };
         },
 
@@ -1114,6 +1210,9 @@ const MGSimulation = (function() {
             company.cash -= totalProcessingCost;
 
             company.logAction('完成・投入', `投入${materialToWip}個(¥${inputCost})、完成${wipToProduct}個(¥${completionCost})`, totalProcessingCost, false);
+
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, '完成・投入後');
 
             return { success: true, inputCost, completionCost, totalProcessingCost };
         },
@@ -1148,6 +1247,9 @@ const MGSimulation = (function() {
             const type = isReferral ? '縁故採用' : '採用';
             company.logAction(type, `ワーカー${count}人採用`, cost, false);
 
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, 'ワーカー採用後');
+
             return { success: true, cost };
         },
 
@@ -1176,6 +1278,9 @@ const MGSimulation = (function() {
 
             company.logAction('セールスマン採用', `${count}人採用`, cost, false);
 
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, 'セールスマン採用後');
+
             return { success: true, cost };
         },
 
@@ -1197,6 +1302,9 @@ const MGSimulation = (function() {
             company.totalF += cost;
             company.logAction('退職', `${count}人退職`, cost, false);
 
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, '退職後');
+
             return { success: true, cost };
         },
 
@@ -1212,6 +1320,9 @@ const MGSimulation = (function() {
             company.cash -= machineInfo.cost;
             company.machines.push({ type, attachments: 0 });
             company.logAction('機械購入', `${type === 'large' ? '大型' : '小型'}機械購入`, machineInfo.cost, false);
+
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, gameState, '機械購入後');
 
             return { success: true, cost: machineInfo.cost };
         },
@@ -1239,6 +1350,9 @@ const MGSimulation = (function() {
             company.machines.splice(machineIndex, 1);
 
             company.logAction('機械売却', `${machine.type === 'large' ? '大型' : '小型'}機械売却 簿価${totalBookValue}→${salePrice}円`, salePrice, true);
+
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, { period }, '機械売却後');
 
             return { success: true, salePrice, loss };
         },
@@ -1288,6 +1402,9 @@ const MGSimulation = (function() {
             const detailStr = typeStr ? `${chipNames[chipType]}チップ(${typeStr})` : `${chipNames[chipType]}チップ`;
             company.logAction('チップ購入', detailStr, cost, false);
 
+            // ルール強制チェック（特にルール①: 2期に特急がないか）
+            RuntimeRuleEnforcer.enforce(company, { period }, 'チップ購入後');
+
             return { success: true, cost };
         },
 
@@ -1304,6 +1421,9 @@ const MGSimulation = (function() {
             company.warehouses += 1;
             // 倉庫費用は期末処理でFに計上される（ここでは計上しない）
             company.logAction('倉庫購入', '倉庫購入', RULES.COST.WAREHOUSE, false);
+
+            // ルール強制チェック
+            RuntimeRuleEnforcer.enforce(company, {}, '倉庫購入後');
 
             return { success: true, cost: RULES.COST.WAREHOUSE };
         },
@@ -2187,6 +2307,9 @@ const MGSimulation = (function() {
             // デッキから1枚引く
             const cardId = gameState.drawRiskCard();
             this.applyRiskCard(company, gameState, cardId);
+
+            // ルール強制チェック（リスクカード後も状態が有効か確認）
+            RuntimeRuleEnforcer.enforce(company, gameState, `リスクカード(${cardId})後`);
         },
 
         /**
@@ -2287,8 +2410,10 @@ const MGSimulation = (function() {
 
                 // 特別サービス (19-20): 材料10円で5個まで購入可
                 case 19: case 20:
-                    // シミュレーションでは自動的に購入を試みる
-                    const buyQty = Math.min(5, company.getStorageCapacity() - company.materials - company.products);
+                    // シミュレーションでは自動的に購入を試みる（材料上限を考慮）
+                    const maxMaterials = RULES.CAPACITY.MATERIAL_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+                    const availableMaterialSpace = maxMaterials - company.materials;
+                    const buyQty = Math.min(5, availableMaterialSpace);
                     if (buyQty > 0 && company.cash >= buyQty * 10) {
                         company.cash -= buyQty * 10;
                         company.materials += buyQty;
@@ -2300,7 +2425,8 @@ const MGSimulation = (function() {
 
                 // 返品発生 (21-23): 売上-20、製品+1（2期免除）
                 case 21: case 22: case 23:
-                    if (period > 2 && company.totalSoldQuantity > 0) {
+                    const maxProductsReturn = RULES.CAPACITY.PRODUCT_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+                    if (period > 2 && company.totalSoldQuantity > 0 && company.products < maxProductsReturn) {
                         company.totalSales -= 20;
                         company.totalSoldQuantity -= 1;
                         company.products += 1;
@@ -2385,7 +2511,9 @@ const MGSimulation = (function() {
 
                 // 各社共通 (41-42): 全社3個まで12円で購入可（シミュレーションでは自社のみ）
                 case 41: case 42:
-                    const commonBuyQty = Math.min(3, company.getStorageCapacity() - company.materials - company.products);
+                    const maxMaterialsCommon = RULES.CAPACITY.MATERIAL_BASE + (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
+                    const availableSpaceCommon = maxMaterialsCommon - company.materials;
+                    const commonBuyQty = Math.min(3, availableSpaceCommon);
                     if (commonBuyQty > 0 && company.cash >= commonBuyQty * 12) {
                         company.cash -= commonBuyQty * 12;
                         company.materials += commonBuyQty;
@@ -2800,11 +2928,256 @@ const MGSimulation = (function() {
     };
 
     // ============================================
+    // 学習システム（LearningSystem）
+    // シミュレーション結果から戦略パラメータを最適化
+    // ============================================
+    const LearningSystem = {
+        data: null,
+        dataPath: null,
+
+        /**
+         * 学習データを読み込み
+         */
+        load(dataPath) {
+            this.dataPath = dataPath;
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    if (fs.existsSync(dataPath)) {
+                        const content = fs.readFileSync(dataPath, 'utf-8');
+                        this.data = JSON.parse(content);
+                        return true;
+                    }
+                }
+            } catch (e) {
+                // ファイルがなければ新規作成
+            }
+            this.data = {
+                version: '2.0',
+                lastUpdated: new Date().toISOString(),
+                totalSimulations: 0,
+                strategyStats: {},
+                bestPatterns: [],
+                dynamicParams: {}  // 学習された動的パラメータ
+            };
+            return false;
+        },
+
+        /**
+         * 戦略パラメータを学習データに基づいて調整
+         * @param {string} strategyType - 戦略タイプ
+         * @returns {Object} 調整されたパラメータ
+         */
+        getOptimizedParams(strategyType) {
+            // 防御的プログラミング: RULES.AI_STRATEGIESが未定義の場合は空オブジェクトを返す
+            if (!RULES || !RULES.AI_STRATEGIES) {
+                return {};
+            }
+
+            const baseStrategy = RULES.AI_STRATEGIES[strategyType] || {};
+
+            // 学習データがない、または該当戦略の統計がない場合は基本戦略を返す
+            if (!this.data || !this.data.strategyStats || !this.data.strategyStats[strategyType]) {
+                return baseStrategy;
+            }
+
+            const stats = this.data.strategyStats[strategyType];
+
+            // 勝率に基づいてパラメータを調整
+            const winRate = stats.totalGames > 0 ? stats.totalWins / stats.totalGames : 0;
+
+            // 勝率が低い場合、研究チップ重視度を上げる
+            const researchBoost = winRate < 0.2 ? 1 : 0;
+
+            // 動的パラメータがあれば適用
+            const dynamicParams = (this.data.dynamicParams && this.data.dynamicParams[strategyType]) || {};
+
+            return {
+                ...baseStrategy,
+                chipTargets: this.adjustChipTargets(baseStrategy.chipTargets, researchBoost),
+                priceAdjustment: dynamicParams.priceAdjustment ?? baseStrategy.priceAdjustment,
+                learningApplied: true,
+                winRate: Math.round(winRate * 100)
+            };
+        },
+
+        /**
+         * チップ目標を調整
+         */
+        adjustChipTargets(targets, researchBoost) {
+            if (!targets) return targets;
+
+            const adjusted = {};
+            for (const period of [2, 3, 4, 5]) {
+                if (targets[period]) {
+                    adjusted[period] = {
+                        ...targets[period],
+                        research: Math.min(5, (targets[period].research || 0) + researchBoost)
+                    };
+                }
+            }
+            return adjusted;
+        },
+
+        /**
+         * シミュレーション結果から学習
+         */
+        learn(results) {
+            if (!this.data) this.load(this.dataPath || 'data/learned-strategies.json');
+
+            this.data.totalSimulations++;
+            this.data.lastUpdated = new Date().toISOString();
+
+            // 各会社の結果を記録
+            results.finalEquities.forEach(company => {
+                const strategy = company.strategy || 'PLAYER';
+                if (!this.data.strategyStats[strategy]) {
+                    this.data.strategyStats[strategy] = {
+                        totalGames: 0,
+                        totalWins: 0,
+                        winRate: 0,
+                        avgEquity: 0,
+                        maxEquity: 0,
+                        totalEquity: 0
+                    };
+                }
+
+                const stats = this.data.strategyStats[strategy];
+                stats.totalGames++;
+                stats.totalEquity = (stats.totalEquity || 0) + company.equity;
+                stats.avgEquity = Math.round(stats.totalEquity / stats.totalGames);
+                stats.maxEquity = Math.max(stats.maxEquity, company.equity);
+
+                if (company.equity === results.winner.equity) {
+                    stats.totalWins++;
+                }
+                stats.winRate = Math.round(stats.totalWins / stats.totalGames * 1000) / 10;
+            });
+
+            // 最高記録を更新
+            const winner = results.winner;
+            if (this.data.bestPatterns.length < 10 || winner.equity > this.data.bestPatterns[this.data.bestPatterns.length - 1].equity) {
+                this.data.bestPatterns.push({
+                    equity: winner.equity,
+                    strategy: winner.strategy || 'PLAYER',
+                    name: winner.name,
+                    date: new Date().toISOString().split('T')[0]
+                });
+                this.data.bestPatterns.sort((a, b) => b.equity - a.equity);
+                this.data.bestPatterns = this.data.bestPatterns.slice(0, 10);
+            }
+
+            // 動的パラメータの更新（最強戦略に基づく）
+            this.updateDynamicParams();
+        },
+
+        /**
+         * 動的パラメータを更新
+         */
+        updateDynamicParams() {
+            if (!this.data || !this.data.strategyStats) return;
+
+            // dynamicParamsが未定義なら初期化
+            if (!this.data.dynamicParams) {
+                this.data.dynamicParams = {};
+            }
+
+            const stats = this.data.strategyStats;
+            let bestStrategy = null;
+            let bestWinRate = 0;
+
+            for (const [strategy, stat] of Object.entries(stats)) {
+                const winRate = stat.totalGames > 100 ? stat.totalWins / stat.totalGames : 0;
+                if (winRate > bestWinRate) {
+                    bestWinRate = winRate;
+                    bestStrategy = strategy;
+                }
+            }
+
+            if (bestStrategy) {
+                // 最強戦略のパラメータを他の戦略にも反映
+                this.data.dynamicParams.bestStrategy = bestStrategy;
+                this.data.dynamicParams.bestWinRate = Math.round(bestWinRate * 100);
+            }
+        },
+
+        /**
+         * 学習データを保存
+         */
+        save() {
+            if (!this.data || !this.dataPath) return false;
+
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const dir = path.dirname(this.dataPath);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+
+                    // インサイトを生成
+                    this.data.insights = this.generateInsights();
+
+                    fs.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2));
+                    return true;
+                }
+            } catch (e) {
+                console.error('学習データ保存エラー:', e.message);
+            }
+            return false;
+        },
+
+        /**
+         * インサイトを生成
+         */
+        generateInsights() {
+            const stats = this.data.strategyStats;
+            const insights = [];
+
+            // 最強戦略を特定
+            let bestStrategy = null;
+            let bestWinRate = 0;
+            for (const [strategy, stat] of Object.entries(stats)) {
+                if (stat.winRate > bestWinRate) {
+                    bestWinRate = stat.winRate;
+                    bestStrategy = strategy;
+                }
+            }
+
+            if (bestStrategy) {
+                insights.push(`最強戦略: ${bestStrategy} (勝率${bestWinRate}%)`);
+            }
+
+            // 平均自己資本最高
+            let bestAvgStrategy = null;
+            let bestAvgEquity = -Infinity;
+            for (const [strategy, stat] of Object.entries(stats)) {
+                if (stat.avgEquity > bestAvgEquity) {
+                    bestAvgEquity = stat.avgEquity;
+                    bestAvgStrategy = strategy;
+                }
+            }
+
+            if (bestAvgStrategy) {
+                insights.push(`平均自己資本最高: ${bestAvgStrategy}`);
+            }
+
+            insights.push(`総シミュレーション回数: ${this.data.totalSimulations}回`);
+
+            return insights;
+        }
+    };
+
+    // ============================================
     // 公開API
     // ============================================
     return {
         RULES,
         RuleValidator,
+        RuntimeRuleEnforcer,
+        ActionValidator,
+        LearningSystem,
         Company,
         GameState,
         BiddingEngine,
@@ -2831,14 +3204,19 @@ const MGSimulation = (function() {
             return Evaluator.evaluate(results);
         },
 
-        // 複数回シミュレーション（メモリ最適化版）
+        // 複数回シミュレーション（メモリ最適化版 + 学習システム統合）
         runMultipleSimulations: function(count = 100, options = {}) {
+            // 学習データを読み込み
+            const dataPath = options.learningDataPath || 'data/learned-strategies.json';
+            LearningSystem.load(dataPath);
+
             // 統計用（メモリ節約のため全結果は保持しない）
             const stats = {
                 totalRuns: count,
                 targetReachRate: 0,
                 averageWinnerEquity: 0,
-                equityDistribution: { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 }
+                equityDistribution: { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 },
+                ruleViolations: 0  // ルール違反カウント
             };
 
             // 戦略別統計
@@ -2848,34 +3226,47 @@ const MGSimulation = (function() {
             let bestResults = [];
 
             for (let i = 0; i < count; i++) {
-                const result = this.runSimulation(options);
+                try {
+                    const result = this.runSimulation(options);
 
-                // 統計更新
-                if (result.winner.reachedTarget) stats.targetReachRate++;
-                stats.averageWinnerEquity += result.winner.equity;
-                const grade = Evaluator.getGrade(result.winner.equity);
-                stats.equityDistribution[grade]++;
+                    // 学習システムに結果を記録
+                    LearningSystem.learn(result);
 
-                // 戦略別統計
-                result.finalEquities.forEach(company => {
-                    const strategy = company.strategy || 'PLAYER';
-                    if (!strategyStats[strategy]) {
-                        strategyStats[strategy] = { wins: 0, games: 0, totalEquity: 0, maxEquity: 0 };
+                    // 統計更新
+                    if (result.winner.reachedTarget) stats.targetReachRate++;
+                    stats.averageWinnerEquity += result.winner.equity;
+                    const grade = Evaluator.getGrade(result.winner.equity);
+                    stats.equityDistribution[grade]++;
+
+                    // 戦略別統計
+                    result.finalEquities.forEach(company => {
+                        const strategy = company.strategy || 'PLAYER';
+                        if (!strategyStats[strategy]) {
+                            strategyStats[strategy] = { wins: 0, games: 0, totalEquity: 0, maxEquity: 0 };
+                        }
+                        strategyStats[strategy].games++;
+                        strategyStats[strategy].totalEquity += company.equity;
+                        strategyStats[strategy].maxEquity = Math.max(strategyStats[strategy].maxEquity, company.equity);
+                        if (company.equity === result.winner.equity) {
+                            strategyStats[strategy].wins++;
+                        }
+                    });
+
+                    // 上位5件を保持（自己資本でソート）
+                    if (bestResults.length < 5 || result.winner.equity > bestResults[bestResults.length - 1].winner.equity) {
+                        bestResults.push(result);
+                        bestResults.sort((a, b) => b.winner.equity - a.winner.equity);
+                        if (bestResults.length > 5) {
+                            bestResults = bestResults.slice(0, 5);
+                        }
                     }
-                    strategyStats[strategy].games++;
-                    strategyStats[strategy].totalEquity += company.equity;
-                    strategyStats[strategy].maxEquity = Math.max(strategyStats[strategy].maxEquity, company.equity);
-                    if (company.equity === result.winner.equity) {
-                        strategyStats[strategy].wins++;
-                    }
-                });
-
-                // 上位5件を保持（自己資本でソート）
-                if (bestResults.length < 5 || result.winner.equity > bestResults[bestResults.length - 1].winner.equity) {
-                    bestResults.push(result);
-                    bestResults.sort((a, b) => b.winner.equity - a.winner.equity);
-                    if (bestResults.length > 5) {
-                        bestResults = bestResults.slice(0, 5);
+                } catch (e) {
+                    // ルール違反が発生した場合
+                    if (e.message.includes('RuntimeRuleEnforcer')) {
+                        stats.ruleViolations++;
+                        console.error(`\nシミュレーション${i + 1}でルール違反: ${e.message}`);
+                    } else {
+                        throw e;  // 他のエラーは再スロー
                     }
                 }
 
@@ -2885,9 +3276,14 @@ const MGSimulation = (function() {
                 }
             }
 
+            // 学習データを保存
+            LearningSystem.save();
+
             stats.targetReachRate = Math.round(stats.targetReachRate / count * 100);
             stats.averageWinnerEquity = Math.round(stats.averageWinnerEquity / count);
             stats.strategyStats = strategyStats;
+            stats.learningApplied = true;
+            stats.totalLearningSimulations = LearningSystem.data?.totalSimulations || 0;
 
             // allResultsは最優秀パターンのみ（互換性維持）
             return { allResults: bestResults, stats, bestResult: bestResults[0] };
