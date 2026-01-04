@@ -843,41 +843,70 @@ function showPeriodEndAnnouncement(triggerCompany) {
 function showStartMenu() {
     const hasSave = hasSavedGame();
     const saveData = hasSave ? loadGame() : null;
-    const saveInfo = saveData ? `（${saveData.currentPeriod}期、${new Date(saveData.timestamp).toLocaleString('ja-JP')}）` : '';
+    const saveDate = saveData ? new Date(saveData.timestamp).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
     const menuHtml = `
         <div class="modal active" style="z-index: 2000;">
-            <div class="modal-content" style="max-width: 450px; text-align: center;">
-                <h2 style="margin-bottom: 15px; color: #1e40af;">🎮 MG（マネジメントゲーム）</h2>
-                <p style="margin-bottom: 15px; color: #666;">自主練モード - 6人対戦</p>
-
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    ${hasSave ? `
-                        <button onclick="resumeGame()" class="action-btn primary" style="padding: 12px; font-size: 15px;">
-                            ▶ 続きから始める${saveInfo}
-                        </button>
-                    ` : ''}
-                    <button onclick="startNewGame()" class="action-btn success" style="padding: 12px; font-size: 15px;">
-                        🆕 2期から新しく始める
-                    </button>
-
-                    <div style="border-top: 1px solid #e5e7eb; margin: 8px 0;"></div>
-                    <p style="font-size: 12px; color: #999; margin: 5px 0;">カスタムモード</p>
-
-                    <button onclick="showCustomGameSetupModal()" class="action-btn warning" style="padding: 12px; font-size: 14px;">
-                        ⚙️ カスタム条件でゲーム開始
-                    </button>
-                    <button onclick="showAIActionPlanModal()" class="action-btn secondary" style="padding: 12px; font-size: 14px;">
-                        🤖 AI行動提案を見る
-                    </button>
-
-                    ${hasSave ? `
-                        <div style="border-top: 1px solid #e5e7eb; margin: 8px 0;"></div>
-                        <button onclick="confirmDeleteSave()" class="action-btn secondary" style="padding: 8px; font-size: 12px; color: #999;">
-                            🗑 セーブデータを削除
-                        </button>
-                    ` : ''}
+            <div class="modal-content" style="max-width: 480px; padding: 24px;">
+                <!-- ヘッダー -->
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 42px; margin-bottom: 8px;">🎲</div>
+                    <h2 style="margin: 0 0 6px 0; color: #1e3a5f; font-size: 22px;">マネジメントゲーム</h2>
+                    <p style="margin: 0; color: #6b7280; font-size: 13px;">自主練モード - 6社対戦シミュレーション</p>
                 </div>
+
+                <!-- メインアクション -->
+                <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                    ${hasSave ? `
+                        <!-- セーブデータがある場合 -->
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border: 2px solid #10b981; cursor: pointer;" onclick="resumeGame()">
+                            <div style="font-size: 28px;">▶️</div>
+                            <div style="flex: 1; text-align: left;">
+                                <div style="font-weight: bold; color: #065f46; font-size: 15px;">続きから再開</div>
+                                <div style="font-size: 12px; color: #6b7280;">${saveData.currentPeriod}期 - ${saveDate}</div>
+                            </div>
+                            <div style="color: #10b981; font-size: 18px;">→</div>
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: ${hasSave ? '#f0fdf4' : 'white'}; border-radius: 8px; border: 2px solid ${hasSave ? '#a7f3d0' : '#10b981'}; cursor: pointer;" onclick="startNewGame()">
+                        <div style="font-size: 28px;">🆕</div>
+                        <div style="flex: 1; text-align: left;">
+                            <div style="font-weight: bold; color: #065f46; font-size: 15px;">新規ゲーム開始</div>
+                            <div style="font-size: 12px; color: #6b7280;">2期からスタート</div>
+                        </div>
+                        <div style="color: #10b981; font-size: 18px;">→</div>
+                    </div>
+                </div>
+
+                <!-- 詳細設定 -->
+                <div style="background: #f8fafc; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                    <div style="font-size: 11px; color: #64748b; margin-bottom: 8px; font-weight: bold;">詳細設定</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: white; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0;" onclick="showCustomGameSetupModal()">
+                            <div style="font-size: 20px;">⚙️</div>
+                            <div style="text-align: left;">
+                                <div style="font-size: 13px; font-weight: bold; color: #334155;">カスタム設定</div>
+                                <div style="font-size: 10px; color: #94a3b8;">期・現金など指定</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: white; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0;" onclick="showAIActionPlanModal()">
+                            <div style="font-size: 20px;">🤖</div>
+                            <div style="text-align: left;">
+                                <div style="font-size: 13px; font-weight: bold; color: #334155;">AI提案</div>
+                                <div style="font-size: 10px; color: #94a3b8;">最適行動を確認</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                ${hasSave ? `
+                    <!-- セーブ削除 -->
+                    <div style="text-align: center;">
+                        <span style="font-size: 12px; color: #9ca3af; cursor: pointer; text-decoration: underline;" onclick="confirmDeleteSave()">
+                            セーブデータを削除
+                        </span>
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;

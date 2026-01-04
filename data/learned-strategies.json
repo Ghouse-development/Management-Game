@@ -1,55 +1,55 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-01-04T05:20:19.650Z",
-  "totalSimulations": 71783,
+  "lastUpdated": "2026-01-04T12:30:57.767Z",
+  "totalSimulations": 187780,
   "strategyStats": {
     "PLAYER": {
-      "totalGames": 71783,
-      "totalWins": 8689,
-      "winRate": 12.1,
-      "avgEquity": -40,
+      "totalGames": 187780,
+      "totalWins": 24603,
+      "winRate": 13.1,
+      "avgEquity": -308,
       "maxEquity": 838,
-      "totalEquity": -2526567
+      "totalEquity": -57918072
     },
     "AGGRESSIVE": {
-      "totalGames": 71783,
-      "totalWins": 12695,
-      "winRate": 17.7,
-      "avgEquity": -34,
+      "totalGames": 187780,
+      "totalWins": 27179,
+      "winRate": 14.5,
+      "avgEquity": -301,
       "maxEquity": 510,
-      "totalEquity": -2143167
+      "totalEquity": -56493170
     },
     "BALANCED": {
-      "totalGames": 71783,
-      "totalWins": 16536,
-      "winRate": 23,
-      "avgEquity": -36,
+      "totalGames": 187780,
+      "totalWins": 41142,
+      "winRate": 21.9,
+      "avgEquity": -275,
       "maxEquity": 530,
-      "totalEquity": -2250017
+      "totalEquity": -51587345
     },
     "RESEARCH_FOCUSED": {
-      "totalGames": 71783,
-      "totalWins": 23071,
-      "winRate": 32.1,
-      "avgEquity": -34,
+      "totalGames": 187780,
+      "totalWins": 43131,
+      "winRate": 23,
+      "avgEquity": -297,
       "maxEquity": 687,
-      "totalEquity": -2148343
+      "totalEquity": -55684616
     },
     "SALES_FOCUSED": {
-      "totalGames": 71783,
-      "totalWins": 7806,
-      "winRate": 10.9,
-      "avgEquity": -38,
+      "totalGames": 187780,
+      "totalWins": 19682,
+      "winRate": 10.5,
+      "avgEquity": -307,
       "maxEquity": 375,
-      "totalEquity": -2386627
+      "totalEquity": -57683021
     },
     "LOW_CHIP": {
-      "totalGames": 71783,
-      "totalWins": 3685,
-      "winRate": 5.1,
-      "avgEquity": -37,
+      "totalGames": 187780,
+      "totalWins": 33178,
+      "winRate": 17.7,
+      "avgEquity": -269,
       "maxEquity": 217,
-      "totalEquity": -2359659
+      "totalEquity": -50603134
     }
   },
   "bestPatterns": [
@@ -115,12 +115,12 @@
     }
   ],
   "insights": [
-    "最強戦略: RESEARCH_FOCUSED (勝率32.1%)",
-    "平均自己資本最高: RESEARCH_FOCUSED",
-    "総シミュレーション回数: 71783回"
+    "最強戦略: RESEARCH_FOCUSED (勝率23%)",
+    "平均自己資本最高: LOW_CHIP",
+    "総シミュレーション回数: 187780回"
   ],
   "dynamicParams": {
     "bestStrategy": "RESEARCH_FOCUSED",
-    "bestWinRate": 32
+    "bestWinRate": 23
   }
 }

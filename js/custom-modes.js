@@ -912,128 +912,62 @@ function generateRowByRowPlan(state) {
 }
 
 // ============================================
-// 提案結果モーダル
+// 提案結果モーダル（簡素化版）
 // ============================================
 function showProposalModal(state, analysis) {
-    const feasibilityColors = {
-        high: { bg: '#dcfce7', border: '#22c55e', text: '#166534', label: '達成可能性: 高' },
-        medium: { bg: '#fef9c3', border: '#eab308', text: '#854d0e', label: '達成可能性: 中' },
-        low: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', label: '達成可能性: 低' }
-    };
-    const fc = feasibilityColors[analysis.feasibility];
-
+    // 推奨アクションのみ表示（シンプル版）
     let html = `
-        <div style="max-height: 80vh; overflow-y: auto; padding: 5px;">
-            <!-- 結果サマリー -->
-            <div style="background: ${fc.bg}; border: 2px solid ${fc.border}; border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: ${fc.text};">
-                    ${analysis.feasibility === 'high' ? '🎉' : analysis.feasibility === 'medium' ? '⚠️' : '❌'} ${fc.label}
-                </div>
-                <div style="margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="background: white; padding: 10px; border-radius: 8px;">
-                        <div style="font-size: 11px; color: #666;">成功率</div>
-                        <div style="font-size: 24px; font-weight: bold; color: ${fc.text};">${analysis.simResults.successRate}%</div>
-                    </div>
-                    <div style="background: white; padding: 10px; border-radius: 8px;">
-                        <div style="font-size: 11px; color: #666;">平均自己資本</div>
-                        <div style="font-size: 24px; font-weight: bold; color: #2563eb;">¥${analysis.simResults.avgEquity}</div>
-                    </div>
-                    <div style="background: white; padding: 10px; border-radius: 8px;">
-                        <div style="font-size: 11px; color: #666;">最高到達</div>
-                        <div style="font-size: 24px; font-weight: bold; color: #059669;">¥${analysis.simResults.maxEquity}</div>
-                    </div>
+        <div style="max-height: 70vh; overflow-y: auto; padding: 5px;">
+            <!-- 現在状態（コンパクト） -->
+            <div style="background: #f8fafc; border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
+                    <div>💰 現金: <b>¥${state.cash}</b></div>
+                    <div>🎯 目標まで: <b>¥${analysis.targetGap}</b></div>
+                    <div>🔧 製造: <b>${analysis.mfgCap}</b> / 📢 販売: <b>${analysis.salesCap}</b></div>
+                    <div>🔬 研究: <b>${state.chips.research || 0}枚</b></div>
                 </div>
             </div>
 
-            <!-- 現在状態 -->
-            <div style="background: #f8fafc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
-                <div style="font-weight: bold; margin-bottom: 10px;">📊 現在の状態（${state.period}期初）</div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 12px;">
-                    <div>💰 現金: ¥${state.cash}</div>
-                    <div>📈 自己資本: ¥${state.equity}</div>
-                    <div>🎯 目標まで: ¥${analysis.targetGap}</div>
-                    <div>📅 残り期: ${analysis.remainingPeriods}期</div>
-                    <div>🔧 製造能力: ${analysis.mfgCap}</div>
-                    <div>📢 販売能力: ${analysis.salesCap}</div>
-                    <div>🔬 研究: ${state.chips.research || 0}枚</div>
-                    <div>📚 教育: ${state.chips.education || 0}枚</div>
-                </div>
-            </div>
-
-            <!-- 推奨アクション -->
-            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px;">
-                <div style="color: white; font-weight: bold; margin-bottom: 12px; font-size: 16px;">🎯 推奨アクション</div>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    ${analysis.recommendations.slice(0, 5).map((rec, i) => `
-                        <div style="background: white; border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px;">
-                            <div style="font-size: 28px;">${rec.icon}</div>
+            <!-- 今すぐやるべきこと（TOP 3） -->
+            <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="color: white; font-weight: bold; margin-bottom: 10px; font-size: 15px;">今すぐやるべきこと</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${analysis.recommendations.slice(0, 3).map((rec, i) => `
+                        <div style="background: white; border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px;">
+                            <div style="background: #4f46e5; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; flex-shrink: 0;">${i + 1}</div>
+                            <div style="font-size: 20px; flex-shrink: 0;">${rec.icon}</div>
                             <div style="flex: 1;">
-                                <div style="font-weight: bold; color: #1f2937;">${rec.action}</div>
-                                <div style="font-size: 12px; color: #6b7280;">${rec.detail}</div>
-                                <div style="font-size: 11px; color: #4f46e5; margin-top: 3px;">${rec.reason}</div>
+                                <div style="font-weight: bold; color: #1f2937; font-size: 14px;">${rec.action}</div>
+                                <div style="font-size: 11px; color: #6b7280;">${rec.detail}</div>
                             </div>
-                            <div style="background: #4f46e5; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${i + 1}</div>
                         </div>
                     `).join('')}
                 </div>
             </div>
 
-            <!-- 行数別アクション計画 -->
-            <div style="background: #fef3c7; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
-                <div style="font-weight: bold; color: #92400e; margin-bottom: 10px;">📋 ${state.period}期 行数別アクション計画（全${GAME_RULES.MAX_ROWS[state.period]}行）</div>
-                <div style="max-height: 200px; overflow-y: auto;">
-                    <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                        ${generateRowByRowPlan(state).map(item => {
-                            const bgColor = item.type === 'required' ? '#fef3c7' :
-                                           item.type === 'investment' ? '#dbeafe' :
-                                           item.type === 'finance' ? '#dcfce7' :
-                                           item.type === 'production' ? '#f3e8ff' :
-                                           item.type === 'sales' ? '#fce7f3' :
-                                           item.type === 'risk' ? '#fee2e2' :
-                                           item.type === 'optional' ? '#e5e7eb' : '#fff';
-                            return `
-                                <tr style="background: ${bgColor};">
-                                    <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-weight: bold; width: 50px;">${item.row}行</td>
-                                    <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.icon} ${item.action}</td>
-                                    <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; color: #6b7280;">${item.detail}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </table>
+            <!-- 期の行動計画（折りたたみ可能） -->
+            <details style="background: #fef3c7; border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                <summary style="font-weight: bold; color: #92400e; cursor: pointer; font-size: 13px;">
+                    📋 ${state.period}期の行動計画を見る
+                </summary>
+                <div style="margin-top: 10px; max-height: 150px; overflow-y: auto;">
+                    ${generateRowByRowPlan(state).slice(0, 8).map(item => `
+                        <div style="padding: 4px 0; font-size: 12px; border-bottom: 1px dashed #e5e7eb;">
+                            <span style="color: #666;">${item.row}行</span> ${item.icon} ${item.action}
+                        </div>
+                    `).join('')}
                 </div>
-            </div>
+            </details>
 
-            <!-- 最適戦略情報 -->
-            <div style="background: #f0f9ff; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
-                <div style="font-weight: bold; color: #0369a1; margin-bottom: 10px;">📚 v8シミュレーション結果に基づく最適戦略</div>
-                <div style="font-size: 13px; line-height: 1.8; color: #1e40af;">
-                    <div><strong>1位: R2E1_NR_SM_DYN</strong> - 成功率95.20%</div>
-                    <div style="margin-left: 20px; font-size: 12px; color: #6b7280;">研究2+教育1+翌期研究+機械+動的借入</div>
-                    <div style="margin-top: 10px;"><strong>最新発見:</strong></div>
-                    <ul style="margin: 5px 0 0 20px; padding: 0;">
-                        <li><strong>動的借入が最強</strong>: 現金不足時のみ借りる</li>
-                        <li><strong>翌期チップ必須</strong>: 成功率+12%の効果</li>
-                        <li>段階的借入（3期30円+4期70円）も93%成功</li>
-                        <li>研究3枚で名古屋¥28市場を勝率78%確保</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- ボタン -->
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                <button onclick="closeModal(); showStateInputModal()"
-                    style="padding: 14px; background: #6b7280; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
-                    ← 状態を変更
-                </button>
-                <button onclick="closeModal()"
-                    style="padding: 14px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
-                    閉じる
-                </button>
-            </div>
+            <!-- 閉じるボタン -->
+            <button onclick="closeModal()"
+                style="width: 100%; padding: 14px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 15px;">
+                閉じる
+            </button>
         </div>
     `;
 
-    showModal('🧠 AI戦略提案', html);
+    showModal('🤖 AI提案', html);
 }
 
 // ============================================

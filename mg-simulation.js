@@ -385,8 +385,15 @@ class SimulationManager {
             console.log('  | 行  | 種別     | 行動                                    | 結果                       |');
             console.log('  |-----|----------|-----------------------------------------|----------------------------|');
 
+            // ★行番号順にソート（-1は期末処理なので最後に表示）
+            const sortedActions = [...actions].sort((a, b) => {
+                const rowA = a.row === -1 ? 999 : (a.row || 0);
+                const rowB = b.row === -1 ? 999 : (b.row || 0);
+                return rowA - rowB;
+            });
+
             // 各行を出力（実際の行番号を使用）
-            actions.forEach((a) => {
+            sortedActions.forEach((a) => {
                 // 期首処理・期末処理も表示する（行番号で区別）
 
                 const type = (a.type || '意思決定').padEnd(8);
@@ -444,18 +451,52 @@ class SimulationManager {
                 const detail = periodEnd.detail;
                 const personnelMatch = detail.match(/人件費(\d+)\(([^)]+)\)/);
                 const depMatch = detail.match(/減価償却(\d+)/);
+                const pcMatch = detail.match(/PC(\d+)/);
+                const insuranceMatch = detail.match(/保険(\d+)/);
+                const chipMatch = detail.match(/チップ(\d+)/);
+                const warehouseMatch = detail.match(/倉庫(\d+)/);
+                const interestMatch = detail.match(/短期金利(\d+)/);
                 const taxMatch = detail.match(/税(\d+)/);
 
+                let fTotal = 0;
+
                 if (personnelMatch) {
-                    console.log(`  | 人件費                      | ¥${personnelMatch[1].padStart(3)} |`);
+                    const val = parseInt(personnelMatch[1]);
+                    console.log(`  | 人件費                      | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
                 }
                 if (depMatch) {
-                    console.log(`  | 減価償却                    | ¥${depMatch[1].padStart(3)} |`);
+                    const val = parseInt(depMatch[1]);
+                    console.log(`  | 減価償却                    | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
+                }
+                if (pcMatch && parseInt(pcMatch[1]) > 0) {
+                    const val = parseInt(pcMatch[1]);
+                    console.log(`  | PC費用                      | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
+                }
+                if (insuranceMatch && parseInt(insuranceMatch[1]) > 0) {
+                    const val = parseInt(insuranceMatch[1]);
+                    console.log(`  | 保険費用                    | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
+                }
+                if (chipMatch && parseInt(chipMatch[1]) > 0) {
+                    const val = parseInt(chipMatch[1]);
+                    console.log(`  | チップ費用                  | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
+                }
+                if (warehouseMatch && parseInt(warehouseMatch[1]) > 0) {
+                    const val = parseInt(warehouseMatch[1]);
+                    console.log(`  | 倉庫費用                    | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
+                }
+                if (interestMatch && parseInt(interestMatch[1]) > 0) {
+                    const val = parseInt(interestMatch[1]);
+                    console.log(`  | 短期借入金利                | ¥${String(val).padStart(3)} |`);
+                    fTotal += val;
                 }
 
-                let fTotal = 0;
-                if (personnelMatch) fTotal += parseInt(personnelMatch[1]);
-                if (depMatch) fTotal += parseInt(depMatch[1]);
+                console.log('  |-----------------------------|------|');
                 console.log(`  | F合計                       | ¥${String(fTotal).padStart(3)} |`);
                 console.log('');
             }
@@ -507,6 +548,108 @@ class SimulationManager {
 
         console.log(`  | 合計 | ¥${String(totalSales).padStart(4)} | ${String(totalSoldQty).padStart(4)}個 | -      | -        | -            |`);
         console.log('');
+
+        // ===== 全6社の会社盤サマリー =====
+        this.showAllCompaniesBoard(result);
+
+        // ===== 行使用状況サマリー =====
+        this.showRowUsageSummary(result, periodActions);
+    }
+
+    /**
+     * 全6社の会社盤を表示
+     */
+    showAllCompaniesBoard(result) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('● 全6社 会社盤（5期末）');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('');
+
+        // 全会社の情報を取得
+        const companies = result.finalEquities || [];
+        const nameMap = {
+            'RESEARCH_FOCUSED': '研究商事',
+            'SALES_FOCUSED': '販売産業',
+            'LOW_CHIP': '堅実工業',
+            'BALANCED': 'バランス物産',
+            'AGGRESSIVE': '積極製作所',
+            'PLAYER': 'プレイヤー型'
+        };
+
+        console.log('  | 順位 | 会社名        | 自己資本  | 現金   | 在庫 | チップ | 機械        | 借入     |');
+        console.log('  |------|---------------|-----------|--------|------|--------|-------------|----------|');
+
+        // 自己資本順にソート
+        const sorted = [...companies].sort((a, b) => b.equity - a.equity);
+
+        sorted.forEach((c, idx) => {
+            const name = (nameMap[c.strategy] || c.name || 'AI').padEnd(11);
+            const equity = String(c.equity).padStart(7);
+            const cash = String(c.cash || 0).padStart(4);
+            const inventory = String((c.products || 0) + (c.wip || 0) + (c.materials || 0)).padStart(2);
+            const chips = String((c.researchChips || 0) + (c.educationChips || 0) + (c.advertisingChips || 0)).padStart(4);
+            const machines = `小${c.smallMachines ?? 1}大${c.largeMachines ?? 0}`.padEnd(9);
+            const loans = `長${c.longTermLoan || 0}短${c.shortTermLoan || 0}`.padEnd(6);
+            console.log(`  | ${idx + 1}位  | ${name} | ¥${equity} | ¥${cash} | ${inventory}個 | ${chips}枚 | ${machines} | ${loans} |`);
+        });
+        console.log('');
+    }
+
+    /**
+     * 行使用状況サマリーを表示
+     */
+    showRowUsageSummary(result, periodActions) {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('● 行使用状況サマリー');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('');
+
+        const maxRows = { 2: 20, 3: 30, 4: 34, 5: 35 };
+
+        for (const period of [2, 3, 4, 5]) {
+            const actions = periodActions[period] || [];
+            if (actions.length === 0) continue;
+
+            // 行番号ごとにアクションを集計
+            const rowUsage = {};
+            actions.forEach(a => {
+                const row = a.row === -1 ? '末' : (a.row || 0);
+                if (!rowUsage[row]) {
+                    rowUsage[row] = { count: 0, types: {} };
+                }
+                rowUsage[row].count++;
+                const type = a.action || '不明';
+                rowUsage[row].types[type] = (rowUsage[row].types[type] || 0) + 1;
+            });
+
+            // サイコロ情報を取得（3期以降）
+            let diceInfo = '';
+            if (period >= 3 && result.periods) {
+                const periodResult = result.periods[period - 2];
+                if (periodResult && periodResult.diceEffects) {
+                    const d = periodResult.diceEffects;
+                    diceInfo = ` 【サイコロ${d.value}】閉鎖:${d.closedMarkets.join('・') || 'なし'} 人件費${d.wageMultiplier === 1.1 ? '×1.1' : '×1.2'} 大阪¥${d.osakaPrice}`;
+                }
+            }
+
+            console.log(`  ${period}期（全${maxRows[period]}行）${diceInfo}`);
+            console.log('');
+
+            // 行動タイプ別集計
+            const typeCounts = {};
+            actions.forEach(a => {
+                const type = a.action || '不明';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+
+            console.log('  行動別回数:');
+            Object.entries(typeCounts)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([type, count]) => {
+                    console.log(`    ${type}: ${count}回`);
+                });
+            console.log('');
+        }
     }
 
     runMultiple(count) {

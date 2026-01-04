@@ -241,10 +241,21 @@ const IntelligentLearning = (function() {
             let bestAction = actions[0];
             let bestValue = -Infinity;
 
+            // ★★★ 成功パターンから推奨行動を取得 ★★★
+            const successPattern = SuccessPatterns.getBestPattern(stateKey);
+            const patternActions = successPattern ? successPattern.actionSequence : [];
+
             for (const action of actions) {
                 const qValue = QTable.getValue(stateKey, action.type);
-                // 基本スコア（ヒューリスティック）+ Q値（学習）
-                const totalValue = action.score * 0.5 + qValue * 0.5;
+
+                // ★★★ 成功パターンに含まれる行動にボーナス ★★★
+                let patternBonus = 0;
+                if (patternActions.includes(action.type)) {
+                    patternBonus = 50 + (successPattern.equityGain > 0 ? 30 : 0);
+                }
+
+                // 基本スコア（40%）+ Q値（40%）+ パターンボーナス（20%）
+                const totalValue = action.score * 0.4 + qValue * 0.4 + patternBonus * 0.2;
 
                 if (totalValue > bestValue) {
                     bestValue = totalValue;
@@ -407,6 +418,202 @@ const IntelligentLearning = (function() {
     };
 
     // ============================================
+    // 失敗パターン記録 v1.0
+    // 失敗した行動パターンを永続的に記録して学習
+    // ============================================
+    const FailurePatterns = {
+        dataPath: 'data/failure-patterns.json',
+        patterns: [],
+        maxPatterns: 1000,  // 最大記録数
+
+        /**
+         * 失敗パターンを記録
+         * @param {string} stateKey - 状態キー
+         * @param {string} actionType - 行動タイプ
+         * @param {number} equityLoss - 自己資本減少額
+         * @param {string} reason - 失敗理由
+         */
+        record(stateKey, actionType, equityLoss, reason) {
+            this.patterns.push({
+                stateKey,
+                actionType,
+                equityLoss,
+                reason,
+                timestamp: new Date().toISOString()
+            });
+
+            // 上限を超えたら古いパターンを削除
+            if (this.patterns.length > this.maxPatterns) {
+                this.patterns.shift();
+            }
+
+            // 即座に保存
+            this.save();
+        },
+
+        /**
+         * 特定状態での失敗パターンを取得
+         */
+        getFailures(stateKey) {
+            return this.patterns.filter(p => p.stateKey === stateKey);
+        },
+
+        /**
+         * 特定行動の失敗率を計算
+         */
+        getFailureRate(stateKey, actionType) {
+            const failures = this.patterns.filter(p =>
+                p.stateKey === stateKey && p.actionType === actionType
+            );
+            return failures.length;
+        },
+
+        save() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    const path = require('path');
+
+                    const dir = path.dirname(this.dataPath);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+
+                    const data = {
+                        version: '1.0',
+                        lastUpdated: new Date().toISOString(),
+                        totalFailures: this.patterns.length,
+                        patterns: this.patterns
+                    };
+
+                    fs.writeFileSync(this.dataPath, JSON.stringify(data, null, 2));
+                    return true;
+                }
+            } catch (e) {
+                // サイレント
+            }
+            return false;
+        },
+
+        load() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    if (fs.existsSync(this.dataPath)) {
+                        const content = fs.readFileSync(this.dataPath, 'utf-8');
+                        const data = JSON.parse(content);
+                        this.patterns = data.patterns || [];
+                        return true;
+                    }
+                }
+            } catch (e) {
+                // サイレント
+            }
+            return false;
+        }
+    };
+
+    // ============================================
+    // 成功パターン記録 v1.0
+    // 高収益だった行動パターンを永続的に記録
+    // ============================================
+    const SuccessPatterns = {
+        dataPath: 'data/success-patterns.json',
+        patterns: [],
+        maxPatterns: 500,
+
+        /**
+         * 成功パターンを記録
+         */
+        record(stateKey, actionSequence, equityGain, rank) {
+            // 既存の同じパターンがあれば更新
+            const existing = this.patterns.find(p =>
+                p.stateKey === stateKey && JSON.stringify(p.actionSequence) === JSON.stringify(actionSequence)
+            );
+
+            if (existing) {
+                if (equityGain > existing.equityGain) {
+                    existing.equityGain = equityGain;
+                    existing.rank = rank;
+                    existing.count++;
+                    existing.lastUpdated = new Date().toISOString();
+                }
+            } else {
+                this.patterns.push({
+                    stateKey,
+                    actionSequence,
+                    equityGain,
+                    rank,
+                    count: 1,
+                    timestamp: new Date().toISOString(),
+                    lastUpdated: new Date().toISOString()
+                });
+            }
+
+            // 上限を超えたら低収益パターンを削除
+            if (this.patterns.length > this.maxPatterns) {
+                this.patterns.sort((a, b) => b.equityGain - a.equityGain);
+                this.patterns = this.patterns.slice(0, this.maxPatterns);
+            }
+
+            this.save();
+        },
+
+        /**
+         * 状態に対する最良パターンを取得
+         */
+        getBestPattern(stateKey) {
+            const matching = this.patterns.filter(p => p.stateKey === stateKey);
+            if (matching.length === 0) return null;
+            return matching.reduce((best, p) => p.equityGain > best.equityGain ? p : best);
+        },
+
+        save() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    const path = require('path');
+
+                    const dir = path.dirname(this.dataPath);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+
+                    const data = {
+                        version: '1.0',
+                        lastUpdated: new Date().toISOString(),
+                        totalPatterns: this.patterns.length,
+                        patterns: this.patterns
+                    };
+
+                    fs.writeFileSync(this.dataPath, JSON.stringify(data, null, 2));
+                    return true;
+                }
+            } catch (e) {
+                // サイレント
+            }
+            return false;
+        },
+
+        load() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    if (fs.existsSync(this.dataPath)) {
+                        const content = fs.readFileSync(this.dataPath, 'utf-8');
+                        const data = JSON.parse(content);
+                        this.patterns = data.patterns || [];
+                        return true;
+                    }
+                }
+            } catch (e) {
+                // サイレント
+            }
+            return false;
+        }
+    };
+
+    // ============================================
     // 公開API v2.0
     // ============================================
     return {
@@ -415,12 +622,16 @@ const IntelligentLearning = (function() {
         CompanyTrackers,
         ActionSelector,
         Persistence,
+        FailurePatterns,
+        SuccessPatterns,
 
         /**
          * 初期化（シミュレーション開始時）
          */
         init() {
             Persistence.load();
+            FailurePatterns.load();
+            SuccessPatterns.load();
         },
 
         /**
@@ -458,9 +669,39 @@ const IntelligentLearning = (function() {
 
         /**
          * ゲーム終了時に各社の学習を実行
+         * ★★★ 失敗・成功パターンも記録 ★★★
          */
         learnFromGame(company, initialEquity, finalEquity, rank) {
+            const equityChange = finalEquity - initialEquity;
+            const stateKey = StateEncoder.encode(company, { period: 5 });
+
+            // ★★★ 修正: 履歴を先にコピー（learnFromGameでクリアされるため）★★★
+            const actionHistory = [...(CompanyTrackers.trackers[company.index] || [])];
+
+            // Q-learning更新
             CompanyTrackers.learnFromGame(company.index, initialEquity, finalEquity, rank);
+
+            // 大きな損失（-200以下）の場合は失敗パターンとして記録
+            if (equityChange < -200) {
+                const lastActions = actionHistory.slice(-5).map(a => a.actionType);
+                FailurePatterns.record(stateKey, lastActions.join(','), Math.abs(equityChange), '大幅な自己資本減少');
+            }
+
+            // ★★★ 強化: 上位3位または自己資本0以上の場合も成功パターンとして記録 ★★★
+            if (rank <= 3 || finalEquity >= 0) {
+                const actionSequence = actionHistory.map(a => a.actionType);
+                if (actionSequence.length > 0) {  // 空でない場合のみ記録
+                    SuccessPatterns.record(stateKey, actionSequence, equityChange, rank);
+                }
+            }
+        },
+
+        /**
+         * DO_NOTHING発生時に失敗として記録
+         */
+        recordDoNothing(company, gameState, reason) {
+            const stateKey = StateEncoder.encode(company, gameState);
+            FailurePatterns.record(stateKey, 'DO_NOTHING', 0, reason || '行動不能');
         },
 
         /**
