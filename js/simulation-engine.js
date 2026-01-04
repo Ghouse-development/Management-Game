@@ -80,6 +80,236 @@ const MGSimulation = (function() {
     };
 
     // ============================================
+    // アクション検証システム（単一ゲートウェイ）
+    // すべてのアクションはこの検証を通過しないと実行不可能
+    // ============================================
+    const ActionValidator = {
+        /**
+         * アクションが実行可能かどうかを判定
+         * @param {string} actionType - アクションタイプ
+         * @param {Object} params - アクションパラメータ
+         * @param {Object} company - 会社
+         * @param {Object} gameState - ゲーム状態
+         * @returns {Object} { valid: boolean, reason?: string }
+         */
+        canExecute(actionType, params, company, gameState) {
+            const period = gameState?.period || 2;
+
+            switch (actionType) {
+                case 'BUY_CHIP':
+                    return this.validateChipPurchase(params, company, gameState, period);
+                case 'SELL':
+                    return this.validateSale(params, company, gameState, period);
+                case 'BUY_MATERIALS':
+                    return this.validateMaterialPurchase(params, company, gameState, period);
+                case 'PRODUCE':
+                    return this.validateProduction(params, company, gameState);
+                case 'HIRE':
+                case 'HIRE_WORKER':
+                case 'HIRE_SALESMAN':
+                    return this.validateHiring(params, company);
+                case 'BUY_LARGE_MACHINE':
+                case 'BUY_SMALL_MACHINE':
+                    return this.validateMachinePurchase(params, company, gameState, period);
+                case 'SELL_MACHINE':
+                    return this.validateMachineSale(params, company, gameState, period);
+                case 'DO_NOTHING':
+                    return { valid: true };
+                default:
+                    // 未知のアクションタイプは拒否（安全側に倒す）
+                    return { valid: false, reason: `未知のアクションタイプ: ${actionType}` };
+            }
+        },
+
+        // ルール①②⑨: チップ購入の検証
+        validateChipPurchase(params, company, gameState, period) {
+            // ルール①: 2期は特急なし
+            if (period === 2 && params.isExpress) {
+                return { valid: false, reason: 'ルール①: 2期は特急購入不可' };
+            }
+            // ルール②: 1行1枚まで
+            if (company.chipsBoughtThisTurn) {
+                return { valid: false, reason: 'ルール②: 1行1枚まで' };
+            }
+            // ルール⑨: 期首購入不可
+            if (params.phase === 'PERIOD_START') {
+                return { valid: false, reason: 'ルール⑨: 期首にチップ購入不可' };
+            }
+            // 現金チェック
+            const cost = params.isExpress ? 40 : 20;
+            if (company.cash < cost) {
+                return { valid: false, reason: '現金不足' };
+            }
+            return { valid: true };
+        },
+
+        // ルール⑥⑦⑩: 販売の検証
+        validateSale(params, company, gameState, period) {
+            // ルール⑥: セールス0なら販売不可
+            if (company.salesmen === 0) {
+                return { valid: false, reason: 'ルール⑥: セールス0では販売不可' };
+            }
+            // 製品チェック
+            if (company.products < 2) {
+                return { valid: false, reason: '最小販売数(2個)未満' };
+            }
+            // ルール⑦: 市場ボリューム制限（事前チェック）
+            if (params.market) {
+                const remaining = params.market.maxStock - (params.market.currentStock || 0);
+                if (remaining < 2) {
+                    return { valid: false, reason: 'ルール⑦: 市場残り容量不足' };
+                }
+                if (params.quantity > remaining) {
+                    return { valid: false, reason: 'ルール⑦: 販売数が市場残り容量を超過' };
+                }
+            }
+            // 閉鎖市場チェック
+            if (params.market && gameState.isMarketClosed && gameState.isMarketClosed(params.market.name)) {
+                return { valid: false, reason: '市場閉鎖中' };
+            }
+            // ルール⑩: 5期在庫・チップ確保
+            if (period === 5) {
+                // 在庫10個以上必要
+                const currentInventory = company.materials + company.wip + company.products;
+                const afterInventory = currentInventory - (params.quantity || 0);
+                if (afterInventory < 10) {
+                    return { valid: false, reason: 'ルール⑩: 5期は在庫10個以上必要' };
+                }
+                // チップ3枚以上必要（販売自体には影響しないが、状態チェック用）
+                const currentChips = (company.chips.research || 0) + (company.chips.education || 0) +
+                                    (company.chips.advertising || 0) + (company.nextPeriodChips?.research || 0) +
+                                    (company.nextPeriodChips?.education || 0) + (company.nextPeriodChips?.advertising || 0);
+                if (currentChips < 3 && afterInventory >= 10) {
+                    // チップ不足だが在庫は足りている場合、販売可能（チップ確保は別途必要）
+                    // ただし警告情報を付与
+                    return { valid: true, warning: 'チップ3枚未満：別途確保が必要' };
+                }
+            }
+            return { valid: true };
+        },
+
+        // ルール⑦: 材料購入の検証
+        validateMaterialPurchase(params, company, gameState, period) {
+            // ルール⑦: 市場ボリューム制限
+            if (params.market && params.quantity > params.market.maxStock) {
+                return { valid: false, reason: `ルール⑦: ${params.market.name}の購入上限は${params.market.maxStock}個` };
+            }
+            // 2期1周目制限
+            if (period === 2 && gameState.isFirstRound && params.quantity > 3) {
+                return { valid: false, reason: '2期1周目は3個まで' };
+            }
+            // 在庫容量チェック
+            const maxMaterials = 10 + (company.warehouses || 0) * 12;
+            if (company.materials + params.quantity > maxMaterials) {
+                return { valid: false, reason: '材料在庫上限超過' };
+            }
+            // 現金チェック
+            if (params.market && company.cash < params.market.buyPrice * params.quantity) {
+                return { valid: false, reason: '現金不足' };
+            }
+            return { valid: true };
+        },
+
+        // ルール④: 生産の検証
+        validateProduction(params, company, gameState) {
+            const input = params.materialToWip || 0;
+            const complete = params.wipToProduct || 0;
+            // ルール④: 投入1完成1禁止
+            if (input === 1 && complete === 1) {
+                return { valid: false, reason: 'ルール④: 投入1完成1は禁止' };
+            }
+            // 材料チェック
+            if (input > company.materials) {
+                return { valid: false, reason: '材料不足' };
+            }
+            // 仕掛品容量チェック
+            if (company.wip + input > 10) {
+                return { valid: false, reason: '仕掛品容量オーバー' };
+            }
+            // 製造能力チェック
+            const mfgCapacity = company.getMfgCapacity ? company.getMfgCapacity() : 1;
+            if (complete > mfgCapacity) {
+                return { valid: false, reason: '製造能力不足' };
+            }
+            // 仕掛品チェック
+            if (complete > company.wip + input) {
+                return { valid: false, reason: '仕掛品不足' };
+            }
+            return { valid: true };
+        },
+
+        // 採用の検証
+        validateHiring(params, company) {
+            if (params.count > 3) {
+                return { valid: false, reason: '1行で最大3人まで' };
+            }
+            if (company.cash < params.count * 5) {
+                return { valid: false, reason: '現金不足' };
+            }
+            return { valid: true };
+        },
+
+        // 機械購入の検証
+        validateMachinePurchase(params, company, gameState, period) {
+            const cost = params.type === 'large' ? 200 : 100;
+            if (company.cash < cost) {
+                return { valid: false, reason: '現金不足' };
+            }
+            return { valid: true };
+        },
+
+        // 機械売却の検証
+        validateMachineSale(params, company, gameState, period) {
+            if (!company.machines || company.machines.length <= 1) {
+                return { valid: false, reason: '最低1台は必要' };
+            }
+            return { valid: true };
+        },
+
+        /**
+         * アクションを実行前に検証し、無効なら例外を投げる
+         */
+        enforceOrThrow(actionType, params, company, gameState) {
+            const result = this.canExecute(actionType, params, company, gameState);
+            if (!result.valid) {
+                throw new Error(`アクション拒否: ${result.reason}`);
+            }
+            return true;
+        }
+    };
+
+    // ============================================
+    // 行動ログ検証システム（後方互換性のため残存）
+    // 注: ActionValidatorが主要なゲートウェイ
+    // ============================================
+    const ActionLogValidator = {
+        validate(actionLog, period) {
+            // ActionValidatorが事前にブロックするため、ここでの検証は二重チェック
+            const errors = [];
+            actionLog.forEach(a => {
+                // ① 2期特急チェック
+                if (period === 2 && a.detail && a.detail.includes('特急')) {
+                    errors.push(`ルール①違反: 2期に特急購入`);
+                }
+                // ⑦ 仙台上限チェック
+                if (a.action === '材料購入' && a.detail && a.detail.includes('仙台')) {
+                    const match = a.detail.match(/×(\d+)個/);
+                    if (match && parseInt(match[1]) > 3) {
+                        errors.push(`ルール⑦違反: 仙台で${match[1]}個購入`);
+                    }
+                }
+            });
+            return errors;
+        },
+        validateOrThrow(actionLog, period) {
+            const errors = this.validate(actionLog, period);
+            if (errors.length > 0) {
+                throw new Error('ルール違反: ' + errors.join('; '));
+            }
+        }
+    };
+
+    // ============================================
     // ゲームルール定数（正確な値）
     // ============================================
     const RULES = {
@@ -123,6 +353,9 @@ const MGSimulation = (function() {
         // 2期1周目の材料購入制限（ACT-002）
         PERIOD2_FIRST_ROUND_MATERIAL_LIMIT: 3,
 
+        // 最小販売数（1個では販売不可）
+        MIN_SALE_QUANTITY: 2,
+
         // 機械
         MACHINE: {
             SMALL: { cost: 100, capacity: 1, depreciation: 10 },  // 小型=製造能力1
@@ -155,9 +388,10 @@ const MGSimulation = (function() {
             REFERRAL: 5,
             CHIP_NORMAL: 20,
             CHIP_EXPRESS: 40,
-            INSURANCE: 10,
+            PC: 20,          // PCチップ（緑）
+            INSURANCE: 5,    // 保険チップ（橙）- 正しくは5円
             WAREHOUSE: 20,
-            PROCESSING: 1  // 加工費/個
+            PROCESSING: 1    // 加工費/個
         },
 
         // 人件費（期別）
@@ -302,6 +536,20 @@ const MGSimulation = (function() {
                 hirePriority: 'worker',
                 earlyLargeMachine: false,  // 3期に大型機械購入（期首借入後）
                 upgradePeriod: 3
+            },
+            PLAYER: {
+                name: 'プレイヤー型',
+                description: '研究チップ重視・早期大型機械戦略',
+                chipTargets: {
+                    2: { research: 2, education: 1, advertising: 0 },
+                    3: { research: 4, education: 1, advertising: 0 },
+                    4: { research: 5, education: 1, advertising: 0 },
+                    5: { research: 5, education: 1, advertising: 0 }
+                },
+                priceAdjustment: 2,
+                hirePriority: 'worker',
+                earlyLargeMachine: true,  // 2期後半に大型機械購入
+                upgradePeriod: 2
             }
         }
     };
@@ -333,6 +581,7 @@ const MGSimulation = (function() {
             this.shortTermLoan = init.SHORT_TERM_LOAN;
             this.chips = JSON.parse(JSON.stringify(init.CHIPS));
             this.nextPeriodChips = { research: 0, education: 0, advertising: 0 };
+            this.period = 2;  // 現在の期
             this.currentRow = 2;  // 期首処理で1行使用済み
             this.totalSales = 0;
             this.totalSoldQuantity = 0;
@@ -340,6 +589,16 @@ const MGSimulation = (function() {
             this.totalSpecialLoss = 0;
             this.actionLog = [];
             this.maxPersonnel = 0;  // 期中最大人員（ワーカー+セールスマン）
+            // チップ購入履歴（F計算用）
+            this.chipPurchaseHistory = {
+                research: { normal: 0, express: 0 },
+                education: { normal: 0, express: 0 },
+                advertising: { normal: 0, express: 0 }
+            };
+            // ルール②: 1行1枚チップ制限トラッキング
+            this.chipsBoughtThisTurn = false;
+            // 期首処理履歴
+            this.periodStartActions = [];
         }
 
         // 製造能力
@@ -440,14 +699,42 @@ const MGSimulation = (function() {
             return 12;
         }
 
-        logAction(action, detail, amount = 0, isIncome = false) {
+        /**
+         * 行動をログに記録（状態スナップショット付き）
+         * @param {string} action - 行動種別
+         * @param {string} detail - 詳細説明
+         * @param {number} amount - 金額
+         * @param {boolean} isIncome - 収入かどうか
+         * @param {string} type - 種別（'意思決定' or 'リスク' or '期首' or '期末'）、省略時は自動判定
+         */
+        logAction(action, detail, amount = 0, isIncome = false, type = null) {
+            // タイプ自動判定
+            let autoType = type;
+            if (!autoType) {
+                if (action.includes('リスクカード')) {
+                    autoType = 'リスク';
+                } else if (action.includes('期末処理') || action.includes('期首')) {
+                    autoType = '期末';
+                } else {
+                    autoType = '意思決定';
+                }
+            }
+
             this.actionLog.push({
                 row: this.currentRow,
+                period: this.period || 2,
+                type: autoType,
                 action,
                 detail,
                 amount,
                 isIncome,
-                cash: this.cash
+                // 状態スナップショット
+                state: {
+                    cash: this.cash,
+                    materials: this.materials,
+                    wip: this.wip,
+                    products: this.products
+                }
             });
         }
     }
@@ -466,7 +753,7 @@ const MGSimulation = (function() {
             this.parentIndex = 0;  // 親=入札を開始する人（STR-003）
             this.companies = [];
             this.markets = JSON.parse(JSON.stringify(RULES.MARKETS));
-            this.usedRiskCards = [];
+            this.riskDeck = [];  // リスクカードデッキ
             this.periodLog = [];
             // サイコロ関連（3期以降）PS-008
             this.diceResult = 4;  // デフォルト
@@ -476,21 +763,101 @@ const MGSimulation = (function() {
             this.maxRowsReduction = 0;  // 行数削減（サイコロ5-6で-5）
             this.isReversed = false;  // 景気変動による順番逆転（RISK-010）
             this.isFirstRound = true;  // 1周目かどうか（ACT-002用）
+            this.initRiskDeck();  // リスクカードデッキ初期化（64枚）
+            this.initActionDeck();  // 意思決定/リスクデッキ初期化（75枚）
         }
 
-        initCompanies(playerName = 'あなた') {
+        /**
+         * リスクカードデッキを初期化（64枚シャッフル）
+         */
+        initRiskDeck() {
+            // 1-64のカードを作成
+            this.riskDeck = [];
+            for (let i = 1; i <= 64; i++) {
+                this.riskDeck.push(i);
+            }
+            this.shuffleDeck(this.riskDeck);
+        }
+
+        /**
+         * 意思決定/リスクデッキを初期化（75枚：60枚意思決定 + 15枚リスク）
+         */
+        initActionDeck() {
+            this.actionDeck = [];
+            // 60枚の意思決定カード
+            for (let i = 0; i < 60; i++) {
+                this.actionDeck.push('decision');
+            }
+            // 15枚のリスクカードを引くカード
+            for (let i = 0; i < 15; i++) {
+                this.actionDeck.push('risk');
+            }
+            this.shuffleDeck(this.actionDeck);
+        }
+
+        /**
+         * デッキをシャッフル（Fisher-Yates）
+         */
+        shuffleDeck(deck) {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        /**
+         * リスクカードを1枚引く（デッキが空なら再シャッフル）
+         */
+        drawRiskCard() {
+            if (this.riskDeck.length === 0) {
+                this.initRiskDeck();
+            }
+            return this.riskDeck.pop();
+        }
+
+        /**
+         * 意思決定/リスクカードを1枚引く（デッキが空なら再シャッフル）
+         * @returns {string} 'decision' or 'risk'
+         */
+        drawActionCard() {
+            if (this.actionDeck.length === 0) {
+                this.initActionDeck();
+            }
+            return this.actionDeck.pop();
+        }
+
+        /**
+         * 会社を初期化
+         * @param {Object} options - オプション
+         * @param {boolean} options.allAI - true: 6社ともAI, false: プレイヤー1社+AI5社
+         * @param {string} options.playerName - プレイヤー名（allAI=falseの場合）
+         */
+        initCompanies(options = {}) {
+            const allAI = options.allAI || false;
+            const playerName = options.playerName || 'あなた';
+
             // AI戦略タイプを各社に割り当て（STR-001: 6社で競争）
             const aiConfigs = [
                 { name: '研究商事', strategy: 'RESEARCH_FOCUSED' },
                 { name: '販売産業', strategy: 'SALES_FOCUSED' },
                 { name: '堅実工業', strategy: 'LOW_CHIP' },
                 { name: 'バランス物産', strategy: 'BALANCED' },
-                { name: '積極製作所', strategy: 'AGGRESSIVE' }
+                { name: '積極製作所', strategy: 'AGGRESSIVE' },
+                { name: 'プレイヤー型', strategy: 'PLAYER' }  // 6社目のAI
             ];
-            this.companies = [new Company(0, playerName, true)];
-            aiConfigs.forEach((config, i) => {
-                this.companies.push(new Company(i + 1, config.name, false, config.strategy));
-            });
+
+            if (allAI) {
+                // シミュレーション用: 6社ともAI
+                this.companies = aiConfigs.map((config, i) =>
+                    new Company(i, config.name, false, config.strategy)
+                );
+            } else {
+                // ゲーム用: プレイヤー1社 + AI5社
+                this.companies = [new Company(0, playerName, true)];
+                aiConfigs.slice(0, 5).forEach((config, i) => {
+                    this.companies.push(new Company(i + 1, config.name, false, config.strategy));
+                });
+            }
         }
 
         // 行動順序を取得（親から順番、逆転時は逆順）STR-003, STR-004, RISK-010
@@ -621,7 +988,8 @@ const MGSimulation = (function() {
 
         /**
          * 入札処理（BID-004）
-         * 市場の数量を超えたら入札負け
+         * 注: 市場容量超過は事前検証(ActionValidator/evaluateSales)で防止
+         *     ここに到達する入札は全て容量内であることが保証されている
          */
         processBids(bids, market, gameState) {
             if (bids.length === 0) return [];
@@ -631,50 +999,42 @@ const MGSimulation = (function() {
             let remainingCapacity = market.maxStock - (market.currentStock || 0);
 
             for (const bid of sortedBids) {
-                if (remainingCapacity <= 0) {
-                    // 市場容量超過で入札負け（BID-004）
+                const company = gameState.companies[bid.companyIndex];
+
+                // 容量と製品数の制限内で販売（部分販売は許可）
+                const actualQty = Math.min(remainingCapacity, bid.quantity, company.products);
+
+                // 最小販売数チェック（2個未満は販売不可）
+                if (actualQty < RULES.MIN_SALE_QUANTITY) {
                     results.push({
                         companyIndex: bid.companyIndex,
                         quantity: 0,
                         price: bid.displayPrice,
                         revenue: 0,
                         won: false,
-                        reason: '市場容量超過'
+                        reason: `入札負け：販売可能数(${actualQty}個)が最小販売数未満`
                     });
                     continue;
                 }
 
-                const company = gameState.companies[bid.companyIndex];
-                const actualQty = Math.min(remainingCapacity, bid.quantity, company.products);
+                // 販売成功
+                const revenue = bid.displayPrice * actualQty;
+                company.cash += revenue;
+                company.products -= actualQty;
+                company.totalSales += revenue;
+                company.totalSoldQuantity += actualQty;
+                market.currentStock = (market.currentStock || 0) + actualQty;
+                remainingCapacity -= actualQty;
 
-                if (actualQty > 0) {
-                    const revenue = bid.displayPrice * actualQty;
-                    company.cash += revenue;
-                    company.products -= actualQty;
-                    company.totalSales += revenue;
-                    company.totalSoldQuantity += actualQty;
-                    market.currentStock = (market.currentStock || 0) + actualQty;
-                    remainingCapacity -= actualQty;
+                results.push({
+                    companyIndex: bid.companyIndex,
+                    quantity: actualQty,
+                    price: bid.displayPrice,
+                    revenue,
+                    won: true
+                });
 
-                    results.push({
-                        companyIndex: bid.companyIndex,
-                        quantity: actualQty,
-                        price: bid.displayPrice,
-                        revenue,
-                        won: true
-                    });
-
-                    company.logAction('販売', `${market.name}に¥${bid.displayPrice}×${actualQty}個（入札勝利）`, revenue, true);
-                } else {
-                    results.push({
-                        companyIndex: bid.companyIndex,
-                        quantity: 0,
-                        price: bid.displayPrice,
-                        revenue: 0,
-                        won: false,
-                        reason: '製品不足'
-                    });
-                }
+                company.logAction('販売', `${market.name}に¥${bid.displayPrice}×${actualQty}個（入札勝利）`, revenue, true);
             }
 
             return results;
@@ -690,13 +1050,26 @@ const MGSimulation = (function() {
 
     // ============================================
     // アクション実行エンジン
+    // 全メソッドはActionValidatorで事前検証済み前提
+    // 直接呼び出し時も安全のためActionValidator.canExecuteを使用
     // ============================================
     const ActionEngine = {
         /**
          * 材料購入（ACT-001, ACT-002）
-         * ACT-002: 2期1周目は3個まで
+         * ActionValidatorで検証済みだが、直接呼び出し時のために再検証
          */
         buyMaterials(company, quantity, market, gameState) {
+            // ActionValidatorで事前検証
+            const validation = ActionValidator.canExecute('BUY_MATERIALS', { quantity, market }, company, gameState);
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
+            }
+
+            // ルール⑦: 各市場のマーケットボリューム（maxStock）が購入上限
+            if (quantity > market.maxStock) {
+                quantity = market.maxStock;
+            }
+
             // ACT-002: 2期1周目は3個まで
             if (gameState && gameState.period === 2 && gameState.isFirstRound) {
                 if (quantity > RULES.PERIOD2_FIRST_ROUND_MATERIAL_LIMIT) {
@@ -705,15 +1078,7 @@ const MGSimulation = (function() {
             }
 
             const cost = market.buyPrice * quantity;
-            if (company.cash < cost) return { success: false, reason: '現金不足' };
-
-            // 在庫制限チェック（INV-001）
-            const maxMaterials = RULES.CAPACITY.MATERIAL_BASE +
-                                (company.warehouses || 0) * RULES.CAPACITY.WAREHOUSE_BONUS;
-            if (company.materials + quantity > maxMaterials) {
-                return { success: false, reason: '材料在庫上限超過' };
-            }
-
+            // 検証済みなので直接実行
             company.cash -= cost;
             company.materials += quantity;
             company.logAction('材料購入', `${market.name}から¥${market.buyPrice}×${quantity}個`, cost, false);
@@ -724,40 +1089,29 @@ const MGSimulation = (function() {
         /**
          * 完成・投入
          * ルール: 材料→投入(¥1)→仕掛品→完成(¥1)→製品
+         * ActionValidatorで検証済み
          */
         produce(company, materialToWip, wipToProduct) {
-            // 材料→仕掛品
-            if (materialToWip > company.materials) {
-                return { success: false, reason: '材料不足' };
-            }
-            if (company.wip + materialToWip > RULES.CAPACITY.WIP) {
-                return { success: false, reason: '仕掛品容量オーバー' };
-            }
-
-            // 仕掛品→製品（製造能力チェック）
-            const mfgCapacity = company.getMfgCapacity();
-            if (wipToProduct > mfgCapacity) {
-                return { success: false, reason: '製造能力不足' };
-            }
-            if (wipToProduct > company.wip + materialToWip) {
-                return { success: false, reason: '仕掛品不足' };
+            // ActionValidatorで事前検証
+            const validation = ActionValidator.canExecute('PRODUCE', { materialToWip, wipToProduct }, company, {});
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
             }
 
             // 加工費: 投入¥1 + 完成¥1
-            const inputCost = materialToWip * RULES.COST.PROCESSING;      // 投入費
-            const completionCost = wipToProduct * RULES.COST.PROCESSING;  // 完成費
+            const inputCost = materialToWip * RULES.COST.PROCESSING;
+            const completionCost = wipToProduct * RULES.COST.PROCESSING;
             const totalProcessingCost = inputCost + completionCost;
 
             if (company.cash < totalProcessingCost) {
                 return { success: false, reason: '加工費の現金不足' };
             }
 
-            // 実行
+            // 検証済みなので実行
             company.materials -= materialToWip;
             company.wip += materialToWip - wipToProduct;
             company.products += wipToProduct;
             company.cash -= totalProcessingCost;
-            company.totalF += totalProcessingCost;
 
             company.logAction('完成・投入', `投入${materialToWip}個(¥${inputCost})、完成${wipToProduct}個(¥${completionCost})`, totalProcessingCost, false);
 
@@ -766,20 +1120,21 @@ const MGSimulation = (function() {
 
         /**
          * 採用（ワーカー）
+         * ActionValidatorで検証済み
          */
         hire(company, count, isReferral = false) {
-            if (count > 3 && !isReferral) {
-                return { success: false, reason: '1行で最大3人まで' };
+            // ActionValidatorで事前検証
+            const validation = ActionValidator.canExecute('HIRE', { count }, company, {});
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
             }
+
             if (isReferral && count > 1) {
                 return { success: false, reason: '縁故採用は1人まで' };
             }
 
             const cost = count * RULES.COST.HIRING;
-            if (company.cash < cost) {
-                return { success: false, reason: '現金不足' };
-            }
-
+            // 検証済みなので実行
             company.cash -= cost;
             company.workers += count;
             company.totalF += cost;
@@ -798,17 +1153,17 @@ const MGSimulation = (function() {
 
         /**
          * セールスマン採用
+         * ActionValidatorで検証済み
          */
         hireSalesman(company, count) {
-            if (count > 3) {
-                return { success: false, reason: '1行で最大3人まで' };
+            // ActionValidatorで事前検証
+            const validation = ActionValidator.canExecute('HIRE', { count }, company, {});
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
             }
 
             const cost = count * RULES.COST.HIRING;
-            if (company.cash < cost) {
-                return { success: false, reason: '現金不足' };
-            }
-
+            // 検証済みなので実行
             company.cash -= cost;
             company.salesmen += count;
             company.totalF += cost;
@@ -890,31 +1245,55 @@ const MGSimulation = (function() {
 
         /**
          * チップ購入
+         * ルール①: 2期は特急なし（全て¥20、即座に効果）
+         * ルール②: 1行1枚まで（呼び出し側で制御）
+         * ルール⑨: 期首購入不可（AIDecisionEngineから呼ばれる）
+         * ActionValidatorで検証済み
          */
-        buyChip(company, chipType, isExpress = false) {
-            const cost = isExpress ? RULES.COST.CHIP_EXPRESS : RULES.COST.CHIP_NORMAL;
-            if (company.cash < cost) {
-                return { success: false, reason: '現金不足' };
+        buyChip(company, chipType, isExpress = false, period = 2, phase = null) {
+            // ActionValidatorで事前検証（ルール①②⑨をチェック）
+            const validation = ActionValidator.canExecute('BUY_CHIP', { isExpress, phase }, company, { period });
+            if (!validation.valid) {
+                return { success: false, reason: validation.reason };
             }
 
-            company.cash -= cost;
-            company.totalF += cost;
+            // ルール①: 2期は特急という概念がない（全て¥20で即座に効果）
+            if (period === 2) {
+                isExpress = false;  // 2期は必ず通常価格
+            }
 
-            if (isExpress) {
+            const cost = isExpress ? RULES.COST.CHIP_EXPRESS : RULES.COST.CHIP_NORMAL;
+
+            company.cash -= cost;
+            // 注意: totalFはここで加算しない（期末処理でchipPurchaseHistoryから計算）
+
+            // 2期: 即座に効果（特急と同じ扱い）
+            // 3期以降: 特急なら即座、通常なら次期
+            if (period === 2 || isExpress) {
                 company.chips[chipType] = (company.chips[chipType] || 0) + 1;
+                // 購入履歴を記録（F計算用）
+                if (period === 2) {
+                    company.chipPurchaseHistory[chipType].normal += 1;  // 2期は全て通常扱い
+                } else {
+                    company.chipPurchaseHistory[chipType].express += 1;
+                }
             } else {
                 company.nextPeriodChips[chipType] = (company.nextPeriodChips[chipType] || 0) + 1;
+                company.chipPurchaseHistory[chipType].normal += 1;
             }
 
             const chipNames = { research: '研究開発', education: '教育', advertising: '広告' };
-            const typeStr = isExpress ? '特急' : '次期';
-            company.logAction('チップ購入', `${chipNames[chipType]}チップ(${typeStr})`, cost, false);
+            // 2期は「特急」という言葉を使わない
+            const typeStr = period === 2 ? '' : (isExpress ? '特急' : '次期');
+            const detailStr = typeStr ? `${chipNames[chipType]}チップ(${typeStr})` : `${chipNames[chipType]}チップ`;
+            company.logAction('チップ購入', detailStr, cost, false);
 
             return { success: true, cost };
         },
 
         /**
          * 倉庫購入
+         * 注意: 倉庫費用は期末に計上される（購入時ではない）
          */
         buyWarehouse(company) {
             if (company.cash < RULES.COST.WAREHOUSE) {
@@ -923,6 +1302,7 @@ const MGSimulation = (function() {
 
             company.cash -= RULES.COST.WAREHOUSE;
             company.warehouses += 1;
+            // 倉庫費用は期末処理でFに計上される（ここでは計上しない）
             company.logAction('倉庫購入', '倉庫購入', RULES.COST.WAREHOUSE, false);
 
             return { success: true, cost: RULES.COST.WAREHOUSE };
@@ -989,7 +1369,10 @@ const MGSimulation = (function() {
                 wageSalesman: 0,
                 wageMaxPersonnel: 0,
                 depreciation: 0,
-                insurance: 0,
+                pcCost: 0,           // PCチップ費用
+                insuranceCost: 0,    // 保険チップ費用
+                chipCost: 0,         // 研究・教育・広告チップ費用
+                warehouseCost: 0,    // 倉庫費用（期末に計上）
                 longTermRepay: 0,
                 shortTermRepay: 0,
                 shortTermInterest: 0,
@@ -1038,14 +1421,54 @@ const MGSimulation = (function() {
             });
             company.totalF += result.depreciation;
 
-            // 3. 保険料
-            if (company.insurance) {
-                result.insurance = RULES.COST.INSURANCE;
-                company.cash -= result.insurance;
-                company.totalF += result.insurance;
+            // 3. PC・保険・チップのF計算
+            // PC（持っていれば20円）
+            if (company.chips.computer > 0) {
+                result.pcCost = RULES.COST.PC;
+                company.totalF += result.pcCost;
+            }
+            // 保険（持っていれば5円）
+            if (company.chips.insurance > 0) {
+                result.insuranceCost = RULES.COST.INSURANCE;
+                company.totalF += result.insuranceCost;
+            }
+            // チップ費用（CHIP-004, CHIP-005）
+            // ルール①: 2期は特急なし（全て¥20）
+            // 2期: 購入枚数×¥20
+            // 3期以降: 通常×¥20 + 特急×¥40
+            const history = company.chipPurchaseHistory;
+            if (period === 2) {
+                // 2期: 全て¥20（特急という概念がない）
+                const totalPurchases = (history.research.normal || 0) +
+                                       (history.education.normal || 0) +
+                                       (history.advertising.normal || 0);
+                // express履歴があっても2期は¥20で計算（念のため）
+                const expressAsNormal = (history.research.express || 0) +
+                                        (history.education.express || 0) +
+                                        (history.advertising.express || 0);
+                result.chipCost = (totalPurchases + expressAsNormal) * 20;
+                company.totalF += result.chipCost;
+            } else {
+                // 3期以降: 通常×20 + 特急×40
+                const normalCost = ((history.research.normal || 0) +
+                                   (history.education.normal || 0) +
+                                   (history.advertising.normal || 0)) * 20;
+                const expressCost = ((history.research.express || 0) +
+                                    (history.education.express || 0) +
+                                    (history.advertising.express || 0)) * 40;
+                result.chipCost = normalCost + expressCost;
+                company.totalF += result.chipCost;
             }
 
-            // 4. 長期借入返済（最低10%）
+            // 4. 倉庫費用（倉庫数×¥20、期末に没収される）
+            if (company.warehouses > 0) {
+                result.warehouseCost = company.warehouses * RULES.COST.WAREHOUSE;
+                company.totalF += result.warehouseCost;
+                // 倉庫は期末に没収
+                company.warehouses = 0;
+            }
+
+            // 5. 長期借入返済（最低10%）
             if (company.longTermLoan > 0) {
                 result.longTermRepay = Math.ceil(company.longTermLoan * RULES.LOAN.MIN_LONG_REPAY);
                 company.cash -= result.longTermRepay;
@@ -1097,14 +1520,21 @@ const MGSimulation = (function() {
                 }
             }
 
-            result.totalF = result.wage + result.depreciation + result.insurance + result.shortTermInterest;
+            result.totalF = result.wage + result.depreciation + result.pcCost + result.insuranceCost + result.chipCost + result.warehouseCost + result.shortTermInterest;
             result.equityAfter = company.calculateEquity(period + 1);
 
             // 8. 期中最大人員をリセット
             company.maxPersonnel = 0;
 
+            // 9. チップ購入履歴をリセット（次期用）
+            company.chipPurchaseHistory = {
+                research: { normal: 0, express: 0 },
+                education: { normal: 0, express: 0 },
+                advertising: { normal: 0, express: 0 }
+            };
+
             company.logAction('期末処理',
-                `人件費${result.wage}(W${result.wageWorker}+M${result.wageMachine}+S${result.wageSalesman}+Max${result.wageMaxPersonnel}) 減価償却${result.depreciation} 税${result.tax}`,
+                `人件費${result.wage}(W${result.wageWorker}+M${result.wageMachine}+S${result.wageSalesman}+Max${result.wageMaxPersonnel}) 減価償却${result.depreciation} PC${result.pcCost} 保険${result.insuranceCost} チップ${result.chipCost} 税${result.tax}`,
                 result.totalF + result.tax, false);
 
             return result;
@@ -1136,15 +1566,27 @@ const MGSimulation = (function() {
             const actions = [];
             const period = gameState.period;
 
-            // 販売
-            if (company.products > 0) {
+            // ルール⑩: 5期は在庫10個以上、チップ3枚以上を確保する必要がある
+            const isPeriod5 = period === 5;
+            const currentInventory = company.materials + company.wip + company.products;
+            const currentChips = (company.chips.research || 0) + (company.chips.education || 0) +
+                                (company.chips.advertising || 0) + (company.nextPeriodChips.research || 0) +
+                                (company.nextPeriodChips.education || 0) + (company.nextPeriodChips.advertising || 0);
+            const needsMoreInventory = isPeriod5 && currentInventory < RULES.VICTORY.MIN_INVENTORY;
+            const needsMoreChips = isPeriod5 && currentChips < RULES.VICTORY.MIN_CARRYOVER_CHIPS;
+
+            // 販売（5期で在庫確保が必要なら販売しない）
+            if (company.products > 0 && !needsMoreInventory) {
                 const salesAction = this.evaluateSales(company, gameState);
                 if (salesAction) actions.push(salesAction);
             }
 
-            // 材料購入
+            // 材料購入（5期で在庫確保が必要なら優先度UP）
             const buyAction = this.evaluateBuyMaterials(company, gameState);
-            if (buyAction) actions.push(buyAction);
+            if (buyAction) {
+                if (needsMoreInventory) buyAction.score += 500;  // 在庫確保を最優先
+                actions.push(buyAction);
+            }
 
             // 完成・投入
             const produceAction = this.evaluateProduction(company, gameState);
@@ -1158,9 +1600,12 @@ const MGSimulation = (function() {
             const machineAction = this.evaluateMachinePurchase(company, gameState);
             if (machineAction) actions.push(machineAction);
 
-            // チップ購入
+            // チップ購入（5期でチップ確保が必要なら優先度UP）
             const chipAction = this.evaluateChipPurchase(company, gameState);
-            if (chipAction) actions.push(chipAction);
+            if (chipAction) {
+                if (needsMoreChips) chipAction.score += 500;  // チップ確保を最優先
+                actions.push(chipAction);
+            }
 
             // DO NOTHING
             actions.push({ type: 'DO_NOTHING', score: 0, detail: '何もしない' });
@@ -1169,11 +1614,16 @@ const MGSimulation = (function() {
         },
 
         evaluateSales(company, gameState) {
+            // ============================================
+            // 販売可否の判定（ActionValidator経由で100%システム化）
+            // ============================================
+            const period = gameState.period;
+
+            // 基本的な販売能力チェック
             const salesCapacity = company.getSalesCapacity();
             const quantity = Math.min(salesCapacity, company.products);
-            if (quantity === 0) return null;
+            if (quantity < RULES.MIN_SALE_QUANTITY) return null;
 
-            const period = gameState.period;
             const isParent = gameState.isParent(company.index);
             const researchChips = company.chips.research || 0;
 
@@ -1194,28 +1644,53 @@ const MGSimulation = (function() {
             // 価格は最低16円（海外）、最高40円（仙台）
             let targetPrice = Math.max(16, Math.min(40, basePrice));
 
-            // 価格に合う市場を選択
-            let targetMarket = gameState.markets.find(m => m.sellPrice >= targetPrice);
-            if (!targetMarket) {
-                targetMarket = gameState.markets[6]; // 海外
-                targetPrice = 16;
+            // 市場選択（ActionValidatorで検証しながら選択）
+            let targetMarket = null;
+            let actualQuantity = quantity;
+
+            for (const m of gameState.markets) {
+                if (m.sellPrice < targetPrice) continue;
+
+                // 市場の残り容量を計算
+                const remainingCapacity = m.maxStock - (m.currentStock || 0);
+                actualQuantity = Math.min(quantity, remainingCapacity);
+
+                if (actualQuantity < RULES.MIN_SALE_QUANTITY) continue;
+
+                // ActionValidatorで検証（全ルールをチェック）
+                const validation = ActionValidator.canExecute('SELL', {
+                    market: m,
+                    quantity: actualQuantity,
+                    price: targetPrice
+                }, company, gameState);
+
+                if (validation.valid) {
+                    targetMarket = m;
+                    break;
+                }
+                // 無効な場合は次の市場を試す
             }
 
-            const expectedRevenue = targetPrice * quantity;
-            // 販売は最優先 - 高スコア
+            // 有効な市場がない場合は販売しない
+            if (!targetMarket) return null;
+
+            const expectedRevenue = targetPrice * actualQuantity;
             const score = 200 + expectedRevenue;
 
             return {
                 type: 'SELL',
                 score,
-                detail: `${targetMarket.name}に¥${targetPrice}×${quantity}個`,
+                detail: `${targetMarket.name}に¥${targetPrice}×${actualQuantity}個`,
                 market: targetMarket,
                 price: targetPrice,
-                quantity
+                quantity: actualQuantity
             };
         },
 
         evaluateBuyMaterials(company, gameState) {
+            // ============================================
+            // 材料購入（ActionValidator経由で100%システム化）
+            // ============================================
             const period = gameState.period;
             const mfgCapacity = company.getMfgCapacity();
             const storageCapacity = company.getStorageCapacity();
@@ -1224,18 +1699,26 @@ const MGSimulation = (function() {
 
             if (availableStorage <= 0) return null;
 
-            // 2期は製造能力制限なし
-            let targetQty;
-            if (period === 2) {
-                targetQty = Math.min(6, availableStorage);
-            } else {
-                targetQty = Math.min(mfgCapacity, availableStorage);
-            }
-
             // 最安市場を選択
             const market = gameState.markets.reduce((best, m) =>
                 m.buyPrice < best.buyPrice ? m : best
             );
+
+            // 購入数量の計算
+            let targetQty;
+            if (period === 2) {
+                targetQty = Math.min(market.maxStock, availableStorage);
+            } else {
+                targetQty = Math.min(mfgCapacity, availableStorage, market.maxStock);
+            }
+
+            // ActionValidatorで検証
+            const validation = ActionValidator.canExecute('BUY_MATERIALS', {
+                quantity: targetQty,
+                market: market
+            }, company, gameState);
+
+            if (!validation.valid) return null;
 
             const cost = market.buyPrice * targetQty;
             if (company.cash < cost + 50) return null; // 安全マージン
@@ -1256,17 +1739,50 @@ const MGSimulation = (function() {
         },
 
         evaluateProduction(company, gameState) {
+            // ============================================
+            // 生産（ActionValidator経由で100%システム化）
+            // ============================================
             const mfgCapacity = company.getMfgCapacity();
             const canProduce = Math.min(mfgCapacity, company.wip + company.materials);
 
             if (canProduce === 0) return null;
 
-            const materialToWip = Math.min(company.materials, RULES.CAPACITY.WIP - company.wip);
-            const wipToProduct = Math.min(mfgCapacity, company.wip + materialToWip);
+            let materialToWip = Math.min(company.materials, RULES.CAPACITY.WIP - company.wip);
+            let wipToProduct = Math.min(mfgCapacity, company.wip + materialToWip);
 
             if (wipToProduct === 0) return null;
 
-            const processingCost = wipToProduct * RULES.COST.PROCESSING;
+            // ActionValidatorで検証し、ルール④違反なら調整
+            let validation = ActionValidator.canExecute('PRODUCE', {
+                materialToWip,
+                wipToProduct
+            }, company, gameState);
+
+            // ルール④違反の場合、代替案を試す
+            if (!validation.valid && validation.reason?.includes('ルール④')) {
+                // 投入を0にするか完成を2にするか判断
+                if (company.wip >= 2) {
+                    materialToWip = 0;
+                    wipToProduct = Math.min(mfgCapacity, company.wip);
+                } else if (company.materials >= 2 && (RULES.CAPACITY.WIP - company.wip) >= 2) {
+                    materialToWip = 2;
+                    wipToProduct = Math.min(mfgCapacity, company.wip + 2);
+                } else {
+                    return null;  // どうしても1,1になるなら実行しない
+                }
+
+                // 再検証
+                validation = ActionValidator.canExecute('PRODUCE', {
+                    materialToWip,
+                    wipToProduct
+                }, company, gameState);
+
+                if (!validation.valid) return null;
+            } else if (!validation.valid) {
+                return null;
+            }
+
+            const processingCost = (materialToWip + wipToProduct) * RULES.COST.PROCESSING;
             if (company.cash < processingCost + 30) return null;
 
             // スコア: 製品がないときは高優先度
@@ -1302,15 +1818,21 @@ const MGSimulation = (function() {
         },
 
         evaluateWorkerHiring(company, gameState, hirePriority) {
-            const mfgCapacity = company.getMfgCapacity();
+            // ============================================
+            // ワーカー採用（ActionValidator経由で100%システム化）
+            // ============================================
             const machines = company.machines.length;
 
             // ワーカーが機械台数より少ない場合に検討
             if (company.workers >= machines) return null;
 
             const hireCount = Math.min(3, machines - company.workers);
-            const cost = hireCount * RULES.COST.HIRING;
 
+            // ActionValidatorで検証
+            const validation = ActionValidator.canExecute('HIRE', { count: hireCount }, company, gameState);
+            if (!validation.valid) return null;
+
+            const cost = hireCount * RULES.COST.HIRING;
             if (company.cash < cost + 50) return null;
 
             let score = hireCount * 15;
@@ -1326,6 +1848,9 @@ const MGSimulation = (function() {
         },
 
         evaluateSalesmanHiring(company, gameState, hirePriority) {
+            // ============================================
+            // セールスマン採用（ActionValidator経由で100%システム化）
+            // ============================================
             const currentSalesCapacity = company.getSalesCapacity();
             const products = company.products;
             const mfgCapacity = company.getMfgCapacity();
@@ -1333,9 +1858,13 @@ const MGSimulation = (function() {
             // 販売能力が製造能力より低い場合に検討
             if (currentSalesCapacity >= mfgCapacity * 2) return null;
 
-            const hireCount = Math.min(3, 1);  // セールスマンは1人ずつ
-            const cost = hireCount * RULES.COST.HIRING;
+            const hireCount = 1;  // セールスマンは1人ずつ
 
+            // ActionValidatorで検証
+            const validation = ActionValidator.canExecute('HIRE', { count: hireCount }, company, gameState);
+            if (!validation.valid) return null;
+
+            const cost = hireCount * RULES.COST.HIRING;
             if (company.cash < cost + 50) return null;
 
             let score = hireCount * 15;
@@ -1368,55 +1897,58 @@ const MGSimulation = (function() {
             return null;
         },
 
+        /**
+         * チップ購入を評価
+         * ルール①②⑨: ActionValidator経由で100%システム化
+         */
         evaluateChipPurchase(company, gameState) {
+            // ============================================
+            // チップ購入（ActionValidator経由で100%システム化）
+            // ============================================
             const period = gameState.period;
+
+            // 戦略に基づくチップ目標を取得
             const strategy = company.strategy;
-            if (!strategy || !strategy.chipTargets) return null;
-
-            // 期別のチップ目標を取得
-            const targets = strategy.chipTargets[period] || { research: 0, education: 0, advertising: 0 };
-
-            const currentResearch = (company.chips.research || 0) + (company.nextPeriodChips.research || 0);
-            const currentEducation = (company.chips.education || 0) + (company.nextPeriodChips.education || 0);
-            const currentAdvertising = (company.chips.advertising || 0) + (company.nextPeriodChips.advertising || 0);
-
-            const minCash = 80; // 安全マージン
-
-            // 戦略に基づいてチップ購入を評価
-            // 研究開発チップ
-            if (currentResearch < targets.research && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
-                const score = (targets.research - currentResearch) * 25;
-                return {
-                    type: 'BUY_CHIP',
-                    score,
-                    detail: '研究開発チップ（特急）購入',
-                    chipType: 'research',
-                    isExpress: true
-                };
+            if (!strategy || !strategy.chipTargets || !strategy.chipTargets[period]) {
+                return null;
             }
 
-            // 教育チップ
-            if (currentEducation < targets.education && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
-                const score = (targets.education - currentEducation) * 20;
-                return {
-                    type: 'BUY_CHIP',
-                    score,
-                    detail: '教育チップ（特急）購入',
-                    chipType: 'education',
-                    isExpress: true
-                };
-            }
+            const targets = strategy.chipTargets[period];
+            const currentResearch = company.chips.research || 0;
+            const currentEducation = company.chips.education || 0;
+            const currentAdvertising = company.chips.advertising || 0;
 
-            // 広告チップ
-            if (currentAdvertising < targets.advertising && company.cash >= RULES.COST.CHIP_EXPRESS + minCash) {
-                const score = (targets.advertising - currentAdvertising) * 15;
-                return {
-                    type: 'BUY_CHIP',
-                    score,
-                    detail: '広告チップ（特急）購入',
-                    chipType: 'advertising',
-                    isExpress: true
-                };
+            // チップ種類と優先度を定義
+            const chipOptions = [
+                { type: 'research', current: currentResearch, target: targets.research || 0, score: 60 },
+                { type: 'education', current: currentEducation, target: targets.education || 0, score: 55 },
+                { type: 'advertising', current: currentAdvertising, target: targets.advertising || 0, score: 50 }
+            ];
+
+            // 各チップタイプをActionValidatorで検証
+            for (const opt of chipOptions) {
+                if (opt.current >= opt.target) continue;
+
+                // 2期は特急なし（ルール①）
+                const isExpress = period !== 2;
+
+                // ActionValidatorで検証（ルール①②⑨をチェック）
+                const validation = ActionValidator.canExecute('BUY_CHIP', {
+                    isExpress,
+                    phase: 'DECISION'  // 意思決定フェーズ（期首ではない）
+                }, company, gameState);
+
+                if (validation.valid) {
+                    return {
+                        type: 'BUY_CHIP',
+                        score: opt.score,
+                        detail: `${opt.type === 'research' ? '研究開発' : opt.type === 'education' ? '教育' : '広告'}チップ購入`,
+                        chipType: opt.type,
+                        isExpress
+                    };
+                }
+                // 無効なら次のチップタイプを試す（通常は全て同じ理由で無効なので1回で終わる）
+                break;
             }
 
             return null;
@@ -1432,7 +1964,10 @@ const MGSimulation = (function() {
          */
         runFullGame(options = {}) {
             const gameState = new GameState();
-            gameState.initCompanies();
+            gameState.initCompanies({
+                allAI: options.allAI || false,
+                playerName: options.playerName
+            });
 
             const results = {
                 periods: [],
@@ -1451,16 +1986,35 @@ const MGSimulation = (function() {
             // 最終結果
             gameState.companies.forEach(company => {
                 const equity = company.calculateEquity(5);
+                // 5期末の在庫とチップを計算
+                const totalInventory = company.materials + company.wip + company.products;
+                const totalChips = (company.chips.research || 0) +
+                                   (company.chips.education || 0) +
+                                   (company.chips.advertising || 0) +
+                                   (company.nextPeriodChips.research || 0) +
+                                   (company.nextPeriodChips.education || 0) +
+                                   (company.nextPeriodChips.advertising || 0);
+                // 勝利条件チェック（P5-001, P5-002）
+                const meetsInventoryRequirement = totalInventory >= RULES.VICTORY.MIN_INVENTORY;
+                const meetsChipRequirement = totalChips >= RULES.VICTORY.MIN_CARRYOVER_CHIPS;
+                const meetsAllRequirements = meetsInventoryRequirement && meetsChipRequirement;
+
                 results.finalEquities.push({
                     companyIndex: company.index,
                     name: company.name,
                     strategy: company.strategyType || 'PLAYER',
                     equity,
-                    reachedTarget: equity >= RULES.TARGET_EQUITY,
+                    reachedTarget: equity >= RULES.TARGET_EQUITY && meetsAllRequirements,
                     totalSales: company.totalSales,
                     totalSoldQuantity: company.totalSoldQuantity,
                     totalF: company.totalF,
-                    totalSpecialLoss: company.totalSpecialLoss
+                    totalSpecialLoss: company.totalSpecialLoss,
+                    // 5期末勝利条件情報
+                    totalInventory,
+                    totalChips,
+                    meetsInventoryRequirement,
+                    meetsChipRequirement,
+                    meetsAllRequirements
                 });
                 results.actionLogs.push({
                     companyIndex: company.index,
@@ -1468,9 +2022,20 @@ const MGSimulation = (function() {
                 });
             });
 
-            // 勝者決定
+            // 勝者決定（勝利条件を満たす会社を優先）
+            // 条件を満たす会社がいれば、その中で自己資本最高が勝者
+            // 条件を満たす会社がいなければ、自己資本最高が勝者（警告付き）
+            const qualifiedCompanies = results.finalEquities.filter(e => e.meetsAllRequirements);
+            if (qualifiedCompanies.length > 0) {
+                qualifiedCompanies.sort((a, b) => b.equity - a.equity);
+                results.winner = qualifiedCompanies[0];
+            } else {
+                results.finalEquities.sort((a, b) => b.equity - a.equity);
+                results.winner = results.finalEquities[0];
+                results.winner.warningNoQualified = true;  // 条件を満たす会社がいない警告
+            }
+            // ランキング用にソート
             results.finalEquities.sort((a, b) => b.equity - a.equity);
-            results.winner = results.finalEquities[0];
 
             return results;
         },
@@ -1500,8 +2065,9 @@ const MGSimulation = (function() {
 
             const maxRows = gameState.getMaxRows();
 
-            // 期首処理2: 最大人員を初期化
+            // 期首処理2: 最大人員を初期化 & 期を設定
             gameState.companies.forEach(company => {
+                company.period = period;  // 各会社の期を更新
                 company.maxPersonnel = company.workers + company.salesmen;
             });
 
@@ -1513,9 +2079,18 @@ const MGSimulation = (function() {
                     const equity = company.calculateEquity(period);
                     const limit = RULES.getLoanLimit(period, equity);
                     const available = limit - company.longTermLoan;
-                    if (available > 0 && company.cash < 150) {
+                    // より積極的に借入（投資資金確保）
+                    if (available > 0 && company.cash < 300) {
                         ActionEngine.borrowLongTerm(company, available, period, equity);
                     }
+                }
+            });
+
+            // 期首処理4: AI投資戦略（チップ・機械・人員）
+            turnOrder.forEach(companyIndex => {
+                const company = gameState.companies[companyIndex];
+                if (!company.isPlayer || options.autoPlayer) {
+                    this.executeAIInvestmentStrategy(company, period, gameState);
                 }
             });
 
@@ -1540,8 +2115,14 @@ const MGSimulation = (function() {
                     const company = gameState.companies[companyIndex];
                     if (company.currentRow >= maxRows) continue;
 
-                    // カードを引く（リスク確率20%）RISK-001
-                    const isRisk = Math.random() < RULES.RISK_PROBABILITY;
+                    // ルール②: ターン開始時にチップ購入フラグをリセット
+                    company.chipsBoughtThisTurn = false;
+
+                    // 75枚デッキから1枚引く（60枚意思決定 + 15枚リスク）
+                    const actionCard = gameState.drawActionCard();
+                    const isRisk = (actionCard === 'risk');
+
+                    let rowConsumed = true;  // デフォルトは行を消費
 
                     if (isRisk) {
                         // リスクカード処理
@@ -1550,11 +2131,18 @@ const MGSimulation = (function() {
                         // 意思決定
                         if (!company.isPlayer || options.autoPlayer) {
                             const action = AIDecisionEngine.decideAction(company, gameState);
-                            this.executeAction(company, action, gameState);
+                            const result = this.executeAction(company, action, gameState);
+                            // ルール③: 入札負けは行を使わない
+                            if (result && result.consumedRow === false) {
+                                rowConsumed = false;
+                            }
                         }
                     }
 
-                    company.currentRow++;
+                    // ルール③: 入札負けは行を使わない
+                    if (rowConsumed) {
+                        company.currentRow++;
+                    }
 
                     // 行数チェック
                     if (company.currentRow >= maxRows) {
@@ -1593,10 +2181,11 @@ const MGSimulation = (function() {
 
         /**
          * リスクカード処理（64種類）
+         * デッキから1枚引く（同じカードは山札がなくなるまで出ない）
          */
         processRiskCard(company, gameState) {
-            // 64種類のリスクカードからランダムに選択
-            const cardId = Math.floor(Math.random() * 64) + 1;
+            // デッキから1枚引く
+            const cardId = gameState.drawRiskCard();
             this.applyRiskCard(company, gameState, cardId);
         },
 
@@ -1936,8 +2525,106 @@ const MGSimulation = (function() {
             }
         },
 
+        /**
+         * AI投資戦略を実行（期首処理で呼ばれる）
+         * PC/保険購入、チップ購入、機械購入、人員採用を行う
+         */
+        executeAIInvestmentStrategy(company, period, gameState) {
+            // 期首処理履歴をリセット
+            company.periodStartActions = [];
+
+            // 1. PC購入（3期以降、現金があれば必ず購入）
+            if (period >= 3 && company.cash >= 20) {
+                company.cash -= 20;
+                company.chips.computer = 1;
+                company.periodStartActions.push({
+                    type: 'PC購入',
+                    detail: 'PCチップ購入（¥20）',
+                    amount: 20
+                });
+            }
+
+            // 2. 保険購入（3期以降、現金があれば必ず購入）
+            if (period >= 3 && company.cash >= 5) {
+                company.cash -= 5;
+                company.chips.insurance = 1;
+                company.periodStartActions.push({
+                    type: '保険購入',
+                    detail: '保険チップ購入（¥5）',
+                    amount: 5
+                });
+            }
+
+            // ルール⑨: チップは期首購入不可（意思決定カードで購入）
+            // チップ購入はここでは行わない - AIDecisionEngine.evaluateChipPurchaseで処理
+
+            // 4. 大型機械購入（3期で小型→大型への移行）
+            const strategy = company.strategy;
+            if (period === 3 && strategy && strategy.earlyLargeMachine) {
+                const hasOnlySmall = company.machines.length === 1 && company.machines[0].type === 'small';
+                if (hasOnlySmall && company.cash >= 200) {
+                    // 小型機械を売却
+                    const bookValue = RULES.BOOK_VALUE.SMALL[period] || 80;
+                    const salePrice = Math.floor(bookValue * RULES.SALE_RATIO);
+                    company.cash += salePrice;
+                    const saleLoss = bookValue - salePrice;
+                    company.totalSpecialLoss += saleLoss;
+                    company.periodStartActions.push({
+                        type: '機械売却',
+                        detail: `小型機械売却（簿価¥${bookValue} → 売却¥${salePrice}、売却損¥${saleLoss}）`,
+                        amount: salePrice,
+                        loss: saleLoss
+                    });
+                    company.machines = [];
+
+                    // 大型機械を購入
+                    if (company.cash >= 200) {
+                        company.cash -= 200;
+                        company.machines.push({ type: 'large', attachments: 0 });
+                        company.periodStartActions.push({
+                            type: '機械購入',
+                            detail: '大型機械購入（¥200）',
+                            amount: 200
+                        });
+                    }
+                }
+            }
+
+            // 5. セールスマン採用（販売能力が足りない場合）
+            const salesCapacity = company.getSalesCapacity();
+            const mfgCapacity = company.getMfgCapacity();
+            if (salesCapacity < mfgCapacity && company.cash >= 10) {
+                const hireCount = Math.min(2, Math.floor(company.cash / 5));
+                if (hireCount > 0) {
+                    const cost = hireCount * 5;
+                    company.cash -= cost;
+                    company.salesmen += hireCount;
+                    company.periodStartActions.push({
+                        type: '採用',
+                        detail: `セールスマン${hireCount}名採用（¥${cost}）`,
+                        amount: cost
+                    });
+                }
+            }
+
+            // 期首処理をログに記録
+            company.periodStartActions.forEach(action => {
+                company.logAction(action.type, action.detail, action.amount, false, '期首');
+            });
+        },
+
         executeAction(company, action, gameState) {
             if (!action) return;
+
+            // ============================================
+            // ActionValidator経由で全アクションを事前検証
+            // 無効なアクションは実行されない（仕組み化）
+            // ============================================
+            const validationResult = ActionValidator.canExecute(action.type, action, company, gameState);
+            if (!validationResult.valid) {
+                company.logAction('アクション拒否', `${action.type}: ${validationResult.reason}`, 0, false);
+                return { consumedRow: false, rejected: true, reason: validationResult.reason };
+            }
 
             switch (action.type) {
                 case 'SELL':
@@ -1980,10 +2667,11 @@ const MGSimulation = (function() {
                         company.totalSales += revenue;
                         company.totalSoldQuantity += action.quantity;
                         company.logAction('販売', action.detail, revenue, true);
+                        return { consumedRow: true };  // 販売成功は行を消費
                     } else {
                         company.logAction('販売失敗', `入札に負け: ${action.detail}`, 0, false);
+                        return { consumedRow: false };  // ルール③: 入札負けは行を使わない
                     }
-                    break;
 
                 case 'BUY_MATERIALS':
                     ActionEngine.buyMaterials(company, action.quantity, action.market, gameState);
@@ -2010,7 +2698,9 @@ const MGSimulation = (function() {
                     break;
 
                 case 'BUY_CHIP':
-                    ActionEngine.buyChip(company, action.chipType, action.isExpress);
+                    // ルール①: 2期は特急なし、ルール②: 1行1枚まで
+                    ActionEngine.buyChip(company, action.chipType, action.isExpress, gameState.period);
+                    company.chipsBoughtThisTurn = true;  // ルール②: フラグを設定
                     break;
 
                 case 'DO_NOTHING':
@@ -2018,6 +2708,8 @@ const MGSimulation = (function() {
                     company.logAction('様子見', '何もしない', 0, false);
                     break;
             }
+            // デフォルト: 行を消費する（入札負け以外）
+            return { consumedRow: true };
         }
     };
 
@@ -2139,14 +2831,9 @@ const MGSimulation = (function() {
             return Evaluator.evaluate(results);
         },
 
-        // 複数回シミュレーション
+        // 複数回シミュレーション（メモリ最適化版）
         runMultipleSimulations: function(count = 100, options = {}) {
-            const allResults = [];
-            for (let i = 0; i < count; i++) {
-                allResults.push(this.runSimulation(options));
-            }
-
-            // 統計
+            // 統計用（メモリ節約のため全結果は保持しない）
             const stats = {
                 totalRuns: count,
                 targetReachRate: 0,
@@ -2154,17 +2841,56 @@ const MGSimulation = (function() {
                 equityDistribution: { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 }
             };
 
-            allResults.forEach(result => {
+            // 戦略別統計
+            const strategyStats = {};
+
+            // 最優秀パターン保持用（上位5件のみ）
+            let bestResults = [];
+
+            for (let i = 0; i < count; i++) {
+                const result = this.runSimulation(options);
+
+                // 統計更新
                 if (result.winner.reachedTarget) stats.targetReachRate++;
                 stats.averageWinnerEquity += result.winner.equity;
                 const grade = Evaluator.getGrade(result.winner.equity);
                 stats.equityDistribution[grade]++;
-            });
+
+                // 戦略別統計
+                result.finalEquities.forEach(company => {
+                    const strategy = company.strategy || 'PLAYER';
+                    if (!strategyStats[strategy]) {
+                        strategyStats[strategy] = { wins: 0, games: 0, totalEquity: 0, maxEquity: 0 };
+                    }
+                    strategyStats[strategy].games++;
+                    strategyStats[strategy].totalEquity += company.equity;
+                    strategyStats[strategy].maxEquity = Math.max(strategyStats[strategy].maxEquity, company.equity);
+                    if (company.equity === result.winner.equity) {
+                        strategyStats[strategy].wins++;
+                    }
+                });
+
+                // 上位5件を保持（自己資本でソート）
+                if (bestResults.length < 5 || result.winner.equity > bestResults[bestResults.length - 1].winner.equity) {
+                    bestResults.push(result);
+                    bestResults.sort((a, b) => b.winner.equity - a.winner.equity);
+                    if (bestResults.length > 5) {
+                        bestResults = bestResults.slice(0, 5);
+                    }
+                }
+
+                // 進捗表示（1000回ごと）
+                if ((i + 1) % 1000 === 0) {
+                    process.stdout.write(`  進捗: ${i + 1}/${count}回\r`);
+                }
+            }
 
             stats.targetReachRate = Math.round(stats.targetReachRate / count * 100);
             stats.averageWinnerEquity = Math.round(stats.averageWinnerEquity / count);
+            stats.strategyStats = strategyStats;
 
-            return { allResults, stats };
+            // allResultsは最優秀パターンのみ（互換性維持）
+            return { allResults: bestResults, stats, bestResult: bestResults[0] };
         }
     };
 })();
