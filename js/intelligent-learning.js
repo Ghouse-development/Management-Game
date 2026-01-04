@@ -614,6 +614,168 @@ const IntelligentLearning = (function() {
     };
 
     // ============================================
+    // 期別戦略プロファイル v1.0
+    // 期ごとの成功戦略を詳細に記録・分析
+    // ============================================
+    const StrategyProfiles = {
+        dataPath: 'data/strategy-profiles.json',
+        profiles: [],
+        maxProfiles: 500,
+
+        /**
+         * 戦略プロファイルを記録
+         * @param {Object} company - 会社オブジェクト
+         * @param {number} period - 期
+         * @param {number} startEquity - 期首自己資本
+         * @param {number} endEquity - 期末自己資本
+         * @param {Array} periodActions - 期中の行動リスト
+         */
+        recordPeriodProfile(company, period, startEquity, endEquity, periodActions) {
+            const equityChange = endEquity - startEquity;
+
+            // 行動の集計
+            const actionCounts = {};
+            periodActions.forEach(a => {
+                actionCounts[a] = (actionCounts[a] || 0) + 1;
+            });
+
+            const profile = {
+                period,
+                equityChange,
+                startEquity,
+                endEquity,
+                // 戦略指標
+                researchChips: company.chips?.research || 0,
+                educationChips: company.chips?.education || 0,
+                adChips: company.chips?.ad || 0,
+                pcChips: company.chips?.pc || 0,
+                workers: company.workers,
+                salesmen: company.salesmen,
+                hasBigMachine: company.machines?.some(m => m.type === 'large') || false,
+                products: company.products,
+                materials: company.materials,
+                // 行動集計
+                sellCount: actionCounts['SELL'] || 0,
+                produceCount: actionCounts['PRODUCE'] || 0,
+                buyMaterialsCount: actionCounts['BUY_MATERIALS'] || 0,
+                buyChipCount: actionCounts['BUY_CHIP'] || 0,
+                hireCount: (actionCounts['HIRE_WORKER'] || 0) + (actionCounts['HIRE_SALESMAN'] || 0),
+                // タイムスタンプ
+                timestamp: new Date().toISOString()
+            };
+
+            // 成功プロファイル（自己資本増加）のみ保存
+            if (equityChange > 0) {
+                this.addProfile(profile);
+            }
+        },
+
+        addProfile(profile) {
+            // 同じ期・同じ戦略特性のプロファイルを検索
+            const key = `${profile.period}_${profile.researchChips}_${profile.hasBigMachine}`;
+            const existing = this.profiles.find(p =>
+                `${p.period}_${p.researchChips}_${p.hasBigMachine}` === key
+            );
+
+            if (existing) {
+                // より良い結果なら更新
+                if (profile.equityChange > existing.equityChange) {
+                    Object.assign(existing, profile);
+                    existing.count = (existing.count || 1) + 1;
+                }
+            } else {
+                profile.count = 1;
+                this.profiles.push(profile);
+            }
+
+            // 上限超過時は低収益プロファイルを削除
+            if (this.profiles.length > this.maxProfiles) {
+                this.profiles.sort((a, b) => b.equityChange - a.equityChange);
+                this.profiles = this.profiles.slice(0, this.maxProfiles);
+            }
+        },
+
+        /**
+         * 特定期の推奨戦略を取得
+         */
+        getRecommendedStrategy(period, currentState) {
+            const periodProfiles = this.profiles.filter(p => p.period === period);
+            if (periodProfiles.length === 0) return null;
+
+            // 自己資本増加量でソート
+            periodProfiles.sort((a, b) => b.equityChange - a.equityChange);
+
+            // 上位3つから推奨を生成
+            const top3 = periodProfiles.slice(0, 3);
+
+            return {
+                avgResearchChips: Math.round(top3.reduce((s, p) => s + p.researchChips, 0) / top3.length),
+                avgSellCount: Math.round(top3.reduce((s, p) => s + p.sellCount, 0) / top3.length),
+                avgProduceCount: Math.round(top3.reduce((s, p) => s + p.produceCount, 0) / top3.length),
+                shouldUpgradeMachine: top3.filter(p => p.hasBigMachine).length >= 2,
+                bestEquityChange: top3[0].equityChange,
+                sampleCount: periodProfiles.length
+            };
+        },
+
+        /**
+         * 全期間の戦略サマリーを取得
+         */
+        getStrategySummary() {
+            const summary = {};
+            for (let period = 2; period <= 5; period++) {
+                summary[period] = this.getRecommendedStrategy(period);
+            }
+            return summary;
+        },
+
+        save() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    const path = require('path');
+
+                    const dir = path.dirname(this.dataPath);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+
+                    const data = {
+                        version: '1.0',
+                        lastUpdated: new Date().toISOString(),
+                        totalProfiles: this.profiles.length,
+                        summary: this.getStrategySummary(),
+                        profiles: this.profiles
+                    };
+
+                    fs.writeFileSync(this.dataPath, JSON.stringify(data, null, 2));
+                    return true;
+                }
+            } catch (e) {
+                // サイレント
+            }
+            return false;
+        },
+
+        load() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const fs = require('fs');
+                    if (fs.existsSync(this.dataPath)) {
+                        const content = fs.readFileSync(this.dataPath, 'utf-8');
+                        const data = JSON.parse(content);
+                        this.profiles = data.profiles || [];
+                        return true;
+                    }
+                }
+            } catch (e) {
+                // サイレント
+            }
+            return false;
+        }
+    };
+
+    // ============================================
     // 公開API v2.0
     // ============================================
     return {
@@ -624,6 +786,7 @@ const IntelligentLearning = (function() {
         Persistence,
         FailurePatterns,
         SuccessPatterns,
+        StrategyProfiles,
 
         /**
          * 初期化（シミュレーション開始時）
@@ -632,6 +795,7 @@ const IntelligentLearning = (function() {
             Persistence.load();
             FailurePatterns.load();
             SuccessPatterns.load();
+            StrategyProfiles.load();
         },
 
         /**
@@ -705,10 +869,38 @@ const IntelligentLearning = (function() {
         },
 
         /**
+         * 期末に戦略プロファイルを記録
+         * @param {Object} company - 会社オブジェクト
+         * @param {number} period - 期
+         * @param {number} startEquity - 期首自己資本
+         * @param {number} endEquity - 期末自己資本
+         * @param {Array} periodActions - 期中の行動リスト
+         */
+        recordPeriodEnd(company, period, startEquity, endEquity, periodActions) {
+            StrategyProfiles.recordPeriodProfile(company, period, startEquity, endEquity, periodActions);
+        },
+
+        /**
+         * 特定期の推奨戦略を取得
+         */
+        getRecommendedStrategy(period) {
+            return StrategyProfiles.getRecommendedStrategy(period);
+        },
+
+        /**
+         * 全期間の戦略サマリーを取得
+         */
+        getStrategySummary() {
+            return StrategyProfiles.getStrategySummary();
+        },
+
+        /**
          * 保存
          */
         save() {
-            return Persistence.save();
+            Persistence.save();
+            StrategyProfiles.save();
+            return true;
         },
 
         /**

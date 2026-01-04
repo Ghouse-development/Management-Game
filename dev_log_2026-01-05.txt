@@ -1,0 +1,69 @@
+# 開発記録 2026-01-05
+
+## Q学習システム v2.1 完成
+
+### 主な改善点
+
+1. **期首処理の学習追加**
+   - 大型機械購入・人員採用判断を学習対象に追加
+   - INVEST_MACHINE / INVEST_HIRE / INVEST_MINIMAL として記録
+
+2. **学習データの大規模蓄積**
+   - 状態数: 273
+   - 累計更新回数: 156,717,510
+   - 探索率: 5%（自動調整済み）
+
+3. **不要ファイルの削除**
+   - ai-personalities.json
+   - learning-data.json
+   - simulation-output.txt 等の一時ファイル
+   - 古い learning-engine.js, run-learning.js
+
+4. **CLAUDE.md の簡潔化**
+   - 361行 → 99行 (72%削減)
+   - 冗長な説明を削除
+   - 主要情報のみ保持
+
+### 検証結果
+
+- 84/84 ルールテスト成功
+- ルール違反: 0件
+- システム安定稼働確認
+
+### ファイル構成 (最終)
+
+```
+Management Game/
+├── mg-simulation.js              # エントリポイント
+├── CLAUDE.md                     # プロジェクト説明
+├── js/
+│   ├── simulation-engine.js      # ルール定義+エンジン
+│   └── intelligent-learning.js   # Q学習システム v2.0
+├── data/
+│   ├── q-learning-data.json      # Q学習データ
+│   ├── learned-strategies.json   # 戦略統計
+│   ├── success-patterns.json     # 成功パターン
+│   ├── failure-patterns.json     # 失敗パターン
+│   └── strategy-profiles.json    # 戦略プロファイル
+├── rules/
+│   ├── rules-checklist.json      # ルールチェックリスト
+│   └── verify-rules.js           # 検証スクリプト
+└── tests/
+    ├── rule-tests.js             # ルールテスト (84項目)
+    └── behavior-tests.js         # 動作テスト
+```
+
+### v1.0 → v2.0 → v2.1 の改善比較
+
+| 項目           | v1.0             | v2.0              | v2.1              |
+|----------------|------------------|-------------------|-------------------|
+| 会社分離       | 全社混入         | 会社別トラッカー  | 同左              |
+| 状態数         | 8,036            | 243               | 273               |
+| 期首学習       | なし             | なし              | あり              |
+| 探索率         | 固定25%          | 自動調整          | 5%まで収束        |
+| 累計更新       | -                | 320万             | 1.5億             |
+
+### 残課題
+
+- 目標達成率(自己資本¥450以上)はまだ0%
+- 更なる学習継続で改善の可能性あり

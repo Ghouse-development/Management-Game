@@ -1,126 +1,126 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-01-04T12:30:57.767Z",
-  "totalSimulations": 187780,
+  "lastUpdated": "2026-01-04T21:34:22.445Z",
+  "totalSimulations": 12012,
   "strategyStats": {
     "PLAYER": {
-      "totalGames": 187780,
-      "totalWins": 24603,
-      "winRate": 13.1,
-      "avgEquity": -308,
-      "maxEquity": 838,
-      "totalEquity": -57918072
+      "totalGames": 12012,
+      "totalWins": 2508,
+      "winRate": 20.9,
+      "avgEquity": -145,
+      "maxEquity": 124,
+      "totalEquity": -1119807
     },
     "AGGRESSIVE": {
-      "totalGames": 187780,
-      "totalWins": 27179,
-      "winRate": 14.5,
-      "avgEquity": -301,
-      "maxEquity": 510,
-      "totalEquity": -56493170
+      "totalGames": 12012,
+      "totalWins": 2063,
+      "winRate": 17.2,
+      "avgEquity": -151,
+      "maxEquity": 105,
+      "totalEquity": -1165998
     },
     "BALANCED": {
-      "totalGames": 187780,
-      "totalWins": 41142,
-      "winRate": 21.9,
-      "avgEquity": -275,
-      "maxEquity": 530,
-      "totalEquity": -51587345
+      "totalGames": 12012,
+      "totalWins": 2506,
+      "winRate": 20.9,
+      "avgEquity": -146,
+      "maxEquity": 140,
+      "totalEquity": -1117732
     },
     "RESEARCH_FOCUSED": {
-      "totalGames": 187780,
-      "totalWins": 43131,
-      "winRate": 23,
-      "avgEquity": -297,
-      "maxEquity": 687,
-      "totalEquity": -55684616
+      "totalGames": 12012,
+      "totalWins": 3510,
+      "winRate": 29.2,
+      "avgEquity": -129,
+      "maxEquity": 133,
+      "totalEquity": -968833
     },
     "SALES_FOCUSED": {
-      "totalGames": 187780,
-      "totalWins": 19682,
-      "winRate": 10.5,
-      "avgEquity": -307,
-      "maxEquity": 375,
-      "totalEquity": -57683021
+      "totalGames": 12012,
+      "totalWins": 1227,
+      "winRate": 10.2,
+      "avgEquity": -161,
+      "maxEquity": 84,
+      "totalEquity": -1259082
     },
     "LOW_CHIP": {
-      "totalGames": 187780,
-      "totalWins": 33178,
-      "winRate": 17.7,
-      "avgEquity": -269,
-      "maxEquity": 217,
-      "totalEquity": -50603134
+      "totalGames": 12012,
+      "totalWins": 274,
+      "winRate": 2.3,
+      "avgEquity": -201,
+      "maxEquity": 42,
+      "totalEquity": -1629891
     }
   },
   "bestPatterns": [
     {
-      "equity": 838,
+      "equity": 140,
+      "strategy": "BALANCED",
+      "name": "バランス物産",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 140,
+      "strategy": "BALANCED",
+      "name": "バランス物産",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 134,
+      "strategy": "BALANCED",
+      "name": "バランス物産",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 134,
+      "strategy": "BALANCED",
+      "name": "バランス物産",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 133,
+      "strategy": "RESEARCH_FOCUSED",
+      "name": "研究商事",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 129,
+      "strategy": "RESEARCH_FOCUSED",
+      "name": "研究商事",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 129,
+      "strategy": "RESEARCH_FOCUSED",
+      "name": "研究商事",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 126,
+      "strategy": "RESEARCH_FOCUSED",
+      "name": "研究商事",
+      "date": "2026-01-04"
+    },
+    {
+      "equity": 124,
       "strategy": "PLAYER",
       "name": "プレイヤー型",
       "date": "2026-01-04"
     },
     {
-      "equity": 448,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 364,
+      "equity": 122,
       "strategy": "PLAYER",
       "name": "プレイヤー型",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 364,
-      "strategy": "PLAYER",
-      "name": "プレイヤー型",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 331,
-      "strategy": "SALES_FOCUSED",
-      "name": "販売産業",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 285,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 285,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 284,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 273,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 259,
-      "strategy": "SALES_FOCUSED",
-      "name": "販売産業",
       "date": "2026-01-04"
     }
   ],
   "insights": [
-    "最強戦略: RESEARCH_FOCUSED (勝率23%)",
-    "平均自己資本最高: LOW_CHIP",
-    "総シミュレーション回数: 187780回"
+    "最強戦略: RESEARCH_FOCUSED (勝率29.2%)",
+    "平均自己資本最高: RESEARCH_FOCUSED",
+    "総シミュレーション回数: 12012回"
   ],
   "dynamicParams": {
     "bestStrategy": "RESEARCH_FOCUSED",
-    "bestWinRate": 23
+    "bestWinRate": 29
   }
 }
