@@ -1,10 +1,24 @@
 /**
- * MG シミュレーションエンジン v2.0
+ * MG シミュレーションエンジン v3.0
  *
  * 完全なゲームルールを実装した高精度シミュレーター
- * 全73ルールを正確に実装
+ * 全84ルールを正確に実装
+ * インテリジェント学習システム統合
  * Node.js/ブラウザ両対応
  */
+
+// インテリジェント学習システムを読み込み
+let IntelligentLearning = null;
+try {
+    if (typeof require !== 'undefined') {
+        IntelligentLearning = require('./intelligent-learning.js');
+    }
+} catch (e) {
+    // ブラウザ環境ではwindowから取得
+    if (typeof window !== 'undefined' && window.IntelligentLearning) {
+        IntelligentLearning = window.IntelligentLearning;
+    }
+}
 
 const MGSimulation = (function() {
     'use strict';
@@ -1673,9 +1687,16 @@ const MGSimulation = (function() {
             const isParent = gameState.isParent(company.index);
             const actions = this.evaluateAllActions(company, gameState);
 
-            // スコアでソート
+            // スコアでソート（基本スコア順）
             actions.sort((a, b) => b.score - a.score);
 
+            // インテリジェント学習システムが有効な場合
+            if (IntelligentLearning && options.useLearning !== false) {
+                // 学習に基づいて行動を選択（探索と活用のバランス）
+                return IntelligentLearning.selectAction(actions, company, gameState);
+            }
+
+            // 学習なしの場合は最高スコアを選択
             return actions[0];
         },
 
@@ -2089,6 +2110,17 @@ const MGSimulation = (function() {
                 playerName: options.playerName
             });
 
+            // Q学習v2.0: ゲーム開始時に全会社のトラッカーを初期化
+            if (IntelligentLearning) {
+                IntelligentLearning.startGame(gameState.companies.length);
+            }
+
+            // Q学習: 各社の初期自己資本を記録
+            const initialEquities = {};
+            gameState.companies.forEach(company => {
+                initialEquities[company.index] = company.calculateEquity(2);
+            });
+
             const results = {
                 periods: [],
                 finalEquities: [],
@@ -2156,6 +2188,19 @@ const MGSimulation = (function() {
             }
             // ランキング用にソート
             results.finalEquities.sort((a, b) => b.equity - a.equity);
+
+            // ============================================
+            // Q学習: ゲーム終了時に各社の行動履歴から学習
+            // 順位と最終自己資本を報酬として学習を実行
+            // ============================================
+            if (IntelligentLearning) {
+                results.finalEquities.forEach((companyResult, rank) => {
+                    const initialEquity = initialEquities[companyResult.companyIndex] || 300;
+                    const finalEquity = companyResult.equity;
+                    const company = gameState.companies[companyResult.companyIndex];
+                    IntelligentLearning.learnFromGame(company, initialEquity, finalEquity, rank + 1);
+                });
+            }
 
             return results;
         },
@@ -2304,9 +2349,18 @@ const MGSimulation = (function() {
          * デッキから1枚引く（同じカードは山札がなくなるまで出ない）
          */
         processRiskCard(company, gameState) {
+            // Q学習: リスクカード前の現金を記録
+            const cashBefore = company.cash;
+
             // デッキから1枚引く
             const cardId = gameState.drawRiskCard();
             this.applyRiskCard(company, gameState, cardId);
+
+            // Q学習v2.0: リスクカードの効果を学習（現金変化を報酬として）
+            if (IntelligentLearning) {
+                const cashChange = company.cash - cashBefore;
+                IntelligentLearning.recordRiskCard(company, gameState, cardId, cashChange);
+            }
 
             // ルール強制チェック（リスクカード後も状態が有効か確認）
             RuntimeRuleEnforcer.enforce(company, gameState, `リスクカード(${cardId})後`);
@@ -2739,6 +2793,21 @@ const MGSimulation = (function() {
             company.periodStartActions.forEach(action => {
                 company.logAction(action.type, action.detail, action.amount, false, '期首');
             });
+
+            // Q学習v2.0: 期首投資判断を学習（大型機械購入・人員採用の判断）
+            if (IntelligentLearning) {
+                const hasMachineAction = company.periodStartActions.some(a => a.type === '機械購入');
+                const hasHireAction = company.periodStartActions.some(a => a.type === '採用');
+                const investmentType = hasMachineAction ? 'INVEST_MACHINE' :
+                                      hasHireAction ? 'INVEST_HIRE' : 'INVEST_MINIMAL';
+                // 期首投資は報酬なし（結果は期末に反映）
+                IntelligentLearning.CompanyTrackers.record(
+                    company.index,
+                    IntelligentLearning.StateEncoder.encode(company, gameState),
+                    investmentType,
+                    0
+                );
+            }
         },
 
         executeAction(company, action, gameState) {
@@ -2795,10 +2864,24 @@ const MGSimulation = (function() {
                         company.totalSales += revenue;
                         company.totalSoldQuantity += action.quantity;
                         company.logAction('販売', action.detail, revenue, true);
-                        return { consumedRow: true };  // 販売成功は行を消費
+
+                        // ルール強制チェック（販売後の状態確認）
+                        RuntimeRuleEnforcer.enforce(company, gameState, 'executeAction販売後');
+
+                        const successResult = { consumedRow: true };
+                        // Q学習: 販売成功を記録
+                        if (IntelligentLearning) {
+                            IntelligentLearning.recordAction(company, gameState, action, successResult);
+                        }
+                        return successResult;  // 販売成功は行を消費
                     } else {
                         company.logAction('販売失敗', `入札に負け: ${action.detail}`, 0, false);
-                        return { consumedRow: false };  // ルール③: 入札負けは行を使わない
+                        const failResult = { consumedRow: false };
+                        // Q学習: 販売失敗を記録（負の報酬で学習）
+                        if (IntelligentLearning) {
+                            IntelligentLearning.recordAction(company, gameState, action, failResult);
+                        }
+                        return failResult;  // ルール③: 入札負けは行を使わない
                     }
 
                 case 'BUY_MATERIALS':
@@ -2836,8 +2919,17 @@ const MGSimulation = (function() {
                     company.logAction('様子見', '何もしない', 0, false);
                     break;
             }
+
+            // ============================================
+            // Q学習: 行動を記録（毎行動を学習データとして蓄積）
+            // ============================================
+            const defaultResult = { consumedRow: true };
+            if (IntelligentLearning && action) {
+                IntelligentLearning.recordAction(company, gameState, action, defaultResult);
+            }
+
             // デフォルト: 行を消費する（入札負け以外）
-            return { consumedRow: true };
+            return defaultResult;
         }
     };
 
@@ -3210,6 +3302,11 @@ const MGSimulation = (function() {
             const dataPath = options.learningDataPath || 'data/learned-strategies.json';
             LearningSystem.load(dataPath);
 
+            // Q学習システム初期化（行動レベルの学習）
+            if (IntelligentLearning) {
+                IntelligentLearning.init();
+            }
+
             // 統計用（メモリ節約のため全結果は保持しない）
             const stats = {
                 totalRuns: count,
@@ -3270,20 +3367,34 @@ const MGSimulation = (function() {
                     }
                 }
 
-                // 進捗表示（1000回ごと）
+                // 進捗表示（1000回ごと）+ Q学習の探索率調整
                 if ((i + 1) % 1000 === 0) {
                     process.stdout.write(`  進捗: ${i + 1}/${count}回\r`);
+                    // Q学習: 探索率を調整（学習が進むにつれて減少）
+                    if (IntelligentLearning) {
+                        IntelligentLearning.adjustExploration(i + 1);
+                    }
                 }
             }
 
             // 学習データを保存
             LearningSystem.save();
 
+            // Q学習データを保存
+            if (IntelligentLearning) {
+                IntelligentLearning.save();
+            }
+
             stats.targetReachRate = Math.round(stats.targetReachRate / count * 100);
             stats.averageWinnerEquity = Math.round(stats.averageWinnerEquity / count);
             stats.strategyStats = strategyStats;
             stats.learningApplied = true;
             stats.totalLearningSimulations = LearningSystem.data?.totalSimulations || 0;
+
+            // Q学習統計を追加
+            if (IntelligentLearning) {
+                stats.qLearning = IntelligentLearning.getStats();
+            }
 
             // allResultsは最優秀パターンのみ（互換性維持）
             return { allResults: bestResults, stats, bestResult: bestResults[0] };

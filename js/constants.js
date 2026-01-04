@@ -1,6 +1,14 @@
 /**
- * MG (Management Game) - 定数定義
- * ゲームで使用する全ての定数を一元管理
+ * MG (Management Game) - UI用定数定義
+ *
+ * !! 警告 !!
+ * このファイルはブラウザUI表示専用です。
+ *
+ * シミュレーションのルール定義は以下のファイルが唯一のソース（Single Source of Truth）:
+ *   js/simulation-engine.js
+ *
+ * このファイルの値を変更する場合は、simulation-engine.jsのRULESと
+ * 必ず一致するようにしてください。
  */
 
 // ============================================

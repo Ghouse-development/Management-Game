@@ -249,7 +249,8 @@ class SimulationManager {
     }
 
     runSingle() {
-        const result = this.engine.runSimulation({ autoPlayer: true });
+        // シミュレーションでは6社ともAI
+        const result = this.engine.runSimulation({ allAI: true });
         const evaluation = this.engine.evaluateResults(result);
 
         console.log('【結果】');
@@ -261,56 +262,233 @@ class SimulationManager {
         });
         console.log('');
 
-        // 優勝者の行動明細を表示
-        this.showActionDetails(result, evaluation.rankings[0].companyIndex);
+        // 優勝者の行動明細表を表示
+        this.showActionStatement(result, evaluation.rankings[0].companyIndex);
 
         return { result, evaluation };
     }
 
     /**
-     * 行動明細を表示
+     * 行動明細表を表示
+     * 優勝者の各期・各行の行動を詳細に記録した表
      */
-    showActionDetails(result, companyIndex) {
+    showActionStatement(result, companyIndex) {
         const actionLog = result.actionLogs.find(l => l.companyIndex === companyIndex);
         if (!actionLog) return;
 
         const company = result.finalEquities.find(e => e.companyIndex === companyIndex);
-        console.log('========================================');
-        console.log(`【${company.name}の行動明細】`);
-        console.log('========================================');
 
         // 期別に分類
         const periodActions = { 2: [], 3: [], 4: [], 5: [] };
-        let currentPeriod = 2;
+        const periodStats = {
+            2: { sales: 0, soldQty: 0, f: 0, specialLoss: 0, endEquity: 0, periodStartActions: [] },
+            3: { sales: 0, soldQty: 0, f: 0, specialLoss: 0, endEquity: 0, periodStartActions: [] },
+            4: { sales: 0, soldQty: 0, f: 0, specialLoss: 0, endEquity: 0, periodStartActions: [] },
+            5: { sales: 0, soldQty: 0, f: 0, specialLoss: 0, endEquity: 0, periodStartActions: [] }
+        };
 
+        // アクションを期別に分類し、統計を計算
         actionLog.log.forEach(action => {
-            if (action.action === '期末処理') {
-                currentPeriod++;
+            const period = action.period || 2;
+            if (!periodActions[period]) return;
+
+            periodActions[period].push(action);
+
+            // 売上を集計
+            if (action.action === '販売' && action.isIncome) {
+                periodStats[period].sales += action.amount;
+                // 販売数を抽出（例: "仙台に¥26×2個" → 2）
+                const match = action.detail.match(/×(\d+)個/);
+                if (match) {
+                    periodStats[period].soldQty += parseInt(match[1]);
+                }
             }
-            if (periodActions[Math.min(currentPeriod, 5)]) {
-                periodActions[Math.min(currentPeriod, 5)].push(action);
+
+            // 期首処理を記録（type === '期首' の場合のみ）
+            // ルール⑨: チップ購入は期首ではなく意思決定フェーズで行われる
+            if (action.type === '期首') {
+                periodStats[period].periodStartActions.push(action);
             }
         });
 
+        // ===== 全期間サマリーテーブル =====
+        console.log('');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('● 行動明細表');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('');
+        console.log(`  最良ケース（${company.strategy || company.name}）`);
+        console.log('');
+        console.log('  | 期  | 売上   | 販売数 | F合計 | 特別損失 | 期末自己資本 |');
+        console.log('  |-----|--------|--------|-------|----------|--------------|');
+
+        // 期別サマリー行（データは期末処理から取得）
+        for (const period of [2, 3, 4, 5]) {
+            const periodEnd = periodActions[period].find(a => a.action === '期末処理');
+            const stats = periodStats[period];
+
+            // 期末処理から情報を抽出
+            let fTotal = 0;
+            let specialLoss = 0;
+            if (periodEnd) {
+                // 人件費と減価償却を抽出
+                const personnelMatch = periodEnd.detail.match(/人件費(\d+)/);
+                const depMatch = periodEnd.detail.match(/減価償却(\d+)/);
+                if (personnelMatch) fTotal += parseInt(personnelMatch[1]);
+                if (depMatch) fTotal += parseInt(depMatch[1]);
+            }
+
+            console.log(`  | ${period}期 | ¥${String(stats.sales).padStart(4)} | ${String(stats.soldQty).padStart(4)}個 | ¥${String(fTotal).padStart(3)} | ¥${String(specialLoss).padStart(6)} | ¥${String(company.equity).padStart(10)} |`);
+        }
+        console.log('');
+
+        // ===== 各期の詳細 =====
         for (const period of [2, 3, 4, 5]) {
             const actions = periodActions[period];
             if (actions.length === 0) continue;
 
-            console.log(`\n【${period}期】`);
-            console.log('-'.repeat(40));
+            const maxRows = { 2: 20, 3: 30, 4: 34, 5: 35 };
 
-            actions.forEach((a, i) => {
-                const sign = a.isIncome ? '+' : '-';
-                const amount = a.amount > 0 ? ` ${sign}¥${a.amount}` : '';
-                console.log(`  ${String(i + 1).padStart(2)}. ${a.action}: ${a.detail}${amount}`);
+            console.log('---');
+            console.log(`${period}期（全${maxRows[period]}行）`);
+            console.log('');
+
+            // 期首処理
+            const periodStartActions = periodStats[period].periodStartActions;
+            if (periodStartActions.length > 0) {
+                console.log('  期首処理');
+                console.log('');
+                periodStartActions.forEach(a => {
+                    console.log(`  - ${a.action}: ${a.detail}`);
+                });
+                console.log('');
+            }
+
+            // テーブルヘッダー
+            console.log('  | 行  | 種別     | 行動                                    | 結果                       |');
+            console.log('  |-----|----------|-----------------------------------------|----------------------------|');
+
+            // 各行を出力
+            let rowNum = 1;
+            actions.forEach((a) => {
+                // 期末処理は別扱い
+                if (a.action === '期末処理') return;
+
+                const type = (a.type || '意思決定').padEnd(8);
+
+                // 行動の整形
+                let actionText = '';
+                if (a.action === 'リスクカード') {
+                    actionText = a.detail;
+                } else if (a.action === '販売失敗') {
+                    actionText = `販売失敗(入札負け): ${a.detail.replace('入札に負け: ', '')}`;
+                } else if (a.action === '販売' && a.isIncome) {
+                    actionText = `販売成功: ${a.detail} = +¥${a.amount}`;
+                } else if (a.action === '完成・投入') {
+                    actionText = `生産: ${a.detail} = -¥${a.amount}`;
+                } else if (a.action === '材料購入') {
+                    actionText = `材料購入: ${a.detail} = -¥${a.amount}`;
+                } else if (a.isIncome) {
+                    actionText = `${a.action} = +¥${a.amount}`;
+                } else if (a.amount > 0) {
+                    actionText = `${a.action} = -¥${a.amount}`;
+                } else {
+                    actionText = a.detail || a.action;
+                }
+                actionText = actionText.substring(0, 39).padEnd(39);
+
+                // 結果状態
+                const state = a.state || { cash: 0, materials: 0, wip: 0, products: 0 };
+                const resultText = `現金¥${String(state.cash).padStart(4)} 材料${state.materials} 仕掛${state.wip} 製品${state.products}`;
+
+                console.log(`  | ${String(rowNum).padStart(3)} | ${type} | ${actionText} | ${resultText} |`);
+                rowNum++;
             });
+
+            console.log('');
+
+            // F明細
+            const periodEnd = actions.find(a => a.action === '期末処理');
+            if (periodEnd) {
+                console.log(`  ${period}期 F明細`);
+                console.log('');
+                console.log('  | 項目                        | 金額 |');
+                console.log('  |-----------------------------|------|');
+
+                // 期末処理の詳細から情報を抽出して表示
+                const detail = periodEnd.detail;
+                const personnelMatch = detail.match(/人件費(\d+)\(([^)]+)\)/);
+                const depMatch = detail.match(/減価償却(\d+)/);
+                const taxMatch = detail.match(/税(\d+)/);
+
+                if (personnelMatch) {
+                    console.log(`  | 人件費                      | ¥${personnelMatch[1].padStart(3)} |`);
+                }
+                if (depMatch) {
+                    console.log(`  | 減価償却                    | ¥${depMatch[1].padStart(3)} |`);
+                }
+
+                let fTotal = 0;
+                if (personnelMatch) fTotal += parseInt(personnelMatch[1]);
+                if (depMatch) fTotal += parseInt(depMatch[1]);
+                console.log(`  | F合計                       | ¥${String(fTotal).padStart(3)} |`);
+                console.log('');
+            }
+
+            // 特別損失
+            console.log(`  ${period}期 特別損失`);
+            console.log('');
+            const specialLossActions = actions.filter(a =>
+                a.detail && (a.detail.includes('特別損失') || a.detail.includes('売却損'))
+            );
+            if (specialLossActions.length > 0) {
+                console.log('  | 項目                              | 金額 |');
+                console.log('  |-----------------------------------|------|');
+                specialLossActions.forEach(a => {
+                    console.log(`  | ${a.detail.padEnd(33)} | ¥${String(a.amount).padStart(3)} |`);
+                });
+            } else {
+                console.log('  なし');
+            }
+            console.log('');
         }
+
+        // ===== 全期間サマリー =====
+        console.log('---');
+        console.log('全期間サマリー');
+        console.log('');
+        console.log('  | 期   | 売上   | 販売数 | F合計  | 特別損失 | 期末自己資本 |');
+        console.log('  |------|--------|--------|--------|----------|--------------|');
+
+        let totalSales = 0;
+        let totalSoldQty = 0;
+
+        for (const period of [2, 3, 4, 5]) {
+            const stats = periodStats[period];
+            totalSales += stats.sales;
+            totalSoldQty += stats.soldQty;
+
+            const periodEnd = periodActions[period].find(a => a.action === '期末処理');
+            let fTotal = 0;
+            if (periodEnd) {
+                const personnelMatch = periodEnd.detail.match(/人件費(\d+)/);
+                const depMatch = periodEnd.detail.match(/減価償却(\d+)/);
+                if (personnelMatch) fTotal += parseInt(personnelMatch[1]);
+                if (depMatch) fTotal += parseInt(depMatch[1]);
+            }
+
+            console.log(`  | ${period}期  | ¥${String(stats.sales).padStart(4)} | ${String(stats.soldQty).padStart(4)}個 | ¥${String(fTotal).padStart(4)} | ¥${String(0).padStart(6)} | ¥${String(company.equity).padStart(10)} |`);
+        }
+
+        console.log(`  | 合計 | ¥${String(totalSales).padStart(4)} | ${String(totalSoldQty).padStart(4)}個 | -      | -        | -            |`);
         console.log('');
     }
 
     runMultiple(count) {
-        const { allResults, stats } = this.engine.runMultipleSimulations(count, { autoPlayer: true });
+        // シミュレーションでは6社ともAI
+        const { allResults, stats, bestResult } = this.engine.runMultipleSimulations(count, { allAI: true });
 
+        console.log('');
         console.log('【統計結果】');
         console.log('');
         console.log(`  実行回数: ${stats.totalRuns}回`);
@@ -326,47 +504,48 @@ class SimulationManager {
         }
         console.log('');
 
-        // 勝者分析
-        const winnerCounts = {};
-        allResults.forEach(r => {
-            const name = r.winner.name;
-            winnerCounts[name] = (winnerCounts[name] || 0) + 1;
-        });
-
-        console.log('  勝利回数:');
-        const sorted = Object.entries(winnerCounts).sort((a, b) => b[1] - a[1]);
-        sorted.forEach(([name, wins]) => {
-            const pct = (wins / count * 100).toFixed(1);
-            console.log(`    ${name}: ${wins}回 (${pct}%)`);
-        });
-        console.log('');
+        // 戦略別勝率（stats.strategyStatsから）
+        if (stats.strategyStats) {
+            console.log('  勝利回数:');
+            const sorted = Object.entries(stats.strategyStats)
+                .map(([strategy, s]) => ({ strategy, wins: s.wins }))
+                .sort((a, b) => b.wins - a.wins);
+            sorted.forEach(({ strategy, wins }) => {
+                const pct = (wins / count * 100).toFixed(1);
+                // 戦略名を日本語に変換
+                const nameMap = {
+                    'RESEARCH_FOCUSED': '研究商事',
+                    'SALES_FOCUSED': '販売産業',
+                    'LOW_CHIP': '堅実工業',
+                    'BALANCED': 'バランス物産',
+                    'AGGRESSIVE': '積極製作所',
+                    'PLAYER': 'プレイヤー型'
+                };
+                const name = nameMap[strategy] || strategy;
+                console.log(`    ${name}: ${wins}回 (${pct}%)`);
+            });
+            console.log('');
+        }
 
         // 最優秀パターン（最高自己資本）の行動明細を表示
-        let bestResult = allResults[0];
-        let bestEquity = allResults[0].winner.equity;
-        allResults.forEach(r => {
-            if (r.winner.equity > bestEquity) {
-                bestEquity = r.winner.equity;
-                bestResult = r;
-            }
-        });
-
         console.log('========================================');
         console.log(`【最優秀パターン】勝者: ${bestResult.winner.name} 自己資本: ¥${bestResult.winner.equity}`);
         console.log('========================================');
 
-        this.showActionDetails(bestResult, bestResult.winner.companyIndex);
+        this.showActionStatement(bestResult, bestResult.winner.companyIndex);
 
         // 学習データを保存
-        this.saveLearnedStrategies(allResults, stats);
+        this.saveLearnedStrategies(stats, bestResult);
 
         return { allResults, stats };
     }
 
     /**
      * シミュレーション結果から学習し、戦略を保存
+     * @param {Object} stats - 統計情報（strategyStatsを含む）
+     * @param {Object} bestResult - 最優秀パターン
      */
-    saveLearnedStrategies(allResults, stats) {
+    saveLearnedStrategies(stats, bestResult) {
         const learnedPath = path.join(__dirname, 'data', 'learned-strategies.json');
 
         // 既存の学習データを読み込み
@@ -387,60 +566,37 @@ class SimulationManager {
             }
         }
 
-        // 統計を更新
-        learned.totalSimulations += allResults.length;
+        // 統計を更新（実行回数分を追加）
+        learned.totalSimulations += stats.totalRuns;
         learned.lastUpdated = new Date().toISOString();
 
-        // 戦略別の勝率を計算
-        const strategyWins = {};
-        const strategyEquities = {};
-        const strategyGames = {};
-
-        allResults.forEach(result => {
-            result.finalEquities.forEach((company, idx) => {
-                const strategy = company.strategy || 'PLAYER';
-                strategyGames[strategy] = (strategyGames[strategy] || 0) + 1;
-                strategyEquities[strategy] = strategyEquities[strategy] || [];
-                strategyEquities[strategy].push(company.equity);
-
-                if (company.equity === result.winner.equity) {
-                    strategyWins[strategy] = (strategyWins[strategy] || 0) + 1;
+        // 戦略統計を更新（stats.strategyStatsから）
+        if (stats.strategyStats) {
+            for (const [strategy, s] of Object.entries(stats.strategyStats)) {
+                if (!learned.strategyStats[strategy]) {
+                    learned.strategyStats[strategy] = {
+                        totalGames: 0,
+                        totalWins: 0,
+                        winRate: 0,
+                        avgEquity: 0,
+                        maxEquity: 0
+                    };
                 }
-            });
-        });
 
-        // 戦略統計を更新
-        for (const strategy of Object.keys(strategyGames)) {
-            const wins = strategyWins[strategy] || 0;
-            const games = strategyGames[strategy];
-            const equities = strategyEquities[strategy];
-            const avgEquity = Math.round(equities.reduce((a, b) => a + b, 0) / equities.length);
-            const maxEquity = Math.max(...equities);
-
-            if (!learned.strategyStats[strategy]) {
-                learned.strategyStats[strategy] = {
-                    totalGames: 0,
-                    totalWins: 0,
-                    winRate: 0,
-                    avgEquity: 0,
-                    maxEquity: 0
-                };
+                const ls = learned.strategyStats[strategy];
+                const oldGames = ls.totalGames;
+                ls.totalGames += s.games;
+                ls.totalWins += s.wins;
+                ls.winRate = Math.round((ls.totalWins / ls.totalGames) * 1000) / 10;
+                // 平均自己資本の加重平均
+                const newAvgEquity = Math.round(s.totalEquity / s.games);
+                ls.avgEquity = Math.round((ls.avgEquity * oldGames + newAvgEquity * s.games) / ls.totalGames);
+                ls.maxEquity = Math.max(ls.maxEquity, s.maxEquity);
             }
-
-            const s = learned.strategyStats[strategy];
-            s.totalGames += games;
-            s.totalWins += wins;
-            s.winRate = Math.round((s.totalWins / s.totalGames) * 1000) / 10;
-            s.avgEquity = Math.round((s.avgEquity * (s.totalGames - games) + avgEquity * games) / s.totalGames);
-            s.maxEquity = Math.max(s.maxEquity, maxEquity);
         }
 
-        // 最高自己資本のパターンを記録（上位5つ）
-        const bestResult = allResults.reduce((best, r) =>
-            r.winner.equity > best.winner.equity ? r : best
-        );
-
-        if (bestResult.winner.equity > 0) {
+        // 最高自己資本のパターンを記録
+        if (bestResult && bestResult.winner.equity > 0) {
             learned.bestPatterns.push({
                 equity: bestResult.winner.equity,
                 strategy: bestResult.winner.strategy || 'PLAYER',
@@ -451,9 +607,8 @@ class SimulationManager {
             learned.bestPatterns = learned.bestPatterns.slice(0, 10);
         }
 
-        // インサイトを生成
+        // インサイトを生成（全戦略を含む）
         const winRates = Object.entries(learned.strategyStats)
-            .filter(([k]) => k !== 'PLAYER')
             .sort((a, b) => b[1].winRate - a[1].winRate);
 
         if (winRates.length > 0) {
@@ -475,7 +630,6 @@ class SimulationManager {
         console.log('');
         console.log('  戦略別勝率:');
         Object.entries(learned.strategyStats)
-            .filter(([k]) => k !== 'PLAYER')
             .sort((a, b) => b[1].winRate - a[1].winRate)
             .forEach(([name, s]) => {
                 console.log(`    ${name}: ${s.winRate}% (平均¥${s.avgEquity}, 最高¥${s.maxEquity})`);

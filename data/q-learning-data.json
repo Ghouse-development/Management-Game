@@ -1,0 +1,6391 @@
+{
+  "version": "2.0",
+  "lastUpdated": "2026-01-04T05:11:09.975Z",
+  "explorationRate": 0.19999999999999998,
+  "totalUpdates": 3626145,
+  "stateCount": 261,
+  "qTable": {
+    "5L_L_YY_L": {
+      "DO_NOTHING": {
+        "value": 16.557622510464828,
+        "count": 7839
+      },
+      "RISK_CARD": {
+        "value": 16.681209680914353,
+        "count": 2200
+      },
+      "BUY_CHIP": {
+        "value": 21.26647510267641,
+        "count": 28
+      },
+      "PRODUCE": {
+        "value": 23.798453918101902,
+        "count": 57
+      },
+      "BUY_MATERIALS": {
+        "value": 13.990188520035266,
+        "count": 29
+      },
+      "SELL": {
+        "value": 20.028391576036448,
+        "count": 43
+      }
+    },
+    "5M_L_YY_L": {
+      "RISK_CARD": {
+        "value": 52.88055902243254,
+        "count": 3034
+      },
+      "DO_NOTHING": {
+        "value": 54.06204159553608,
+        "count": 10507
+      },
+      "BUY_MATERIALS": {
+        "value": 50.0255489345,
+        "count": 43
+      },
+      "BUY_CHIP": {
+        "value": 60.493300699346854,
+        "count": 59
+      },
+      "PRODUCE": {
+        "value": 56.72232562117919,
+        "count": 69
+      },
+      "SELL": {
+        "value": 60.64447989634747,
+        "count": 87
+      },
+      "HIRE_SALESMAN": {
+        "value": 8.728428785298364,
+        "count": 1
+      }
+    },
+    "5E_L_YY_L": {
+      "DO_NOTHING": {
+        "value": 96.06384786319265,
+        "count": 7800
+      },
+      "RISK_CARD": {
+        "value": 90.23460192193694,
+        "count": 2712
+      },
+      "BUY_CHIP": {
+        "value": 100.9789814792953,
+        "count": 820
+      },
+      "BUY_MATERIALS": {
+        "value": 99.96163630560828,
+        "count": 606
+      },
+      "PRODUCE": {
+        "value": 104.26308275609726,
+        "count": 311
+      },
+      "SELL": {
+        "value": 98.57680620185103,
+        "count": 129
+      },
+      "HIRE_SALESMAN": {
+        "value": 50.97176283752735,
+        "count": 5
+      },
+      "INVEST_MINIMAL": {
+        "value": 98.88445307972448,
+        "count": 704
+      }
+    },
+    "4L_M_YY_L": {
+      "RISK_CARD": {
+        "value": 98.30741592510783,
+        "count": 372
+      },
+      "SELL": {
+        "value": 94.97460639550707,
+        "count": 315
+      },
+      "BUY_MATERIALS": {
+        "value": 99.61014969788442,
+        "count": 142
+      },
+      "PRODUCE": {
+        "value": 102.25899145493815,
+        "count": 927
+      },
+      "HIRE_SALESMAN": {
+        "value": 43.064013469397246,
+        "count": 6
+      },
+      "BUY_CHIP": {
+        "value": 104.32970384059796,
+        "count": 45
+      },
+      "DO_NOTHING": {
+        "value": 24.48207078853772,
+        "count": 2
+      }
+    },
+    "4L_H_YY_L": {
+      "RISK_CARD": {
+        "value": 96.79384718054712,
+        "count": 388
+      },
+      "BUY_MATERIALS": {
+        "value": 98.64057764686548,
+        "count": 193
+      },
+      "PRODUCE": {
+        "value": 102.23926330688573,
+        "count": 1060
+      },
+      "SELL": {
+        "value": 94.33675728845608,
+        "count": 490
+      },
+      "BUY_CHIP": {
+        "value": 99.06759778169581,
+        "count": 30
+      },
+      "HIRE_SALESMAN": {
+        "value": 42.04246281212966,
+        "count": 5
+      }
+    },
+    "4L_H_YN_L": {
+      "PRODUCE": {
+        "value": 99.04883514476003,
+        "count": 1843
+      },
+      "RISK_CARD": {
+        "value": 92.78087895490819,
+        "count": 459
+      },
+      "SELL": {
+        "value": 90.35982095575187,
+        "count": 517
+      },
+      "HIRE_SALESMAN": {
+        "value": 70.80014277608055,
+        "count": 15
+      },
+      "BUY_CHIP": {
+        "value": 98.52424080828905,
+        "count": 59
+      },
+      "DO_NOTHING": {
+        "value": 29.883417961057674,
+        "count": 4
+      }
+    },
+    "4L_H_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 101.53889231206502,
+        "count": 1994
+      },
+      "RISK_CARD": {
+        "value": 95.52770992147886,
+        "count": 1070
+      },
+      "BUY_CHIP": {
+        "value": 104.18717781146607,
+        "count": 112
+      },
+      "SELL": {
+        "value": 99.55670506309923,
+        "count": 1486
+      },
+      "DO_NOTHING": {
+        "value": 33.976350407283476,
+        "count": 4
+      },
+      "PRODUCE": {
+        "value": 100.15327559911834,
+        "count": 289
+      },
+      "HIRE_SALESMAN": {
+        "value": 85.94771222097204,
+        "count": 28
+      }
+    },
+    "4L_H_NN_L": {
+      "SELL": {
+        "value": 95.75137810343575,
+        "count": 1884
+      },
+      "RISK_CARD": {
+        "value": 92.63861895204145,
+        "count": 714
+      },
+      "BUY_CHIP": {
+        "value": 99.5452196195756,
+        "count": 397
+      },
+      "PRODUCE": {
+        "value": 94.7584840390508,
+        "count": 229
+      },
+      "HIRE_WORKER": {
+        "value": 2.9821649216211976,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 90.13579359681907,
+        "count": 42
+      },
+      "DO_NOTHING": {
+        "value": 41.216305178430545,
+        "count": 5
+      }
+    },
+    "4M_H_YN_L": {
+      "RISK_CARD": {
+        "value": 100.50246933997353,
+        "count": 638
+      },
+      "PRODUCE": {
+        "value": 104.81766282063326,
+        "count": 2194
+      },
+      "SELL": {
+        "value": 97.96348156227633,
+        "count": 969
+      },
+      "BUY_CHIP": {
+        "value": 105.72365394311926,
+        "count": 62
+      },
+      "HIRE_SALESMAN": {
+        "value": 89.1752098062575,
+        "count": 23
+      },
+      "DO_NOTHING": {
+        "value": 4.674570107273615,
+        "count": 1
+      },
+      "HIRE_WORKER": {
+        "value": 37.32591144090517,
+        "count": 3
+      }
+    },
+    "4M_H_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 103.57133630214562,
+        "count": 2150
+      },
+      "SELL": {
+        "value": 105.5763153165319,
+        "count": 4510
+      },
+      "RISK_CARD": {
+        "value": 102.53080238378828,
+        "count": 1844
+      },
+      "BUY_CHIP": {
+        "value": 109.48368240934778,
+        "count": 190
+      },
+      "PRODUCE": {
+        "value": 105.71456868911888,
+        "count": 191
+      },
+      "HIRE_SALESMAN": {
+        "value": 98.53330227336578,
+        "count": 38
+      },
+      "DO_NOTHING": {
+        "value": 45.10186894200342,
+        "count": 4
+      }
+    },
+    "4M_H_NN_L": {
+      "SELL": {
+        "value": 104.39229845976367,
+        "count": 2297
+      },
+      "PRODUCE": {
+        "value": 102.35611128689106,
+        "count": 429
+      },
+      "RISK_CARD": {
+        "value": 99.34730225239292,
+        "count": 825
+      },
+      "HIRE_SALESMAN": {
+        "value": 96.09249343607435,
+        "count": 30
+      },
+      "BUY_CHIP": {
+        "value": 107.07589309196065,
+        "count": 519
+      },
+      "HIRE_WORKER": {
+        "value": 16.88099347276273,
+        "count": 2
+      },
+      "DO_NOTHING": {
+        "value": 21.753859575913076,
+        "count": 2
+      }
+    },
+    "4M_M_YN_L": {
+      "SELL": {
+        "value": 97.85255467306872,
+        "count": 720
+      },
+      "RISK_CARD": {
+        "value": 100.21738971947555,
+        "count": 498
+      },
+      "PRODUCE": {
+        "value": 105.37031516696233,
+        "count": 1582
+      },
+      "HIRE_SALESMAN": {
+        "value": 85.09080079948043,
+        "count": 21
+      },
+      "BUY_CHIP": {
+        "value": 106.16923937552048,
+        "count": 97
+      },
+      "HIRE_WORKER": {
+        "value": 7.965914556245952,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 14.187519827324026,
+        "count": 1
+      }
+    },
+    "4M_M_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 105.02734485609878,
+        "count": 1977
+      },
+      "RISK_CARD": {
+        "value": 107.00864810117416,
+        "count": 2010
+      },
+      "BUY_CHIP": {
+        "value": 111.84320675301232,
+        "count": 368
+      },
+      "SELL": {
+        "value": 109.3707805810925,
+        "count": 3098
+      },
+      "HIRE_SALESMAN": {
+        "value": 101.48343766485493,
+        "count": 35
+      },
+      "HIRE_WORKER": {
+        "value": 1.8524658088176156,
+        "count": 1
+      },
+      "PRODUCE": {
+        "value": 110.28978814256195,
+        "count": 1164
+      },
+      "DO_NOTHING": {
+        "value": 62.82456599018453,
+        "count": 7
+      }
+    },
+    "4E_H_NY_L": {
+      "RISK_CARD": {
+        "value": 104.28595559424254,
+        "count": 564
+      },
+      "BUY_MATERIALS": {
+        "value": 107.32406105760636,
+        "count": 676
+      },
+      "SELL": {
+        "value": 106.22518004345513,
+        "count": 1744
+      },
+      "BUY_CHIP": {
+        "value": 105.24659873016539,
+        "count": 36
+      },
+      "HIRE_SALESMAN": {
+        "value": 85.17424798490696,
+        "count": 22
+      },
+      "INVEST_MINIMAL": {
+        "value": 100.0785559159957,
+        "count": 36
+      },
+      "PRODUCE": {
+        "value": 24.120071332572273,
+        "count": 2
+      }
+    },
+    "4E_H_NN_L": {
+      "SELL": {
+        "value": 106.79451261247152,
+        "count": 700
+      },
+      "RISK_CARD": {
+        "value": 102.57676972945298,
+        "count": 226
+      },
+      "BUY_CHIP": {
+        "value": 104.21003904558614,
+        "count": 52
+      },
+      "HIRE_SALESMAN": {
+        "value": 67.17840281363645,
+        "count": 14
+      },
+      "PRODUCE": {
+        "value": 92.69475756522263,
+        "count": 68
+      },
+      "INVEST_MINIMAL": {
+        "value": 67.74804761666367,
+        "count": 9
+      },
+      "INVEST_HIRE": {
+        "value": 11.640861181165896,
+        "count": 1
+      }
+    },
+    "4E_M_YN_L": {
+      "PRODUCE": {
+        "value": 112.6475175195821,
+        "count": 1129
+      },
+      "SELL": {
+        "value": 101.94102941814917,
+        "count": 579
+      },
+      "RISK_CARD": {
+        "value": 105.39477522088022,
+        "count": 378
+      },
+      "BUY_CHIP": {
+        "value": 103.68050177036035,
+        "count": 39
+      },
+      "HIRE_SALESMAN": {
+        "value": 65.29515262819986,
+        "count": 10
+      },
+      "HIRE_WORKER": {
+        "value": 26.65648352071534,
+        "count": 3
+      },
+      "DO_NOTHING": {
+        "value": 10.90560122577058,
+        "count": 1
+      },
+      "INVEST_MINIMAL": {
+        "value": 93.13494453479979,
+        "count": 23
+      },
+      "INVEST_HIRE": {
+        "value": 14.313082476970914,
+        "count": 1
+      }
+    },
+    "4E_M_NY_L": {
+      "SELL": {
+        "value": 113.06602073234485,
+        "count": 6163
+      },
+      "BUY_MATERIALS": {
+        "value": 110.8147671550178,
+        "count": 1445
+      },
+      "BUY_CHIP": {
+        "value": 116.44729139433252,
+        "count": 203
+      },
+      "RISK_CARD": {
+        "value": 111.1052644637679,
+        "count": 2133
+      },
+      "HIRE_SALESMAN": {
+        "value": 106.27252820411937,
+        "count": 55
+      },
+      "PRODUCE": {
+        "value": 112.581667378831,
+        "count": 477
+      },
+      "HIRE_WORKER": {
+        "value": 21.273259756312566,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 110.55433257019143,
+        "count": 311
+      },
+      "DO_NOTHING": {
+        "value": 46.180767147291796,
+        "count": 4
+      },
+      "INVEST_HIRE": {
+        "value": 48.45654372683797,
+        "count": 4
+      }
+    },
+    "4E_M_YY_L": {
+      "PRODUCE": {
+        "value": 116.90082772574415,
+        "count": 5249
+      },
+      "RISK_CARD": {
+        "value": 110.05037285045238,
+        "count": 1833
+      },
+      "SELL": {
+        "value": 108.4170688904849,
+        "count": 2855
+      },
+      "BUY_MATERIALS": {
+        "value": 110.70963929823122,
+        "count": 376
+      },
+      "BUY_CHIP": {
+        "value": 118.02923381739241,
+        "count": 119
+      },
+      "HIRE_SALESMAN": {
+        "value": 108.87181335635916,
+        "count": 61
+      },
+      "INVEST_MINIMAL": {
+        "value": 109.0980217484539,
+        "count": 133
+      },
+      "INVEST_HIRE": {
+        "value": 11.525329006505226,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 45.84139084794299,
+        "count": 4
+      }
+    },
+    "4E_L_YY_L": {
+      "PRODUCE": {
+        "value": 119.33867732265796,
+        "count": 5739
+      },
+      "BUY_MATERIALS": {
+        "value": 113.87965401990823,
+        "count": 373
+      },
+      "SELL": {
+        "value": 112.51141918421054,
+        "count": 7468
+      },
+      "RISK_CARD": {
+        "value": 114.81504969757141,
+        "count": 5228
+      },
+      "BUY_CHIP": {
+        "value": 120.78413439470864,
+        "count": 349
+      },
+      "HIRE_SALESMAN": {
+        "value": 111.93069537152053,
+        "count": 58
+      },
+      "DO_NOTHING": {
+        "value": 98.8923933276124,
+        "count": 18
+      },
+      "INVEST_MINIMAL": {
+        "value": 115.04502708352747,
+        "count": 5185
+      },
+      "INVEST_HIRE": {
+        "value": 101.47219914217779,
+        "count": 17
+      },
+      "HIRE_WORKER": {
+        "value": 14.055366772962754,
+        "count": 1
+      }
+    },
+    "4E_L_NY_L": {
+      "SELL": {
+        "value": 118.46827514903647,
+        "count": 7697
+      },
+      "RISK_CARD": {
+        "value": 113.41241518862624,
+        "count": 60407
+      },
+      "DO_NOTHING": {
+        "value": 115.69581027389735,
+        "count": 236139
+      },
+      "BUY_MATERIALS": {
+        "value": 110.79081284930395,
+        "count": 890
+      },
+      "BUY_CHIP": {
+        "value": 123.19413135642566,
+        "count": 587
+      },
+      "HIRE_WORKER": {
+        "value": 35.162847647999946,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 114.39066435802047,
+        "count": 43
+      },
+      "PRODUCE": {
+        "value": 118.23156395613356,
+        "count": 1491
+      },
+      "INVEST_MINIMAL": {
+        "value": 116.82413391603714,
+        "count": 23525
+      },
+      "INVEST_HIRE": {
+        "value": 101.96324818446755,
+        "count": 15
+      }
+    },
+    "3M_M_YY_L": {
+      "RISK_CARD": {
+        "value": 126.26164736369321,
+        "count": 3954
+      },
+      "PRODUCE": {
+        "value": 131.48247160560817,
+        "count": 8772
+      },
+      "BUY_MATERIALS": {
+        "value": 127.26558049302045,
+        "count": 602
+      },
+      "SELL": {
+        "value": 122.43986878085423,
+        "count": 8286
+      },
+      "BUY_CHIP": {
+        "value": 130.71743178659898,
+        "count": 269
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 90.6457112793589,
+        "count": 14
+      },
+      "HIRE_SALESMAN": {
+        "value": 126.63359559607943,
+        "count": 137
+      },
+      "DO_NOTHING": {
+        "value": 98.82663570733912,
+        "count": 12
+      }
+    },
+    "3M_M_NY_L": {
+      "SELL": {
+        "value": 128.86757009763988,
+        "count": 11582
+      },
+      "RISK_CARD": {
+        "value": 124.8237849564623,
+        "count": 8441
+      },
+      "BUY_MATERIALS": {
+        "value": 128.09617165994533,
+        "count": 16543
+      },
+      "BUY_CHIP": {
+        "value": 132.01902847569605,
+        "count": 1417
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 133.4071611556917,
+        "count": 62
+      },
+      "HIRE_WORKER": {
+        "value": 85.15581457579215,
+        "count": 10
+      },
+      "HIRE_SALESMAN": {
+        "value": 127.58154939113398,
+        "count": 283
+      },
+      "DO_NOTHING": {
+        "value": 116.73480657177294,
+        "count": 20
+      }
+    },
+    "3E_M_YY_L": {
+      "RISK_CARD": {
+        "value": 133.2117255936111,
+        "count": 5551
+      },
+      "SELL": {
+        "value": 133.30902731805932,
+        "count": 12069
+      },
+      "BUY_MATERIALS": {
+        "value": 135.78612943702853,
+        "count": 953
+      },
+      "PRODUCE": {
+        "value": 141.0940671162324,
+        "count": 8168
+      },
+      "BUY_CHIP": {
+        "value": 142.5098619447209,
+        "count": 395
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 87.03972073633001,
+        "count": 12
+      },
+      "HIRE_SALESMAN": {
+        "value": 136.20447192393448,
+        "count": 246
+      },
+      "DO_NOTHING": {
+        "value": 111.73757688032909,
+        "count": 15
+      },
+      "INVEST_MINIMAL": {
+        "value": 135.47174960267625,
+        "count": 3728
+      },
+      "INVEST_MACHINE": {
+        "value": 59.717613468763425,
+        "count": 4
+      }
+    },
+    "3E_H_YY_L": {
+      "RISK_CARD": {
+        "value": 131.87560928833972,
+        "count": 1150
+      },
+      "BUY_MATERIALS": {
+        "value": 132.6987333901945,
+        "count": 178
+      },
+      "PRODUCE": {
+        "value": 136.9779506165007,
+        "count": 2019
+      },
+      "SELL": {
+        "value": 130.4971927128711,
+        "count": 3053
+      },
+      "HIRE_SALESMAN": {
+        "value": 130.5980718235083,
+        "count": 48
+      },
+      "BUY_CHIP": {
+        "value": 132.7579547172391,
+        "count": 46
+      },
+      "INVEST_MINIMAL": {
+        "value": 131.12498711341513,
+        "count": 329
+      }
+    },
+    "3E_H_YN_L": {
+      "SELL": {
+        "value": 122.78260596840465,
+        "count": 647
+      },
+      "PRODUCE": {
+        "value": 129.73165426111038,
+        "count": 464
+      },
+      "RISK_CARD": {
+        "value": 123.91869452474198,
+        "count": 268
+      },
+      "BUY_CHIP": {
+        "value": 102.51088356576835,
+        "count": 18
+      },
+      "HIRE_SALESMAN": {
+        "value": 57.58631158605227,
+        "count": 6
+      },
+      "HIRE_WORKER": {
+        "value": 9.894236259909363,
+        "count": 1
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 20.01566152152223,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 123.64364446376797,
+        "count": 72
+      }
+    },
+    "3E_M_YN_L": {
+      "PRODUCE": {
+        "value": 130.75545461836143,
+        "count": 335
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 66.22094332660865,
+        "count": 9
+      },
+      "SELL": {
+        "value": 124.45647913690348,
+        "count": 728
+      },
+      "RISK_CARD": {
+        "value": 124.66774210329166,
+        "count": 267
+      },
+      "BUY_CHIP": {
+        "value": 125.36303219225357,
+        "count": 37
+      },
+      "HIRE_SALESMAN": {
+        "value": 112.74260387815973,
+        "count": 20
+      },
+      "INVEST_MINIMAL": {
+        "value": 124.55823837183316,
+        "count": 144
+      },
+      "INVEST_MACHINE": {
+        "value": 17.178999701609115,
+        "count": 1
+      }
+    },
+    "2M_M_NY_L": {
+      "SELL": {
+        "value": 132.6505529714189,
+        "count": 9064
+      },
+      "BUY_MATERIALS": {
+        "value": 133.53647818867205,
+        "count": 5333
+      },
+      "RISK_CARD": {
+        "value": 130.1932952896969,
+        "count": 4688
+      },
+      "BUY_CHIP": {
+        "value": 138.59229591771458,
+        "count": 304
+      },
+      "HIRE_SALESMAN": {
+        "value": 131.98312070846526,
+        "count": 159
+      },
+      "DO_NOTHING": {
+        "value": 114.93853129439573,
+        "count": 15
+      }
+    },
+    "2M_L_YY_L": {
+      "SELL": {
+        "value": 128.74320278104926,
+        "count": 12629
+      },
+      "BUY_CHIP": {
+        "value": 138.70993643999773,
+        "count": 616
+      },
+      "RISK_CARD": {
+        "value": 132.23740707644396,
+        "count": 6478
+      },
+      "BUY_MATERIALS": {
+        "value": 134.15212484900377,
+        "count": 376
+      },
+      "PRODUCE": {
+        "value": 139.28760086116012,
+        "count": 16418
+      },
+      "HIRE_SALESMAN": {
+        "value": 133.01039805244466,
+        "count": 188
+      },
+      "DO_NOTHING": {
+        "value": 110.95847543133812,
+        "count": 13
+      }
+    },
+    "2M_M_YY_L": {
+      "PRODUCE": {
+        "value": 137.29417259379312,
+        "count": 1793
+      },
+      "RISK_CARD": {
+        "value": 131.3187700420744,
+        "count": 996
+      },
+      "SELL": {
+        "value": 129.16982150056023,
+        "count": 2626
+      },
+      "BUY_CHIP": {
+        "value": 136.76053648154874,
+        "count": 34
+      },
+      "BUY_MATERIALS": {
+        "value": 133.0934948650057,
+        "count": 102
+      },
+      "HIRE_SALESMAN": {
+        "value": 129.94324061782464,
+        "count": 46
+      },
+      "DO_NOTHING": {
+        "value": 17.722344533045817,
+        "count": 1
+      }
+    },
+    "2E_M_NY_L": {
+      "SELL": {
+        "value": 133.73862573893598,
+        "count": 6039
+      },
+      "RISK_CARD": {
+        "value": 130.71398889386657,
+        "count": 10511
+      },
+      "BUY_MATERIALS": {
+        "value": 134.07293355199783,
+        "count": 3055
+      },
+      "BUY_CHIP": {
+        "value": 138.36126918106504,
+        "count": 271
+      },
+      "HIRE_SALESMAN": {
+        "value": 133.52386033697374,
+        "count": 510
+      },
+      "DO_NOTHING": {
+        "value": 128.46963053576604,
+        "count": 35
+      },
+      "INVEST_MINIMAL": {
+        "value": 130.4820609385696,
+        "count": 30080
+      }
+    },
+    "2E_L_YY_L": {
+      "RISK_CARD": {
+        "value": 131.41940503061463,
+        "count": 3263
+      },
+      "PRODUCE": {
+        "value": 138.81869124920507,
+        "count": 10451
+      },
+      "SELL": {
+        "value": 128.9544841498098,
+        "count": 5635
+      },
+      "BUY_MATERIALS": {
+        "value": 134.3134672562498,
+        "count": 395
+      },
+      "BUY_CHIP": {
+        "value": 139.5595073807567,
+        "count": 582
+      },
+      "HIRE_SALESMAN": {
+        "value": 132.8709372901926,
+        "count": 170
+      },
+      "DO_NOTHING": {
+        "value": 87.609946584154,
+        "count": 8
+      }
+    },
+    "2E_M_YY_L": {
+      "SELL": {
+        "value": 126.47598225393162,
+        "count": 2804
+      },
+      "PRODUCE": {
+        "value": 136.28866773354844,
+        "count": 4060
+      },
+      "RISK_CARD": {
+        "value": 130.19968998040588,
+        "count": 1190
+      },
+      "BUY_MATERIALS": {
+        "value": 132.14418568790674,
+        "count": 46
+      },
+      "HIRE_SALESMAN": {
+        "value": 131.55706249498948,
+        "count": 134
+      },
+      "BUY_CHIP": {
+        "value": 74.46433364086488,
+        "count": 6
+      },
+      "DO_NOTHING": {
+        "value": 17.92562528646044,
+        "count": 1
+      }
+    },
+    "5E_M_YY_L": {
+      "RISK_CARD": {
+        "value": 95.55468103512558,
+        "count": 174
+      },
+      "BUY_MATERIALS": {
+        "value": 97.26183152621519,
+        "count": 467
+      },
+      "BUY_CHIP": {
+        "value": 98.7672865736654,
+        "count": 84
+      },
+      "PRODUCE": {
+        "value": 99.63778479691082,
+        "count": 55
+      },
+      "INVEST_MINIMAL": {
+        "value": 94.0874363420751,
+        "count": 160
+      },
+      "SELL": {
+        "value": 11.846152473677117,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 25.974575022464343,
+        "count": 2
+      }
+    },
+    "4M_H_YY_L": {
+      "PRODUCE": {
+        "value": 108.94915691053731,
+        "count": 3209
+      },
+      "RISK_CARD": {
+        "value": 103.23727535129117,
+        "count": 1144
+      },
+      "SELL": {
+        "value": 102.45741852492583,
+        "count": 1825
+      },
+      "BUY_MATERIALS": {
+        "value": 104.57413740102841,
+        "count": 299
+      },
+      "HIRE_SALESMAN": {
+        "value": 101.15762772579431,
+        "count": 40
+      },
+      "BUY_CHIP": {
+        "value": 109.38306992624732,
+        "count": 68
+      },
+      "DO_NOTHING": {
+        "value": 25.82446216765137,
+        "count": 2
+      }
+    },
+    "4E_H_YN_L": {
+      "PRODUCE": {
+        "value": 109.41700722721524,
+        "count": 476
+      },
+      "RISK_CARD": {
+        "value": 99.90825886940003,
+        "count": 130
+      },
+      "SELL": {
+        "value": 98.80330039080839,
+        "count": 227
+      },
+      "BUY_CHIP": {
+        "value": 58.50360505629275,
+        "count": 7
+      },
+      "HIRE_SALESMAN": {
+        "value": 25.51517077293963,
+        "count": 3
+      },
+      "INVEST_HIRE": {
+        "value": 22.027771008278584,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 14.957065691081121,
+        "count": 1
+      }
+    },
+    "3L_H_YN_L": {
+      "PRODUCE": {
+        "value": 118.86505217573459,
+        "count": 377
+      },
+      "RISK_CARD": {
+        "value": 105.16059831558886,
+        "count": 111
+      },
+      "BUY_CHIP": {
+        "value": 76.14893867761614,
+        "count": 17
+      },
+      "SELL": {
+        "value": 108.93275567726808,
+        "count": 211
+      },
+      "HIRE_SALESMAN": {
+        "value": 29.336046114293794,
+        "count": 5
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 27.98177258610375,
+        "count": 3
+      },
+      "HIRE_WORKER": {
+        "value": 10.498922855855033,
+        "count": 1
+      }
+    },
+    "3L_H_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 117.62693422966,
+        "count": 1929
+      },
+      "SELL": {
+        "value": 118.92433033268233,
+        "count": 2802
+      },
+      "RISK_CARD": {
+        "value": 115.7804137354194,
+        "count": 1380
+      },
+      "HIRE_SALESMAN": {
+        "value": 114.15251086542551,
+        "count": 44
+      },
+      "BUY_CHIP": {
+        "value": 119.96133067336842,
+        "count": 82
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 10.366341045837693,
+        "count": 1
+      },
+      "HIRE_WORKER": {
+        "value": 41.74377473624871,
+        "count": 3
+      }
+    },
+    "3L_H_NN_L": {
+      "SELL": {
+        "value": 113.12609703764139,
+        "count": 412
+      },
+      "PRODUCE": {
+        "value": 84.93381974307454,
+        "count": 54
+      },
+      "RISK_CARD": {
+        "value": 107.08665603162319,
+        "count": 132
+      },
+      "BUY_CHIP": {
+        "value": 91.93454619673139,
+        "count": 22
+      },
+      "HIRE_WORKER": {
+        "value": 15.826202981496936,
+        "count": 3
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 58.80597633845015,
+        "count": 12
+      },
+      "HIRE_SALESMAN": {
+        "value": 32.4533027266459,
+        "count": 4
+      }
+    },
+    "3M_H_YN_L": {
+      "PRODUCE": {
+        "value": 128.18473234112435,
+        "count": 674
+      },
+      "SELL": {
+        "value": 119.9294374244551,
+        "count": 629
+      },
+      "RISK_CARD": {
+        "value": 118.71354057322117,
+        "count": 288
+      },
+      "BUY_CHIP": {
+        "value": 109.36404655681734,
+        "count": 34
+      },
+      "HIRE_SALESMAN": {
+        "value": 65.94189964310289,
+        "count": 7
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 7.520191790917665,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 17.41835170677992,
+        "count": 1
+      }
+    },
+    "3M_H_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 128.46104771072007,
+        "count": 4457
+      },
+      "RISK_CARD": {
+        "value": 125.22742341450703,
+        "count": 2729
+      },
+      "SELL": {
+        "value": 128.94350196233424,
+        "count": 4469
+      },
+      "BUY_CHIP": {
+        "value": 132.67720092326826,
+        "count": 165
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 54.91227607196292,
+        "count": 7
+      },
+      "HIRE_SALESMAN": {
+        "value": 126.6972842108815,
+        "count": 83
+      },
+      "DO_NOTHING": {
+        "value": 40.356464740698634,
+        "count": 3
+      },
+      "HIRE_WORKER": {
+        "value": 17.377406151502395,
+        "count": 1
+      }
+    },
+    "3M_H_NN_L": {
+      "SELL": {
+        "value": 127.79739554836732,
+        "count": 735
+      },
+      "RISK_CARD": {
+        "value": 120.42257337862102,
+        "count": 280
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 54.85412442855953,
+        "count": 12
+      },
+      "BUY_CHIP": {
+        "value": 118.24898191059589,
+        "count": 69
+      },
+      "PRODUCE": {
+        "value": 96.69696087812206,
+        "count": 67
+      },
+      "DO_NOTHING": {
+        "value": 11.890986842104539,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 45.72606125239286,
+        "count": 5
+      },
+      "HIRE_WORKER": {
+        "value": 30.429760480177748,
+        "count": 2
+      }
+    },
+    "3E_H_NN_L": {
+      "RISK_CARD": {
+        "value": 130.21519696138552,
+        "count": 271
+      },
+      "SELL": {
+        "value": 133.30858728216614,
+        "count": 651
+      },
+      "PRODUCE": {
+        "value": 124.0804056522898,
+        "count": 89
+      },
+      "BUY_CHIP": {
+        "value": 132.30295769394968,
+        "count": 159
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 28.68701549262402,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 93.77137287872067,
+        "count": 9
+      },
+      "INVEST_MINIMAL": {
+        "value": 127.19703492353237,
+        "count": 113
+      }
+    },
+    "3E_H_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 134.9580709180583,
+        "count": 6051
+      },
+      "SELL": {
+        "value": 135.0562775261626,
+        "count": 5397
+      },
+      "RISK_CARD": {
+        "value": 133.7581230881788,
+        "count": 3288
+      },
+      "HIRE_SALESMAN": {
+        "value": 134.56718104156118,
+        "count": 105
+      },
+      "BUY_CHIP": {
+        "value": 139.9989508733269,
+        "count": 190
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 28.08870403249867,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 133.75081288442786,
+        "count": 1559
+      },
+      "DO_NOTHING": {
+        "value": 84.92595048979754,
+        "count": 7
+      }
+    },
+    "2L_H_NN_L": {
+      "PRODUCE": {
+        "value": 94.07459576672443,
+        "count": 45
+      },
+      "SELL": {
+        "value": 129.60981230006362,
+        "count": 150
+      },
+      "RISK_CARD": {
+        "value": 125.71153277585601,
+        "count": 58
+      },
+      "BUY_CHIP": {
+        "value": 43.20489757329052,
+        "count": 5
+      },
+      "HIRE_SALESMAN": {
+        "value": 62.32881394514368,
+        "count": 5
+      }
+    },
+    "2L_H_NY_L": {
+      "SELL": {
+        "value": 130.95300424780424,
+        "count": 221
+      },
+      "BUY_MATERIALS": {
+        "value": 133.06082638483772,
+        "count": 83
+      },
+      "RISK_CARD": {
+        "value": 129.20287994814393,
+        "count": 89
+      },
+      "BUY_CHIP": {
+        "value": 50.533061471456065,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 20.34824900186542,
+        "count": 2
+      }
+    },
+    "2L_M_YY_L": {
+      "PRODUCE": {
+        "value": 138.8485203250374,
+        "count": 1349
+      },
+      "RISK_CARD": {
+        "value": 133.63800003936825,
+        "count": 524
+      },
+      "SELL": {
+        "value": 134.2533453615157,
+        "count": 1237
+      },
+      "HIRE_SALESMAN": {
+        "value": 116.58353276056116,
+        "count": 18
+      },
+      "BUY_CHIP": {
+        "value": 115.17843230012377,
+        "count": 17
+      },
+      "BUY_MATERIALS": {
+        "value": 133.70196213414744,
+        "count": 69
+      },
+      "DO_NOTHING": {
+        "value": 12.236821460010399,
+        "count": 1
+      }
+    },
+    "2M_M_NN_L": {
+      "RISK_CARD": {
+        "value": 126.09102940465829,
+        "count": 343
+      },
+      "PRODUCE": {
+        "value": 123.63210952614234,
+        "count": 43
+      },
+      "SELL": {
+        "value": 131.41663693026373,
+        "count": 770
+      },
+      "HIRE_SALESMAN": {
+        "value": 129.33943473530869,
+        "count": 178
+      },
+      "BUY_CHIP": {
+        "value": 129.34985368287266,
+        "count": 300
+      },
+      "DO_NOTHING": {
+        "value": 14.120300929816612,
+        "count": 1
+      }
+    },
+    "2M_H_NY_L": {
+      "HIRE_SALESMAN": {
+        "value": 17.97301796878025,
+        "count": 2
+      },
+      "SELL": {
+        "value": 130.7008806112836,
+        "count": 131
+      },
+      "BUY_MATERIALS": {
+        "value": 127.34504312265905,
+        "count": 37
+      },
+      "RISK_CARD": {
+        "value": 124.15801254110099,
+        "count": 38
+      },
+      "BUY_CHIP": {
+        "value": 8.361683338922946,
+        "count": 1
+      }
+    },
+    "2E_M_NN_L": {
+      "SELL": {
+        "value": 131.65137126418,
+        "count": 329
+      },
+      "HIRE_SALESMAN": {
+        "value": 77.3548713193119,
+        "count": 7
+      },
+      "PRODUCE": {
+        "value": 124.30810250515995,
+        "count": 31
+      },
+      "RISK_CARD": {
+        "value": 128.16356498941997,
+        "count": 66
+      },
+      "BUY_CHIP": {
+        "value": 134.11396078488008,
+        "count": 70
+      }
+    },
+    "2E_M_YN_L": {
+      "SELL": {
+        "value": 120.86842710490286,
+        "count": 759
+      },
+      "PRODUCE": {
+        "value": 128.02539222807115,
+        "count": 660
+      },
+      "RISK_CARD": {
+        "value": 124.10570031985725,
+        "count": 301
+      },
+      "BUY_CHIP": {
+        "value": 120.00333980629502,
+        "count": 17
+      },
+      "HIRE_SALESMAN": {
+        "value": 109.36990135362979,
+        "count": 14
+      },
+      "DO_NOTHING": {
+        "value": 15.819229612369195,
+        "count": 1
+      }
+    },
+    "5L_L_NY_L": {
+      "RISK_CARD": {
+        "value": 21.3514820029502,
+        "count": 46997
+      },
+      "DO_NOTHING": {
+        "value": 25.001657091636638,
+        "count": 188742
+      },
+      "BUY_CHIP": {
+        "value": 33.18853896352451,
+        "count": 130
+      },
+      "BUY_MATERIALS": {
+        "value": 25.82477717589713,
+        "count": 131
+      },
+      "SELL": {
+        "value": 31.38792754293319,
+        "count": 163
+      },
+      "PRODUCE": {
+        "value": 11.910457102893927,
+        "count": 5
+      }
+    },
+    "5M_L_NY_L": {
+      "RISK_CARD": {
+        "value": 65.35091245213785,
+        "count": 67002
+      },
+      "DO_NOTHING": {
+        "value": 68.30175657595136,
+        "count": 269108
+      },
+      "BUY_CHIP": {
+        "value": 76.89381726092115,
+        "count": 232
+      },
+      "BUY_MATERIALS": {
+        "value": 69.41669800812168,
+        "count": 261
+      },
+      "SELL": {
+        "value": 68.85368021132211,
+        "count": 270
+      },
+      "PRODUCE": {
+        "value": 16.759182842489494,
+        "count": 3
+      }
+    },
+    "5E_L_NY_L": {
+      "RISK_CARD": {
+        "value": 95.81241555073545,
+        "count": 61570
+      },
+      "DO_NOTHING": {
+        "value": 100.02333718980049,
+        "count": 246301
+      },
+      "BUY_CHIP": {
+        "value": 109.45825544214155,
+        "count": 1510
+      },
+      "BUY_MATERIALS": {
+        "value": 107.16287448293734,
+        "count": 1545
+      },
+      "SELL": {
+        "value": 106.38144371127639,
+        "count": 337
+      },
+      "HIRE_SALESMAN": {
+        "value": 42.99595580517524,
+        "count": 5
+      },
+      "PRODUCE": {
+        "value": 74.20497207593453,
+        "count": 10
+      },
+      "INVEST_MINIMAL": {
+        "value": 103.06848972333603,
+        "count": 26274
+      },
+      "INVEST_HIRE": {
+        "value": 26.136866322668073,
+        "count": 2
+      }
+    },
+    "4L_L_NY_L": {
+      "RISK_CARD": {
+        "value": 95.91470879325868,
+        "count": 44802
+      },
+      "BUY_MATERIALS": {
+        "value": 97.21663611833048,
+        "count": 217
+      },
+      "BUY_CHIP": {
+        "value": 100.54235604836528,
+        "count": 59
+      },
+      "DO_NOTHING": {
+        "value": 95.08857664335599,
+        "count": 180280
+      },
+      "SELL": {
+        "value": 98.18823562320691,
+        "count": 457
+      },
+      "PRODUCE": {
+        "value": 99.82335402887304,
+        "count": 158
+      },
+      "HIRE_SALESMAN": {
+        "value": 46.092651526476295,
+        "count": 5
+      }
+    },
+    "4M_L_NY_L": {
+      "RISK_CARD": {
+        "value": 106.87261116646256,
+        "count": 59688
+      },
+      "BUY_MATERIALS": {
+        "value": 107.59040405536865,
+        "count": 441
+      },
+      "DO_NOTHING": {
+        "value": 107.06339002595001,
+        "count": 238275
+      },
+      "SELL": {
+        "value": 108.38212002910126,
+        "count": 815
+      },
+      "BUY_CHIP": {
+        "value": 115.01051015060875,
+        "count": 185
+      },
+      "HIRE_SALESMAN": {
+        "value": 41.81534354810713,
+        "count": 5
+      },
+      "PRODUCE": {
+        "value": 110.93380175707286,
+        "count": 428
+      }
+    },
+    "3L_M_NY_L": {
+      "RISK_CARD": {
+        "value": 117.19506523000422,
+        "count": 4018
+      },
+      "BUY_MATERIALS": {
+        "value": 119.52672579414562,
+        "count": 6638
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 110.93427123278863,
+        "count": 37
+      },
+      "SELL": {
+        "value": 120.05158998343497,
+        "count": 6431
+      },
+      "DO_NOTHING": {
+        "value": 87.5523951842571,
+        "count": 10
+      },
+      "BUY_CHIP": {
+        "value": 123.30635874330238,
+        "count": 432
+      },
+      "HIRE_SALESMAN": {
+        "value": 119.12975667156373,
+        "count": 146
+      },
+      "HIRE_WORKER": {
+        "value": 35.48027465588263,
+        "count": 3
+      }
+    },
+    "3E_M_NY_L": {
+      "RISK_CARD": {
+        "value": 133.23363153297962,
+        "count": 11306
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 142.0853736035938,
+        "count": 56
+      },
+      "SELL": {
+        "value": 137.84299882576815,
+        "count": 10339
+      },
+      "BUY_MATERIALS": {
+        "value": 137.29320789718676,
+        "count": 28338
+      },
+      "BUY_CHIP": {
+        "value": 143.9482446248135,
+        "count": 2420
+      },
+      "HIRE_SALESMAN": {
+        "value": 137.08035601924925,
+        "count": 421
+      },
+      "HIRE_WORKER": {
+        "value": 16.01414230455471,
+        "count": 2
+      },
+      "DO_NOTHING": {
+        "value": 127.36764979879092,
+        "count": 24
+      },
+      "INVEST_MINIMAL": {
+        "value": 136.47028188565386,
+        "count": 5108
+      },
+      "INVEST_MACHINE": {
+        "value": 131.05539094615605,
+        "count": 31
+      }
+    },
+    "2L_M_NY_L": {
+      "RISK_CARD": {
+        "value": 131.63699097038608,
+        "count": 2707
+      },
+      "BUY_MATERIALS": {
+        "value": 135.66763044613296,
+        "count": 3244
+      },
+      "BUY_CHIP": {
+        "value": 139.12820380319192,
+        "count": 130
+      },
+      "SELL": {
+        "value": 135.4599968258375,
+        "count": 5778
+      },
+      "HIRE_SALESMAN": {
+        "value": 133.64974233484338,
+        "count": 108
+      },
+      "DO_NOTHING": {
+        "value": 102.86366342673968,
+        "count": 10
+      }
+    },
+    "5L_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 12.183998497791114,
+        "count": 20399
+      },
+      "RISK_CARD": {
+        "value": 10.04947321667571,
+        "count": 5288
+      },
+      "BUY_CHIP": {
+        "value": 19.698649054004967,
+        "count": 41
+      },
+      "PRODUCE": {
+        "value": 1.9623915350898329,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 1.158129315211,
+        "count": 1
+      }
+    },
+    "4L_M_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 98.76118821219956,
+        "count": 1037
+      },
+      "RISK_CARD": {
+        "value": 98.2832483519933,
+        "count": 637
+      },
+      "BUY_CHIP": {
+        "value": 103.34431103904156,
+        "count": 143
+      },
+      "SELL": {
+        "value": 101.0012576880271,
+        "count": 716
+      },
+      "HIRE_SALESMAN": {
+        "value": 81.77691053358988,
+        "count": 16
+      },
+      "PRODUCE": {
+        "value": 100.18491296259731,
+        "count": 459
+      },
+      "DO_NOTHING": {
+        "value": 30.16443442464962,
+        "count": 3
+      }
+    },
+    "4L_M_NN_L": {
+      "RISK_CARD": {
+        "value": 92.68464496762441,
+        "count": 214
+      },
+      "SELL": {
+        "value": 97.44626008763075,
+        "count": 418
+      },
+      "BUY_CHIP": {
+        "value": 95.740955665229,
+        "count": 312
+      },
+      "PRODUCE": {
+        "value": 88.87275622647721,
+        "count": 66
+      },
+      "HIRE_SALESMAN": {
+        "value": 68.47046753337757,
+        "count": 12
+      },
+      "DO_NOTHING": {
+        "value": 13.261665674070063,
+        "count": 1
+      }
+    },
+    "4L_M_YN_L": {
+      "SELL": {
+        "value": 89.9260705377942,
+        "count": 220
+      },
+      "PRODUCE": {
+        "value": 98.42144250157047,
+        "count": 808
+      },
+      "RISK_CARD": {
+        "value": 91.19842603282339,
+        "count": 193
+      },
+      "BUY_CHIP": {
+        "value": 90.86189283695678,
+        "count": 40
+      },
+      "HIRE_SALESMAN": {
+        "value": 68.75794873438225,
+        "count": 16
+      }
+    },
+    "4L_L_YN_L": {
+      "PRODUCE": {
+        "value": 98.23768954749393,
+        "count": 172
+      },
+      "RISK_CARD": {
+        "value": 89.08639474638304,
+        "count": 115
+      },
+      "SELL": {
+        "value": 83.46308183997527,
+        "count": 54
+      },
+      "BUY_CHIP": {
+        "value": 67.75740818086214,
+        "count": 15
+      },
+      "HIRE_SALESMAN": {
+        "value": 11.688593641821122,
+        "count": 1
+      }
+    },
+    "4L_L_YY_L": {
+      "PRODUCE": {
+        "value": 101.58345590333126,
+        "count": 357
+      },
+      "RISK_CARD": {
+        "value": 95.62783983755598,
+        "count": 617
+      },
+      "SELL": {
+        "value": 92.68053544668601,
+        "count": 308
+      },
+      "BUY_CHIP": {
+        "value": 98.17984618946925,
+        "count": 25
+      },
+      "BUY_MATERIALS": {
+        "value": 95.3404229851301,
+        "count": 38
+      },
+      "HIRE_SALESMAN": {
+        "value": 13.85132328479275,
+        "count": 1
+      }
+    },
+    "4M_L_YN_L": {
+      "PRODUCE": {
+        "value": 104.06513466450275,
+        "count": 321
+      },
+      "RISK_CARD": {
+        "value": 95.08454549260495,
+        "count": 194
+      },
+      "BUY_CHIP": {
+        "value": 102.05796041893775,
+        "count": 43
+      },
+      "SELL": {
+        "value": 94.88355176761785,
+        "count": 143
+      },
+      "HIRE_SALESMAN": {
+        "value": 33.370681514091004,
+        "count": 4
+      }
+    },
+    "4M_M_NN_L": {
+      "SELL": {
+        "value": 107.70812410947752,
+        "count": 889
+      },
+      "RISK_CARD": {
+        "value": 103.82738411272629,
+        "count": 434
+      },
+      "BUY_CHIP": {
+        "value": 103.22078713245773,
+        "count": 624
+      },
+      "PRODUCE": {
+        "value": 102.95772489776489,
+        "count": 169
+      },
+      "HIRE_WORKER": {
+        "value": 3.7414471946006733,
+        "count": 2
+      },
+      "DO_NOTHING": {
+        "value": 0.6905534329090572,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 87.72262655288328,
+        "count": 17
+      }
+    },
+    "4M_L_NN_L": {
+      "SELL": {
+        "value": 96.64555607765323,
+        "count": 110
+      },
+      "RISK_CARD": {
+        "value": 94.18983504370462,
+        "count": 3486
+      },
+      "DO_NOTHING": {
+        "value": 92.5346366051735,
+        "count": 12835
+      },
+      "BUY_CHIP": {
+        "value": 100.04905354737038,
+        "count": 386
+      },
+      "PRODUCE": {
+        "value": 65.00040686410696,
+        "count": 14
+      },
+      "HIRE_SALESMAN": {
+        "value": 74.87752954549481,
+        "count": 19
+      }
+    },
+    "4E_M_NN_L": {
+      "SELL": {
+        "value": 111.79073179101157,
+        "count": 1005
+      },
+      "RISK_CARD": {
+        "value": 109.04824660932466,
+        "count": 329
+      },
+      "BUY_CHIP": {
+        "value": 105.03015292176968,
+        "count": 241
+      },
+      "PRODUCE": {
+        "value": 105.62791114132189,
+        "count": 212
+      },
+      "HIRE_SALESMAN": {
+        "value": 77.7477845845808,
+        "count": 18
+      },
+      "DO_NOTHING": {
+        "value": 17.823434223368373,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 71.28453961867922,
+        "count": 8
+      },
+      "HIRE_WORKER": {
+        "value": 44.519485404720776,
+        "count": 4
+      },
+      "INVEST_HIRE": {
+        "value": 38.99959959160732,
+        "count": 3
+      }
+    },
+    "2L_M_YN_L": {
+      "RISK_CARD": {
+        "value": 124.19108402575291,
+        "count": 113
+      },
+      "PRODUCE": {
+        "value": 132.2674090573172,
+        "count": 286
+      },
+      "HIRE_SALESMAN": {
+        "value": 84.54963140069947,
+        "count": 10
+      },
+      "SELL": {
+        "value": 125.18110548001971,
+        "count": 243
+      },
+      "BUY_CHIP": {
+        "value": 68.30598282563916,
+        "count": 7
+      }
+    },
+    "2L_M_NN_L": {
+      "RISK_CARD": {
+        "value": 126.75003338678489,
+        "count": 201
+      },
+      "PRODUCE": {
+        "value": 119.55364810658652,
+        "count": 28
+      },
+      "SELL": {
+        "value": 128.89818691426345,
+        "count": 454
+      },
+      "BUY_CHIP": {
+        "value": 131.59328339030466,
+        "count": 43
+      },
+      "HIRE_SALESMAN": {
+        "value": 127.77742701963741,
+        "count": 26
+      },
+      "DO_NOTHING": {
+        "value": 16.714529829485464,
+        "count": 1
+      }
+    },
+    "2M_M_YN_L": {
+      "RISK_CARD": {
+        "value": 124.53539900158722,
+        "count": 360
+      },
+      "BUY_CHIP": {
+        "value": 130.98133346299062,
+        "count": 42
+      },
+      "PRODUCE": {
+        "value": 131.7544000076906,
+        "count": 537
+      },
+      "HIRE_SALESMAN": {
+        "value": 123.09019663389978,
+        "count": 36
+      },
+      "SELL": {
+        "value": 124.01691365489424,
+        "count": 916
+      },
+      "DO_NOTHING": {
+        "value": 32.37235392353004,
+        "count": 2
+      }
+    },
+    "2E_L_NY_L": {
+      "SELL": {
+        "value": 133.22582941457011,
+        "count": 2685
+      },
+      "BUY_CHIP": {
+        "value": 137.46063263139644,
+        "count": 35659
+      },
+      "RISK_CARD": {
+        "value": 130.5173618648489,
+        "count": 19393
+      },
+      "BUY_MATERIALS": {
+        "value": 133.42527626521715,
+        "count": 54290
+      },
+      "HIRE_SALESMAN": {
+        "value": 133.567079093666,
+        "count": 849
+      },
+      "DO_NOTHING": {
+        "value": 128.30419866086527,
+        "count": 9024
+      }
+    },
+    "4E_L_YN_L": {
+      "PRODUCE": {
+        "value": 109.91620552575652,
+        "count": 653
+      },
+      "RISK_CARD": {
+        "value": 102.77058772511816,
+        "count": 507
+      },
+      "SELL": {
+        "value": 101.96745132051942,
+        "count": 842
+      },
+      "HIRE_WORKER": {
+        "value": 22.530108093827156,
+        "count": 4
+      },
+      "BUY_CHIP": {
+        "value": 107.8107237195144,
+        "count": 62
+      },
+      "HIRE_SALESMAN": {
+        "value": 57.943807078804404,
+        "count": 8
+      },
+      "INVEST_HIRE": {
+        "value": 89.40452853086926,
+        "count": 16
+      },
+      "INVEST_MINIMAL": {
+        "value": 104.18684487845826,
+        "count": 214
+      }
+    },
+    "3M_H_YY_L": {
+      "BUY_MATERIALS": {
+        "value": 124.66137968416078,
+        "count": 193
+      },
+      "PRODUCE": {
+        "value": 132.4942882600304,
+        "count": 2270
+      },
+      "SELL": {
+        "value": 124.39221064122103,
+        "count": 2623
+      },
+      "RISK_CARD": {
+        "value": 123.6928946581954,
+        "count": 1102
+      },
+      "BUY_CHIP": {
+        "value": 125.8817214650044,
+        "count": 53
+      },
+      "HIRE_SALESMAN": {
+        "value": 110.95787517052939,
+        "count": 26
+      },
+      "DO_NOTHING": {
+        "value": 36.6113035160638,
+        "count": 3
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 13.498788506638736,
+        "count": 1
+      },
+      "HIRE_WORKER": {
+        "value": 17.67514283112611,
+        "count": 1
+      }
+    },
+    "5M_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 32.90365918034952,
+        "count": 25977
+      },
+      "RISK_CARD": {
+        "value": 33.25334788707401,
+        "count": 6898
+      },
+      "BUY_CHIP": {
+        "value": 39.163538236882125,
+        "count": 63
+      },
+      "PRODUCE": {
+        "value": 6.2059377208974045,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 3.2980954811786,
+        "count": 1
+      }
+    },
+    "5E_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 67.74414547894696,
+        "count": 21278
+      },
+      "RISK_CARD": {
+        "value": 69.57377763043492,
+        "count": 5711
+      },
+      "BUY_CHIP": {
+        "value": 75.43459247193948,
+        "count": 318
+      },
+      "PRODUCE": {
+        "value": 45.104291494189795,
+        "count": 8
+      },
+      "HIRE_SALESMAN": {
+        "value": 20.701711323453907,
+        "count": 3
+      },
+      "INVEST_MINIMAL": {
+        "value": 70.18024222070585,
+        "count": 1668
+      },
+      "INVEST_HIRE": {
+        "value": 38.06378567459329,
+        "count": 5
+      }
+    },
+    "4L_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 78.49961266487674,
+        "count": 10781
+      },
+      "RISK_CARD": {
+        "value": 78.20905683026558,
+        "count": 2777
+      },
+      "BUY_CHIP": {
+        "value": 85.77978721398924,
+        "count": 134
+      },
+      "SELL": {
+        "value": 83.77738999023477,
+        "count": 59
+      },
+      "HIRE_SALESMAN": {
+        "value": 65.04372801317278,
+        "count": 16
+      },
+      "PRODUCE": {
+        "value": 42.14611169770808,
+        "count": 7
+      }
+    },
+    "4E_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 101.43927204086081,
+        "count": 10071
+      },
+      "RISK_CARD": {
+        "value": 101.5047024188478,
+        "count": 2661
+      },
+      "SELL": {
+        "value": 107.31543130247545,
+        "count": 503
+      },
+      "BUY_CHIP": {
+        "value": 108.3593665295988,
+        "count": 636
+      },
+      "HIRE_SALESMAN": {
+        "value": 73.15278617517343,
+        "count": 16
+      },
+      "HIRE_WORKER": {
+        "value": 28.030100896598718,
+        "count": 5
+      },
+      "PRODUCE": {
+        "value": 104.02874065552136,
+        "count": 112
+      },
+      "INVEST_MINIMAL": {
+        "value": 102.91682939236469,
+        "count": 554
+      },
+      "INVEST_HIRE": {
+        "value": 77.7905052534104,
+        "count": 11
+      }
+    },
+    "3L_M_YN_L": {
+      "PRODUCE": {
+        "value": 118.33680703724878,
+        "count": 288
+      },
+      "SELL": {
+        "value": 111.5010645119082,
+        "count": 222
+      },
+      "RISK_CARD": {
+        "value": 103.09304188878241,
+        "count": 101
+      },
+      "BUY_CHIP": {
+        "value": 54.965891827414055,
+        "count": 8
+      },
+      "HIRE_SALESMAN": {
+        "value": 61.21544363056361,
+        "count": 12
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 53.0237908261445,
+        "count": 10
+      },
+      "HIRE_WORKER": {
+        "value": 8.393910881771154,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 23.351210196821214,
+        "count": 2
+      }
+    },
+    "3M_M_YN_L": {
+      "HIRE_WORKER": {
+        "value": 0.40425389326196526,
+        "count": 1
+      },
+      "SELL": {
+        "value": 120.25929931760561,
+        "count": 620
+      },
+      "HIRE_SALESMAN": {
+        "value": 92.25037437269093,
+        "count": 13
+      },
+      "PRODUCE": {
+        "value": 129.41852785113284,
+        "count": 437
+      },
+      "RISK_CARD": {
+        "value": 120.41645403187503,
+        "count": 214
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 70.58864054827401,
+        "count": 16
+      },
+      "BUY_CHIP": {
+        "value": 115.77011216062186,
+        "count": 35
+      },
+      "DO_NOTHING": {
+        "value": 7.883325324239938,
+        "count": 1
+      }
+    },
+    "3M_L_YN_L": {
+      "PRODUCE": {
+        "value": 124.85339501822178,
+        "count": 500
+      },
+      "BUY_CHIP": {
+        "value": 117.42491875696933,
+        "count": 42
+      },
+      "SELL": {
+        "value": 115.41549482927081,
+        "count": 434
+      },
+      "RISK_CARD": {
+        "value": 117.49538582814696,
+        "count": 199
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 65.80346793397207,
+        "count": 8
+      },
+      "HIRE_SALESMAN": {
+        "value": 96.68525853151718,
+        "count": 14
+      },
+      "HIRE_WORKER": {
+        "value": 19.32617769761925,
+        "count": 2
+      }
+    },
+    "3M_L_YY_L": {
+      "RISK_CARD": {
+        "value": 125.16526252318488,
+        "count": 5423
+      },
+      "BUY_MATERIALS": {
+        "value": 128.2654091326694,
+        "count": 527
+      },
+      "SELL": {
+        "value": 123.4161229449871,
+        "count": 8849
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 130.21692669410345,
+        "count": 49
+      },
+      "PRODUCE": {
+        "value": 132.16545381465042,
+        "count": 13029
+      },
+      "BUY_CHIP": {
+        "value": 131.8260057953968,
+        "count": 661
+      },
+      "HIRE_SALESMAN": {
+        "value": 127.65357148610788,
+        "count": 150
+      },
+      "HIRE_WORKER": {
+        "value": 23.49740604704415,
+        "count": 2
+      },
+      "DO_NOTHING": {
+        "value": 105.82585277018305,
+        "count": 13
+      }
+    },
+    "5E_M_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 104.0281664952034,
+        "count": 1142
+      },
+      "RISK_CARD": {
+        "value": 101.29988960190332,
+        "count": 440
+      },
+      "BUY_CHIP": {
+        "value": 105.1778433615177,
+        "count": 151
+      },
+      "DO_NOTHING": {
+        "value": 20.60602204530063,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 99.61145657563117,
+        "count": 279
+      },
+      "HIRE_SALESMAN": {
+        "value": 12.477418242227849,
+        "count": 1
+      },
+      "SELL": {
+        "value": 13.412819292243439,
+        "count": 1
+      },
+      "INVEST_HIRE": {
+        "value": 27.47326828410039,
+        "count": 2
+      }
+    },
+    "3L_H_YY_L": {
+      "RISK_CARD": {
+        "value": 114.46650970176812,
+        "count": 470
+      },
+      "SELL": {
+        "value": 113.57213450493177,
+        "count": 977
+      },
+      "BUY_MATERIALS": {
+        "value": 113.84566597063841,
+        "count": 89
+      },
+      "PRODUCE": {
+        "value": 122.50400234545042,
+        "count": 1582
+      },
+      "BUY_CHIP": {
+        "value": 91.59159445431348,
+        "count": 20
+      },
+      "HIRE_SALESMAN": {
+        "value": 91.53037768648564,
+        "count": 15
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 11.952602321432797,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 12.864461571153447,
+        "count": 1
+      }
+    },
+    "2M_H_NN_L": {
+      "RISK_CARD": {
+        "value": 128.38807481202463,
+        "count": 91
+      },
+      "PRODUCE": {
+        "value": 59.32868425436701,
+        "count": 14
+      },
+      "SELL": {
+        "value": 130.7988540872307,
+        "count": 240
+      },
+      "HIRE_SALESMAN": {
+        "value": 20.614677161906087,
+        "count": 2
+      },
+      "BUY_CHIP": {
+        "value": 87.9667174471384,
+        "count": 8
+      }
+    },
+    "2E_H_NN_L": {
+      "RISK_CARD": {
+        "value": 98.98831656913215,
+        "count": 15
+      },
+      "SELL": {
+        "value": 130.55588068438317,
+        "count": 71
+      },
+      "HIRE_SALESMAN": {
+        "value": 19.2980451980339,
+        "count": 1
+      },
+      "PRODUCE": {
+        "value": 20.176951891119348,
+        "count": 1
+      }
+    },
+    "3L_L_NY_L": {
+      "RISK_CARD": {
+        "value": 118.73042369454383,
+        "count": 27742
+      },
+      "BUY_MATERIALS": {
+        "value": 119.91906296328872,
+        "count": 6815
+      },
+      "DO_NOTHING": {
+        "value": 117.98367463675936,
+        "count": 98354
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 125.78796046254534,
+        "count": 69
+      },
+      "BUY_CHIP": {
+        "value": 124.69933943363058,
+        "count": 1457
+      },
+      "SELL": {
+        "value": 120.98058784610437,
+        "count": 1913
+      },
+      "HIRE_WORKER": {
+        "value": 49.051248689644225,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 119.0845487921751,
+        "count": 154
+      }
+    },
+    "3M_L_NY_L": {
+      "RISK_CARD": {
+        "value": 126.13945582174233,
+        "count": 41184
+      },
+      "BUY_MATERIALS": {
+        "value": 126.7549149668614,
+        "count": 13551
+      },
+      "DO_NOTHING": {
+        "value": 124.94703439461875,
+        "count": 139145
+      },
+      "BUY_CHIP": {
+        "value": 133.85659379683935,
+        "count": 5981
+      },
+      "HIRE_WORKER": {
+        "value": 74.79673813699998,
+        "count": 8
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 133.83554279330002,
+        "count": 111
+      },
+      "SELL": {
+        "value": 129.2540709286091,
+        "count": 3642
+      },
+      "HIRE_SALESMAN": {
+        "value": 127.31823426149369,
+        "count": 287
+      }
+    },
+    "3E_L_NY_L": {
+      "RISK_CARD": {
+        "value": 135.6060434585155,
+        "count": 34088
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 144.054396710826,
+        "count": 167
+      },
+      "BUY_MATERIALS": {
+        "value": 138.9705252826453,
+        "count": 17286
+      },
+      "BUY_CHIP": {
+        "value": 144.4107936616515,
+        "count": 20901
+      },
+      "SELL": {
+        "value": 137.19330410521763,
+        "count": 3945
+      },
+      "HIRE_SALESMAN": {
+        "value": 138.19213962927844,
+        "count": 430
+      },
+      "DO_NOTHING": {
+        "value": 135.10118940786634,
+        "count": 95419
+      },
+      "HIRE_WORKER": {
+        "value": 38.63287195908539,
+        "count": 4
+      },
+      "INVEST_MINIMAL": {
+        "value": 137.01779659119973,
+        "count": 17651
+      },
+      "INVEST_MACHINE": {
+        "value": 130.93796636612893,
+        "count": 122
+      }
+    },
+    "3L_M_NN_L": {
+      "SELL": {
+        "value": 118.61538798989459,
+        "count": 315
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 74.86975672616686,
+        "count": 20
+      },
+      "RISK_CARD": {
+        "value": 113.36261754906788,
+        "count": 103
+      },
+      "BUY_CHIP": {
+        "value": 113.04231545552042,
+        "count": 42
+      },
+      "PRODUCE": {
+        "value": 91.92429793733662,
+        "count": 17
+      },
+      "HIRE_WORKER": {
+        "value": 28.580433379413172,
+        "count": 3
+      },
+      "HIRE_SALESMAN": {
+        "value": 70.2019285429085,
+        "count": 6
+      }
+    },
+    "3L_L_YN_L": {
+      "PRODUCE": {
+        "value": 117.54377947071865,
+        "count": 405
+      },
+      "SELL": {
+        "value": 108.4954841874649,
+        "count": 203
+      },
+      "RISK_CARD": {
+        "value": 109.0294645025795,
+        "count": 128
+      },
+      "BUY_CHIP": {
+        "value": 104.60923598961708,
+        "count": 21
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 35.95167259117163,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 50.50203718276802,
+        "count": 5
+      }
+    },
+    "3M_M_NN_L": {
+      "BUY_LARGE_MACHINE": {
+        "value": 95.54475846413614,
+        "count": 58
+      },
+      "BUY_CHIP": {
+        "value": 125.66965749943299,
+        "count": 150
+      },
+      "SELL": {
+        "value": 125.36605772426121,
+        "count": 461
+      },
+      "RISK_CARD": {
+        "value": 123.46987072962217,
+        "count": 211
+      },
+      "PRODUCE": {
+        "value": 88.32243921756285,
+        "count": 17
+      },
+      "HIRE_WORKER": {
+        "value": 42.95731141674803,
+        "count": 9
+      },
+      "HIRE_SALESMAN": {
+        "value": 92.71033710723714,
+        "count": 11
+      },
+      "DO_NOTHING": {
+        "value": 15.874282135505116,
+        "count": 1
+      }
+    },
+    "3L_M_YY_L": {
+      "SELL": {
+        "value": 114.65359508976026,
+        "count": 3163
+      },
+      "PRODUCE": {
+        "value": 123.22643035389571,
+        "count": 5417
+      },
+      "BUY_MATERIALS": {
+        "value": 118.81311925126435,
+        "count": 307
+      },
+      "RISK_CARD": {
+        "value": 115.97626390822087,
+        "count": 1786
+      },
+      "BUY_CHIP": {
+        "value": 120.20879402782963,
+        "count": 105
+      },
+      "HIRE_SALESMAN": {
+        "value": 115.61833131055084,
+        "count": 59
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 67.2071432021777,
+        "count": 8
+      },
+      "DO_NOTHING": {
+        "value": 17.305123729043803,
+        "count": 1
+      }
+    },
+    "3L_L_YY_L": {
+      "PRODUCE": {
+        "value": 123.57726269033263,
+        "count": 7266
+      },
+      "SELL": {
+        "value": 114.2231972772674,
+        "count": 3613
+      },
+      "RISK_CARD": {
+        "value": 117.40159980835365,
+        "count": 2733
+      },
+      "BUY_MATERIALS": {
+        "value": 118.51182634429725,
+        "count": 270
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 108.87636544655061,
+        "count": 17
+      },
+      "BUY_CHIP": {
+        "value": 123.49978726809606,
+        "count": 312
+      },
+      "HIRE_SALESMAN": {
+        "value": 117.36843600422321,
+        "count": 47
+      },
+      "DO_NOTHING": {
+        "value": 80.47266300599719,
+        "count": 8
+      },
+      "HIRE_WORKER": {
+        "value": 17.101227228600383,
+        "count": 1
+      }
+    },
+    "2L_H_YY_L": {
+      "PRODUCE": {
+        "value": 103.26944460786531,
+        "count": 33
+      },
+      "RISK_CARD": {
+        "value": 61.39331261519957,
+        "count": 10
+      },
+      "SELL": {
+        "value": 99.14072279095195,
+        "count": 23
+      },
+      "BUY_MATERIALS": {
+        "value": 30.71489628538921,
+        "count": 2
+      }
+    },
+    "5E_M_YN_L": {
+      "RISK_CARD": {
+        "value": 83.98117486207774,
+        "count": 93
+      },
+      "PRODUCE": {
+        "value": 76.7829339188085,
+        "count": 24
+      },
+      "BUY_CHIP": {
+        "value": 93.39616837782671,
+        "count": 109
+      },
+      "INVEST_MINIMAL": {
+        "value": 86.59925149994639,
+        "count": 175
+      },
+      "INVEST_HIRE": {
+        "value": 10.702607177689343,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 30.793160558092744,
+        "count": 3
+      }
+    },
+    "5L_L_NY_H": {
+      "RISK_CARD": {
+        "value": 20.61349860653215,
+        "count": 326
+      },
+      "DO_NOTHING": {
+        "value": 20.61728052736506,
+        "count": 1196
+      },
+      "BUY_CHIP": {
+        "value": 27.639344668999,
+        "count": 52
+      },
+      "BUY_MATERIALS": {
+        "value": 19.58141312928966,
+        "count": 34
+      },
+      "SELL": {
+        "value": 6.562606644764587,
+        "count": 3
+      }
+    },
+    "5M_L_NY_H": {
+      "RISK_CARD": {
+        "value": 55.58555164500682,
+        "count": 309
+      },
+      "DO_NOTHING": {
+        "value": 55.265027616213864,
+        "count": 1403
+      },
+      "BUY_CHIP": {
+        "value": 60.522169733046546,
+        "count": 111
+      },
+      "BUY_MATERIALS": {
+        "value": 43.55939572819549,
+        "count": 49
+      },
+      "SELL": {
+        "value": 8.53466365652417,
+        "count": 2
+      }
+    },
+    "4E_H_YY_L": {
+      "PRODUCE": {
+        "value": 111.00650094016159,
+        "count": 993
+      },
+      "RISK_CARD": {
+        "value": 103.19531770909644,
+        "count": 307
+      },
+      "SELL": {
+        "value": 101.9288147544189,
+        "count": 552
+      },
+      "BUY_MATERIALS": {
+        "value": 103.57133579125309,
+        "count": 71
+      },
+      "BUY_CHIP": {
+        "value": 85.36308042515236,
+        "count": 14
+      },
+      "HIRE_SALESMAN": {
+        "value": 73.08558423413794,
+        "count": 10
+      },
+      "INVEST_MINIMAL": {
+        "value": 71.05840377483227,
+        "count": 10
+      }
+    },
+    "5L_L_YN_L": {
+      "DO_NOTHING": {
+        "value": 7.50799683878781,
+        "count": 4390
+      },
+      "RISK_CARD": {
+        "value": 10.66348023822458,
+        "count": 1127
+      },
+      "BUY_CHIP": {
+        "value": 5.11926502816735,
+        "count": 7
+      },
+      "PRODUCE": {
+        "value": 15.636899730189736,
+        "count": 31
+      },
+      "HIRE_SALESMAN": {
+        "value": 2.010617574724165,
+        "count": 1
+      }
+    },
+    "5M_L_YN_L": {
+      "DO_NOTHING": {
+        "value": 20.78961787342636,
+        "count": 6694
+      },
+      "RISK_CARD": {
+        "value": 22.263496161337354,
+        "count": 1615
+      },
+      "BUY_CHIP": {
+        "value": 18.866074425822422,
+        "count": 17
+      },
+      "HIRE_SALESMAN": {
+        "value": 4.586574408711252,
+        "count": 6
+      },
+      "PRODUCE": {
+        "value": 26.008019285579714,
+        "count": 27
+      }
+    },
+    "5E_L_YN_L": {
+      "DO_NOTHING": {
+        "value": 84.06406852895469,
+        "count": 5845
+      },
+      "BUY_CHIP": {
+        "value": 95.15040882040036,
+        "count": 528
+      },
+      "RISK_CARD": {
+        "value": 74.43891857189965,
+        "count": 1498
+      },
+      "PRODUCE": {
+        "value": 90.84198141663423,
+        "count": 122
+      },
+      "HIRE_SALESMAN": {
+        "value": 38.11024636675771,
+        "count": 6
+      },
+      "INVEST_MINIMAL": {
+        "value": 88.42328265053979,
+        "count": 436
+      },
+      "INVEST_HIRE": {
+        "value": 38.215571443324876,
+        "count": 4
+      }
+    },
+    "4M_M_YY_L": {
+      "SELL": {
+        "value": 104.75820649161518,
+        "count": 2223
+      },
+      "RISK_CARD": {
+        "value": 105.46287381217982,
+        "count": 1740
+      },
+      "PRODUCE": {
+        "value": 113.39977391656396,
+        "count": 3944
+      },
+      "HIRE_SALESMAN": {
+        "value": 104.03700471457903,
+        "count": 50
+      },
+      "BUY_MATERIALS": {
+        "value": 108.81150851054909,
+        "count": 515
+      },
+      "BUY_CHIP": {
+        "value": 114.6796943573972,
+        "count": 178
+      },
+      "DO_NOTHING": {
+        "value": 27.196941853021016,
+        "count": 2
+      }
+    },
+    "2L_L_NY_L": {
+      "RISK_CARD": {
+        "value": 130.33574373144512,
+        "count": 21954
+      },
+      "DO_NOTHING": {
+        "value": 129.01076509417845,
+        "count": 69977
+      },
+      "BUY_CHIP": {
+        "value": 135.53441721196873,
+        "count": 3611
+      },
+      "BUY_MATERIALS": {
+        "value": 135.69886824892575,
+        "count": 9000
+      },
+      "SELL": {
+        "value": 134.17626144096963,
+        "count": 1996
+      },
+      "HIRE_SALESMAN": {
+        "value": 133.3269838847481,
+        "count": 416
+      }
+    },
+    "2M_L_YN_L": {
+      "PRODUCE": {
+        "value": 131.7160319164528,
+        "count": 722
+      },
+      "RISK_CARD": {
+        "value": 124.52678204989319,
+        "count": 202
+      },
+      "BUY_CHIP": {
+        "value": 125.99529999031445,
+        "count": 27
+      },
+      "SELL": {
+        "value": 122.78610882923005,
+        "count": 410
+      },
+      "HIRE_SALESMAN": {
+        "value": 121.62278410857387,
+        "count": 26
+      },
+      "DO_NOTHING": {
+        "value": 6.543320145461332,
+        "count": 1
+      }
+    },
+    "2M_L_NY_L": {
+      "SELL": {
+        "value": 132.07916273227647,
+        "count": 5810
+      },
+      "BUY_MATERIALS": {
+        "value": 133.7117415728515,
+        "count": 17270
+      },
+      "RISK_CARD": {
+        "value": 129.51109240502697,
+        "count": 34578
+      },
+      "BUY_CHIP": {
+        "value": 136.08432320899635,
+        "count": 19098
+      },
+      "HIRE_SALESMAN": {
+        "value": 132.0689338388261,
+        "count": 890
+      },
+      "DO_NOTHING": {
+        "value": 128.0965271669488,
+        "count": 91692
+      }
+    },
+    "2L_H_YN_L": {
+      "PRODUCE": {
+        "value": 111.05458607646325,
+        "count": 33
+      },
+      "RISK_CARD": {
+        "value": 30.94444808522475,
+        "count": 3
+      },
+      "SELL": {
+        "value": 91.6902623583105,
+        "count": 19
+      }
+    },
+    "3L_L_NN_L": {
+      "SELL": {
+        "value": 113.98625119354377,
+        "count": 87
+      },
+      "RISK_CARD": {
+        "value": 108.79833860636772,
+        "count": 583
+      },
+      "DO_NOTHING": {
+        "value": 106.6498068422305,
+        "count": 1828
+      },
+      "BUY_CHIP": {
+        "value": 111.70256653527974,
+        "count": 140
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 67.75770218322077,
+        "count": 15
+      },
+      "HIRE_WORKER": {
+        "value": 47.231231142730934,
+        "count": 6
+      },
+      "PRODUCE": {
+        "value": 106.49787001345244,
+        "count": 31
+      },
+      "HIRE_SALESMAN": {
+        "value": 105.37680138347969,
+        "count": 32
+      }
+    },
+    "3M_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 115.4419029016336,
+        "count": 1757
+      },
+      "BUY_CHIP": {
+        "value": 117.18041817172147,
+        "count": 302
+      },
+      "SELL": {
+        "value": 123.56865234784588,
+        "count": 102
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 103.41742470894647,
+        "count": 36
+      },
+      "RISK_CARD": {
+        "value": 116.79723727329193,
+        "count": 490
+      },
+      "HIRE_WORKER": {
+        "value": 68.14463548535704,
+        "count": 9
+      },
+      "HIRE_SALESMAN": {
+        "value": 106.40835323091576,
+        "count": 26
+      },
+      "PRODUCE": {
+        "value": 102.34142245986475,
+        "count": 17
+      }
+    },
+    "3E_L_YN_L": {
+      "PRODUCE": {
+        "value": 129.11399177675992,
+        "count": 488
+      },
+      "SELL": {
+        "value": 122.31677858058453,
+        "count": 694
+      },
+      "RISK_CARD": {
+        "value": 121.91771950123355,
+        "count": 275
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 111.74176021658653,
+        "count": 21
+      },
+      "BUY_CHIP": {
+        "value": 128.97415982661366,
+        "count": 60
+      },
+      "HIRE_SALESMAN": {
+        "value": 104.46424732060133,
+        "count": 16
+      },
+      "HIRE_WORKER": {
+        "value": 20.55902096257291,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 126.45944595703233,
+        "count": 131
+      },
+      "INVEST_MACHINE": {
+        "value": 108.85828712441703,
+        "count": 15
+      },
+      "DO_NOTHING": {
+        "value": 16.820192197850428,
+        "count": 1
+      }
+    },
+    "3E_M_NN_L": {
+      "PRODUCE": {
+        "value": 92.1701745817424,
+        "count": 21
+      },
+      "SELL": {
+        "value": 133.6005234984204,
+        "count": 409
+      },
+      "RISK_CARD": {
+        "value": 126.31524401234196,
+        "count": 230
+      },
+      "BUY_CHIP": {
+        "value": 135.27819496495633,
+        "count": 227
+      },
+      "HIRE_SALESMAN": {
+        "value": 89.9962643218741,
+        "count": 10
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 122.6899877930965,
+        "count": 33
+      },
+      "HIRE_WORKER": {
+        "value": 22.185917244249403,
+        "count": 2
+      },
+      "INVEST_MINIMAL": {
+        "value": 126.21428570692203,
+        "count": 100
+      },
+      "INVEST_MACHINE": {
+        "value": 77.9102634842768,
+        "count": 6
+      },
+      "DO_NOTHING": {
+        "value": 48.68310173519795,
+        "count": 3
+      }
+    },
+    "3E_L_YY_L": {
+      "PRODUCE": {
+        "value": 142.77644064679728,
+        "count": 10965
+      },
+      "SELL": {
+        "value": 133.4604103549546,
+        "count": 9799
+      },
+      "RISK_CARD": {
+        "value": 136.1102086524799,
+        "count": 5265
+      },
+      "BUY_MATERIALS": {
+        "value": 135.87584192526722,
+        "count": 623
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 134.2337427549279,
+        "count": 39
+      },
+      "HIRE_SALESMAN": {
+        "value": 136.5911729938913,
+        "count": 145
+      },
+      "BUY_CHIP": {
+        "value": 142.62999579551257,
+        "count": 757
+      },
+      "DO_NOTHING": {
+        "value": 97.71588851087537,
+        "count": 9
+      },
+      "INVEST_MINIMAL": {
+        "value": 135.69302280239697,
+        "count": 866
+      },
+      "INVEST_MACHINE": {
+        "value": 132.54300315063546,
+        "count": 51
+      },
+      "HIRE_WORKER": {
+        "value": 14.11912675427428,
+        "count": 1
+      }
+    },
+    "3E_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 114.97980026069982,
+        "count": 565
+      },
+      "BUY_CHIP": {
+        "value": 121.12855520199061,
+        "count": 341
+      },
+      "RISK_CARD": {
+        "value": 117.08664889017584,
+        "count": 257
+      },
+      "SELL": {
+        "value": 120.64974557535525,
+        "count": 135
+      },
+      "PRODUCE": {
+        "value": 87.35606089073477,
+        "count": 12
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 110.37388283517126,
+        "count": 28
+      },
+      "HIRE_WORKER": {
+        "value": 37.71713207311363,
+        "count": 3
+      },
+      "HIRE_SALESMAN": {
+        "value": 99.20146349015482,
+        "count": 14
+      },
+      "INVEST_MINIMAL": {
+        "value": 117.0366832690155,
+        "count": 44
+      },
+      "INVEST_MACHINE": {
+        "value": 63.23898354611587,
+        "count": 5
+      }
+    },
+    "4M_L_YY_L": {
+      "RISK_CARD": {
+        "value": 107.26382007319408,
+        "count": 1208
+      },
+      "PRODUCE": {
+        "value": 105.8829019142699,
+        "count": 1043
+      },
+      "BUY_MATERIALS": {
+        "value": 108.43634719038482,
+        "count": 130
+      },
+      "SELL": {
+        "value": 105.4029145278911,
+        "count": 900
+      },
+      "BUY_CHIP": {
+        "value": 114.5919643926231,
+        "count": 142
+      },
+      "DO_NOTHING": {
+        "value": 7.979300199808654,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 83.36468735371318,
+        "count": 11
+      }
+    },
+    "4L_M_NY_H": {
+      "BUY_MATERIALS": {
+        "value": 90.2836607876731,
+        "count": 171
+      },
+      "SELL": {
+        "value": 81.90671772956978,
+        "count": 36
+      },
+      "RISK_CARD": {
+        "value": 91.12171241599252,
+        "count": 55
+      },
+      "BUY_CHIP": {
+        "value": 68.7887445622562,
+        "count": 13
+      },
+      "PRODUCE": {
+        "value": 53.21743524131976,
+        "count": 8
+      },
+      "HIRE_SALESMAN": {
+        "value": 8.750582541067853,
+        "count": 1
+      }
+    },
+    "4M_H_NN_H": {
+      "SELL": {
+        "value": 67.13482509355066,
+        "count": 56
+      },
+      "BUY_CHIP": {
+        "value": 74.13743109073945,
+        "count": 69
+      },
+      "RISK_CARD": {
+        "value": 54.55708548385123,
+        "count": 30
+      },
+      "PRODUCE": {
+        "value": 29.790620815584038,
+        "count": 4
+      }
+    },
+    "4M_M_YN_H": {
+      "PRODUCE": {
+        "value": 71.59713722066347,
+        "count": 88
+      },
+      "BUY_CHIP": {
+        "value": 31.028158539158568,
+        "count": 8
+      },
+      "SELL": {
+        "value": 54.40628439263865,
+        "count": 34
+      },
+      "RISK_CARD": {
+        "value": 53.3286507977514,
+        "count": 27
+      },
+      "HIRE_SALESMAN": {
+        "value": 8.043738128060967,
+        "count": 2
+      }
+    },
+    "4M_M_NY_H": {
+      "SELL": {
+        "value": 62.36505320691375,
+        "count": 38
+      },
+      "RISK_CARD": {
+        "value": 60.209301187974866,
+        "count": 36
+      },
+      "BUY_MATERIALS": {
+        "value": 77.84351742165342,
+        "count": 147
+      },
+      "BUY_CHIP": {
+        "value": 60.27991116550609,
+        "count": 16
+      }
+    },
+    "4M_L_YY_H": {
+      "BUY_MATERIALS": {
+        "value": 17.249009120888392,
+        "count": 4
+      },
+      "PRODUCE": {
+        "value": 55.59522492287565,
+        "count": 24
+      },
+      "RISK_CARD": {
+        "value": 40.409175222572465,
+        "count": 17
+      },
+      "SELL": {
+        "value": 38.77740243107232,
+        "count": 12
+      },
+      "BUY_CHIP": {
+        "value": 43.53391858337949,
+        "count": 11
+      }
+    },
+    "4M_L_YN_H": {
+      "PRODUCE": {
+        "value": 67.55667567837129,
+        "count": 45
+      },
+      "BUY_CHIP": {
+        "value": 44.9711244021981,
+        "count": 13
+      },
+      "SELL": {
+        "value": 48.96092984216697,
+        "count": 25
+      },
+      "RISK_CARD": {
+        "value": 43.40934319557819,
+        "count": 13
+      },
+      "HIRE_SALESMAN": {
+        "value": 16.11386357258693,
+        "count": 2
+      }
+    },
+    "4M_L_NY_H": {
+      "BUY_CHIP": {
+        "value": 56.64951338693422,
+        "count": 23
+      },
+      "RISK_CARD": {
+        "value": 51.79789259937908,
+        "count": 26
+      },
+      "BUY_MATERIALS": {
+        "value": 67.15061566308238,
+        "count": 74
+      },
+      "PRODUCE": {
+        "value": 1.2057031434472412,
+        "count": 2
+      },
+      "SELL": {
+        "value": 27.961654010233612,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 8.579691132189224,
+        "count": 3
+      },
+      "DO_NOTHING": {
+        "value": 59.23260347406444,
+        "count": 34
+      }
+    },
+    "2M_H_YN_L": {
+      "SELL": {
+        "value": 52.208953732139776,
+        "count": 10
+      },
+      "RISK_CARD": {
+        "value": 2.9281653019108362,
+        "count": 3
+      },
+      "PRODUCE": {
+        "value": 19.499491598267056,
+        "count": 5
+      }
+    },
+    "3L_H_NN_H": {
+      "RISK_CARD": {
+        "value": 24.311742858660267,
+        "count": 6
+      },
+      "SELL": {
+        "value": 99.42724823173806,
+        "count": 32
+      },
+      "BUY_CHIP": {
+        "value": 40.39695063453374,
+        "count": 4
+      },
+      "PRODUCE": {
+        "value": 23.27096866638695,
+        "count": 3
+      }
+    },
+    "3L_H_YN_H": {
+      "PRODUCE": {
+        "value": 86.69496255510165,
+        "count": 41
+      },
+      "SELL": {
+        "value": 75.9341286285202,
+        "count": 32
+      },
+      "RISK_CARD": {
+        "value": 67.87397090891501,
+        "count": 13
+      }
+    },
+    "3M_H_NY_H": {
+      "BUY_MATERIALS": {
+        "value": 112.93397485645943,
+        "count": 163
+      },
+      "RISK_CARD": {
+        "value": 113.49773572071648,
+        "count": 116
+      },
+      "SELL": {
+        "value": 115.68567519557165,
+        "count": 269
+      },
+      "BUY_CHIP": {
+        "value": 96.39821457830801,
+        "count": 19
+      },
+      "HIRE_WORKER": {
+        "value": 13.121548488951332,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 52.473659433233166,
+        "count": 4
+      }
+    },
+    "3M_H_NN_H": {
+      "SELL": {
+        "value": 101.31969571228962,
+        "count": 58
+      },
+      "RISK_CARD": {
+        "value": 80.77939576117322,
+        "count": 26
+      },
+      "BUY_CHIP": {
+        "value": 92.88646150052551,
+        "count": 16
+      },
+      "PRODUCE": {
+        "value": 56.27067162834527,
+        "count": 11
+      }
+    },
+    "3M_M_YN_H": {
+      "SELL": {
+        "value": 88.93818690724423,
+        "count": 70
+      },
+      "PRODUCE": {
+        "value": 83.65704845006128,
+        "count": 56
+      },
+      "BUY_CHIP": {
+        "value": 50.46546517919616,
+        "count": 9
+      },
+      "RISK_CARD": {
+        "value": 64.04942229279652,
+        "count": 26
+      },
+      "HIRE_SALESMAN": {
+        "value": 19.102985552544055,
+        "count": 2
+      }
+    },
+    "3M_M_NY_H": {
+      "RISK_CARD": {
+        "value": 117.78906203337922,
+        "count": 387
+      },
+      "BUY_CHIP": {
+        "value": 124.73926252782182,
+        "count": 128
+      },
+      "SELL": {
+        "value": 120.89163742654951,
+        "count": 711
+      },
+      "BUY_MATERIALS": {
+        "value": 119.12937820724993,
+        "count": 636
+      },
+      "HIRE_SALESMAN": {
+        "value": 107.20978812476793,
+        "count": 15
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 16.28585834802226,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 17.18240670614092,
+        "count": 1
+      }
+    },
+    "3M_L_YY_H": {
+      "SELL": {
+        "value": 115.85592977263164,
+        "count": 976
+      },
+      "BUY_CHIP": {
+        "value": 124.38386038884813,
+        "count": 129
+      },
+      "PRODUCE": {
+        "value": 123.35348485143513,
+        "count": 931
+      },
+      "RISK_CARD": {
+        "value": 118.93884650750609,
+        "count": 479
+      },
+      "HIRE_SALESMAN": {
+        "value": 85.59365944171293,
+        "count": 10
+      },
+      "BUY_MATERIALS": {
+        "value": 117.44736024882604,
+        "count": 42
+      },
+      "DO_NOTHING": {
+        "value": 57.19268631365105,
+        "count": 5
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 15.877079966460585,
+        "count": 1
+      }
+    },
+    "2L_L_YY_L": {
+      "PRODUCE": {
+        "value": 141.28111304352637,
+        "count": 9468
+      },
+      "SELL": {
+        "value": 130.32585597291018,
+        "count": 4869
+      },
+      "HIRE_SALESMAN": {
+        "value": 133.5327409404004,
+        "count": 84
+      },
+      "RISK_CARD": {
+        "value": 133.5542257069453,
+        "count": 2913
+      },
+      "BUY_MATERIALS": {
+        "value": 136.65516911293219,
+        "count": 173
+      },
+      "BUY_CHIP": {
+        "value": 138.5238871918021,
+        "count": 193
+      },
+      "DO_NOTHING": {
+        "value": 95.93208926944075,
+        "count": 9
+      }
+    },
+    "5E_M_NN_L": {
+      "RISK_CARD": {
+        "value": 89.17798857236546,
+        "count": 137
+      },
+      "BUY_CHIP": {
+        "value": 93.39037787436855,
+        "count": 51
+      },
+      "INVEST_MINIMAL": {
+        "value": 97.37348095516838,
+        "count": 213
+      },
+      "INVEST_HIRE": {
+        "value": 32.07739061615361,
+        "count": 3
+      },
+      "HIRE_SALESMAN": {
+        "value": 13.664551938743326,
+        "count": 1
+      }
+    },
+    "2E_L_YN_L": {
+      "RISK_CARD": {
+        "value": 123.22316474038858,
+        "count": 43
+      },
+      "PRODUCE": {
+        "value": 131.9552023861506,
+        "count": 140
+      },
+      "SELL": {
+        "value": 119.77268613303167,
+        "count": 70
+      },
+      "HIRE_SALESMAN": {
+        "value": 6.763881856630638,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 116.85938557209083,
+        "count": 18
+      }
+    },
+    "2M_H_YY_L": {
+      "PRODUCE": {
+        "value": 68.73411457360227,
+        "count": 12
+      },
+      "SELL": {
+        "value": 41.893749379946506,
+        "count": 5
+      }
+    },
+    "3M_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 99.64027549643258,
+        "count": 902
+      },
+      "BUY_CHIP": {
+        "value": 106.5896117975049,
+        "count": 115
+      },
+      "RISK_CARD": {
+        "value": 102.01685706304619,
+        "count": 247
+      },
+      "HIRE_WORKER": {
+        "value": 11.855932213295484,
+        "count": 2
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 18.506038842583408,
+        "count": 2
+      },
+      "SELL": {
+        "value": 89.09843607356824,
+        "count": 14
+      },
+      "PRODUCE": {
+        "value": 51.95840458475196,
+        "count": 7
+      },
+      "HIRE_SALESMAN": {
+        "value": 41.6567714201236,
+        "count": 4
+      }
+    },
+    "5L_M_NY_L": {
+      "RISK_CARD": {
+        "value": 5.964320321208775,
+        "count": 14
+      },
+      "BUY_MATERIALS": {
+        "value": 8.509731160719923,
+        "count": 12
+      }
+    },
+    "5M_M_NY_L": {
+      "RISK_CARD": {
+        "value": 52.44285866086707,
+        "count": 19
+      },
+      "BUY_MATERIALS": {
+        "value": 53.30881765513332,
+        "count": 17
+      },
+      "BUY_CHIP": {
+        "value": 4.754538761265272,
+        "count": 1
+      }
+    },
+    "4L_H_NY_H": {
+      "RISK_CARD": {
+        "value": 82.58823440572509,
+        "count": 41
+      },
+      "BUY_MATERIALS": {
+        "value": 81.053334831217,
+        "count": 139
+      },
+      "BUY_CHIP": {
+        "value": 26.51532474186251,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 28.666347371612638,
+        "count": 3
+      },
+      "SELL": {
+        "value": 81.72916450934854,
+        "count": 44
+      },
+      "HIRE_WORKER": {
+        "value": 11.721743415041802,
+        "count": 1
+      }
+    },
+    "4L_H_NN_H": {
+      "SELL": {
+        "value": 81.6290171908479,
+        "count": 119
+      },
+      "RISK_CARD": {
+        "value": 74.61899050575236,
+        "count": 34
+      },
+      "BUY_CHIP": {
+        "value": 87.1337604452066,
+        "count": 68
+      },
+      "PRODUCE": {
+        "value": 15.891071385295282,
+        "count": 3
+      },
+      "HIRE_SALESMAN": {
+        "value": 22.22686747208212,
+        "count": 3
+      }
+    },
+    "4L_M_YN_H": {
+      "PRODUCE": {
+        "value": 91.25150351266723,
+        "count": 112
+      },
+      "SELL": {
+        "value": 70.92249468982655,
+        "count": 32
+      },
+      "RISK_CARD": {
+        "value": 66.08957400222282,
+        "count": 22
+      },
+      "HIRE_SALESMAN": {
+        "value": 2.3268002360241247,
+        "count": 2
+      },
+      "BUY_CHIP": {
+        "value": 57.973814253610634,
+        "count": 9
+      }
+    },
+    "4L_L_YY_H": {
+      "SELL": {
+        "value": 46.85401698685379,
+        "count": 9
+      },
+      "RISK_CARD": {
+        "value": 49.1192767189042,
+        "count": 14
+      },
+      "PRODUCE": {
+        "value": 89.79415928213106,
+        "count": 34
+      },
+      "BUY_CHIP": {
+        "value": 5.476144577486872,
+        "count": 1
+      },
+      "BUY_MATERIALS": {
+        "value": 44.267272341988665,
+        "count": 7
+      }
+    },
+    "4M_M_YY_H": {
+      "PRODUCE": {
+        "value": 60.817512617675895,
+        "count": 36
+      },
+      "BUY_CHIP": {
+        "value": 41.302411061568726,
+        "count": 10
+      },
+      "BUY_MATERIALS": {
+        "value": 26.881920448365783,
+        "count": 8
+      },
+      "RISK_CARD": {
+        "value": 48.414766260724484,
+        "count": 14
+      },
+      "SELL": {
+        "value": 46.115584399541746,
+        "count": 21
+      },
+      "HIRE_SALESMAN": {
+        "value": 6.2639991697830135,
+        "count": 1
+      }
+    },
+    "4M_M_NN_H": {
+      "SELL": {
+        "value": 67.7062534074388,
+        "count": 57
+      },
+      "BUY_CHIP": {
+        "value": 83.1134764079782,
+        "count": 165
+      },
+      "RISK_CARD": {
+        "value": 66.68693000332975,
+        "count": 44
+      },
+      "HIRE_SALESMAN": {
+        "value": 20.41739343953177,
+        "count": 4
+      },
+      "PRODUCE": {
+        "value": 9.528048866767367,
+        "count": 1
+      }
+    },
+    "2L_L_NY_H": {
+      "DO_NOTHING": {
+        "value": 131.24768356616198,
+        "count": 5989
+      },
+      "RISK_CARD": {
+        "value": 132.2100409557774,
+        "count": 1588
+      },
+      "BUY_CHIP": {
+        "value": 138.30970710122054,
+        "count": 868
+      },
+      "BUY_MATERIALS": {
+        "value": 136.09426273299235,
+        "count": 118
+      },
+      "SELL": {
+        "value": 132.58586372706597,
+        "count": 49
+      },
+      "HIRE_SALESMAN": {
+        "value": 34.54352223140052,
+        "count": 2
+      }
+    },
+    "2M_L_NY_H": {
+      "DO_NOTHING": {
+        "value": 129.56437612453934,
+        "count": 4272
+      },
+      "RISK_CARD": {
+        "value": 126.39650914780157,
+        "count": 1207
+      },
+      "BUY_CHIP": {
+        "value": 137.25913913814188,
+        "count": 1904
+      },
+      "BUY_MATERIALS": {
+        "value": 124.25314268737684,
+        "count": 50
+      },
+      "SELL": {
+        "value": 121.56031560404895,
+        "count": 32
+      },
+      "HIRE_SALESMAN": {
+        "value": 19.877939652235,
+        "count": 1
+      }
+    },
+    "5L_L_YY_H": {
+      "DO_NOTHING": {
+        "value": 17.774186738474846,
+        "count": 478
+      },
+      "RISK_CARD": {
+        "value": 17.581791020888886,
+        "count": 156
+      },
+      "PRODUCE": {
+        "value": 24.9988593109896,
+        "count": 93
+      },
+      "BUY_CHIP": {
+        "value": 21.835397393692897,
+        "count": 24
+      },
+      "BUY_MATERIALS": {
+        "value": 19.720067731816354,
+        "count": 33
+      },
+      "SELL": {
+        "value": 4.809848132172231,
+        "count": 7
+      },
+      "HIRE_SALESMAN": {
+        "value": 0.7007536232236744,
+        "count": 1
+      }
+    },
+    "5M_L_YY_H": {
+      "DO_NOTHING": {
+        "value": 50.950981924167216,
+        "count": 704
+      },
+      "BUY_CHIP": {
+        "value": 54.188999873090026,
+        "count": 53
+      },
+      "RISK_CARD": {
+        "value": 48.21146480663184,
+        "count": 200
+      },
+      "PRODUCE": {
+        "value": 55.556358002577035,
+        "count": 207
+      },
+      "BUY_MATERIALS": {
+        "value": 43.89492711331599,
+        "count": 50
+      },
+      "SELL": {
+        "value": 28.326438546866463,
+        "count": 13
+      },
+      "HIRE_SALESMAN": {
+        "value": 9.356905682860809,
+        "count": 4
+      }
+    },
+    "5M_M_YY_H": {
+      "PRODUCE": {
+        "value": 38.73960866722557,
+        "count": 74
+      },
+      "BUY_MATERIALS": {
+        "value": 36.798911031032766,
+        "count": 42
+      },
+      "RISK_CARD": {
+        "value": 29.480749644612473,
+        "count": 50
+      },
+      "SELL": {
+        "value": 32.41296513092765,
+        "count": 40
+      },
+      "BUY_CHIP": {
+        "value": 19.613633630140765,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 9.979377766996407,
+        "count": 3
+      }
+    },
+    "5M_M_NY_H": {
+      "BUY_MATERIALS": {
+        "value": 1.8483411648866992,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 24.3359888833388,
+        "count": 8
+      },
+      "BUY_CHIP": {
+        "value": 7.110758773202145,
+        "count": 2
+      },
+      "SELL": {
+        "value": 15.377991534644618,
+        "count": 5
+      }
+    },
+    "5E_M_NY_H": {
+      "RISK_CARD": {
+        "value": 20.811236674596223,
+        "count": 6
+      },
+      "SELL": {
+        "value": 18.155076891390998,
+        "count": 6
+      },
+      "BUY_CHIP": {
+        "value": 24.11062108472078,
+        "count": 6
+      },
+      "BUY_MATERIALS": {
+        "value": 3.9162253234983084,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 1.2812683659735138,
+        "count": 1
+      }
+    },
+    "5E_L_YY_H": {
+      "PRODUCE": {
+        "value": 64.64790907578214,
+        "count": 88
+      },
+      "DO_NOTHING": {
+        "value": 69.28700109873999,
+        "count": 172
+      },
+      "RISK_CARD": {
+        "value": 48.044626954705,
+        "count": 56
+      },
+      "BUY_CHIP": {
+        "value": 80.04689810362514,
+        "count": 95
+      },
+      "SELL": {
+        "value": 25.105985668038826,
+        "count": 8
+      },
+      "BUY_MATERIALS": {
+        "value": 47.84443198467534,
+        "count": 14
+      }
+    },
+    "5E_L_NY_H": {
+      "BUY_CHIP": {
+        "value": 73.0135039668872,
+        "count": 134
+      },
+      "RISK_CARD": {
+        "value": 62.7425098712079,
+        "count": 91
+      },
+      "SELL": {
+        "value": 23.159350401701243,
+        "count": 5
+      },
+      "DO_NOTHING": {
+        "value": 64.22972643158685,
+        "count": 202
+      },
+      "BUY_MATERIALS": {
+        "value": 62.42136787332986,
+        "count": 20
+      }
+    },
+    "5E_H_NY_L": {
+      "BUY_MATERIALS": {
+        "value": 87.91010923005145,
+        "count": 168
+      },
+      "RISK_CARD": {
+        "value": 85.6885854157814,
+        "count": 77
+      },
+      "INVEST_MINIMAL": {
+        "value": 85.37992233252214,
+        "count": 55
+      },
+      "BUY_CHIP": {
+        "value": 72.11936003136405,
+        "count": 22
+      },
+      "HIRE_SALESMAN": {
+        "value": 10.66823018576581,
+        "count": 1
+      }
+    },
+    "5M_M_NN_L": {
+      "RISK_CARD": {
+        "value": 41.43695849379152,
+        "count": 22
+      }
+    },
+    "5L_H_YY_H": {
+      "PRODUCE": {
+        "value": 22.84859233339898,
+        "count": 34
+      },
+      "SELL": {
+        "value": 19.609958495620027,
+        "count": 40
+      },
+      "BUY_MATERIALS": {
+        "value": 18.08863824302922,
+        "count": 26
+      },
+      "RISK_CARD": {
+        "value": 15.403403482215175,
+        "count": 23
+      },
+      "BUY_CHIP": {
+        "value": 2.9548259116710023,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 3.315592634286365,
+        "count": 2
+      }
+    },
+    "5L_M_YY_H": {
+      "PRODUCE": {
+        "value": 21.69715179618547,
+        "count": 33
+      },
+      "SELL": {
+        "value": 18.539125371448808,
+        "count": 35
+      },
+      "BUY_CHIP": {
+        "value": 10.836593292769196,
+        "count": 8
+      },
+      "BUY_MATERIALS": {
+        "value": 17.89460689652128,
+        "count": 39
+      },
+      "RISK_CARD": {
+        "value": 14.964277780386812,
+        "count": 25
+      },
+      "HIRE_SALESMAN": {
+        "value": 7.02749928232036,
+        "count": 4
+      }
+    },
+    "4L_H_YN_H": {
+      "PRODUCE": {
+        "value": 84.27149888765473,
+        "count": 74
+      },
+      "RISK_CARD": {
+        "value": 64.4816158495238,
+        "count": 19
+      },
+      "SELL": {
+        "value": 72.6099029901839,
+        "count": 34
+      },
+      "BUY_CHIP": {
+        "value": 57.205340306754024,
+        "count": 9
+      }
+    },
+    "5L_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 5.764159878856185,
+        "count": 556
+      },
+      "RISK_CARD": {
+        "value": 7.184797026451356,
+        "count": 135
+      },
+      "BUY_CHIP": {
+        "value": 12.265434732669627,
+        "count": 22
+      },
+      "HIRE_SALESMAN": {
+        "value": 1.4518562381435858,
+        "count": 2
+      },
+      "PRODUCE": {
+        "value": 0.8187916404857581,
+        "count": 1
+      }
+    },
+    "5M_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 22.518676900987508,
+        "count": 522
+      },
+      "RISK_CARD": {
+        "value": 26.327687604960857,
+        "count": 147
+      },
+      "BUY_CHIP": {
+        "value": 21.0273284530129,
+        "count": 22
+      },
+      "PRODUCE": {
+        "value": 1.2407290568525957,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 5.549271995122148,
+        "count": 3
+      }
+    },
+    "5E_L_YN_H": {
+      "DO_NOTHING": {
+        "value": 60.58956714717387,
+        "count": 345
+      },
+      "BUY_CHIP": {
+        "value": 73.37253729360343,
+        "count": 112
+      },
+      "RISK_CARD": {
+        "value": 54.82220430013947,
+        "count": 78
+      },
+      "HIRE_SALESMAN": {
+        "value": 9.380439956511738,
+        "count": 2
+      },
+      "PRODUCE": {
+        "value": 45.968293381689904,
+        "count": 14
+      }
+    },
+    "5L_L_YN_H": {
+      "DO_NOTHING": {
+        "value": 11.744619955369233,
+        "count": 615
+      },
+      "RISK_CARD": {
+        "value": 14.357250273599716,
+        "count": 160
+      },
+      "PRODUCE": {
+        "value": 19.21007082226092,
+        "count": 44
+      },
+      "BUY_CHIP": {
+        "value": 19.83771538218684,
+        "count": 35
+      },
+      "HIRE_SALESMAN": {
+        "value": 3.224144086097547,
+        "count": 4
+      }
+    },
+    "5M_L_YN_H": {
+      "DO_NOTHING": {
+        "value": 32.51791438883327,
+        "count": 715
+      },
+      "RISK_CARD": {
+        "value": 30.661165545651606,
+        "count": 188
+      },
+      "BUY_CHIP": {
+        "value": 36.83572086216601,
+        "count": 46
+      },
+      "PRODUCE": {
+        "value": 33.91858340767447,
+        "count": 66
+      },
+      "HIRE_SALESMAN": {
+        "value": 7.97435926064619,
+        "count": 3
+      }
+    },
+    "3L_M_YY_H": {
+      "PRODUCE": {
+        "value": 120.55834303457053,
+        "count": 328
+      },
+      "SELL": {
+        "value": 111.86618327474449,
+        "count": 280
+      },
+      "RISK_CARD": {
+        "value": 113.75856439184892,
+        "count": 139
+      },
+      "BUY_CHIP": {
+        "value": 108.51159817044697,
+        "count": 18
+      },
+      "BUY_MATERIALS": {
+        "value": 103.74775705019583,
+        "count": 19
+      },
+      "HIRE_SALESMAN": {
+        "value": 83.97403481462959,
+        "count": 10
+      }
+    },
+    "2E_H_NY_L": {
+      "RISK_CARD": {
+        "value": 63.57192211137992,
+        "count": 6
+      }
+    },
+    "5L_M_NN_L": {
+      "RISK_CARD": {
+        "value": 13.218738782183012,
+        "count": 21
+      }
+    },
+    "5E_H_NN_L": {
+      "RISK_CARD": {
+        "value": 69.80967416936457,
+        "count": 19
+      },
+      "BUY_CHIP": {
+        "value": 26.984256286900013,
+        "count": 3
+      },
+      "INVEST_MINIMAL": {
+        "value": 87.07084656764641,
+        "count": 50
+      }
+    },
+    "3L_M_YN_H": {
+      "BUY_CHIP": {
+        "value": 38.96746779956119,
+        "count": 5
+      },
+      "PRODUCE": {
+        "value": 81.92611833621423,
+        "count": 20
+      },
+      "SELL": {
+        "value": 75.99556036478829,
+        "count": 26
+      },
+      "RISK_CARD": {
+        "value": 55.40520077660507,
+        "count": 10
+      }
+    },
+    "5L_M_YN_H": {
+      "BUY_CHIP": {
+        "value": 1.2777228768046875,
+        "count": 1
+      },
+      "PRODUCE": {
+        "value": 7.022184785860525,
+        "count": 9
+      },
+      "HIRE_SALESMAN": {
+        "value": 0.6251627853187499,
+        "count": 1
+      },
+      "RISK_CARD": {
+        "value": 1.9822941542055943,
+        "count": 2
+      }
+    },
+    "5M_M_YN_H": {
+      "PRODUCE": {
+        "value": 21.876528759342985,
+        "count": 11
+      },
+      "BUY_CHIP": {
+        "value": 3.9061383558352354,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 17.823486751045657,
+        "count": 7
+      }
+    },
+    "5E_H_YY_L": {
+      "BUY_MATERIALS": {
+        "value": 80.14979628670781,
+        "count": 80
+      },
+      "BUY_CHIP": {
+        "value": 66.48567148246372,
+        "count": 17
+      },
+      "PRODUCE": {
+        "value": 49.44735755394703,
+        "count": 10
+      },
+      "HIRE_SALESMAN": {
+        "value": 21.525407128740774,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 69.93302786769705,
+        "count": 23
+      },
+      "INVEST_MINIMAL": {
+        "value": 78.2631864525907,
+        "count": 27
+      },
+      "SELL": {
+        "value": 13.698700588239115,
+        "count": 1
+      }
+    },
+    "3L_H_NY_H": {
+      "SELL": {
+        "value": 114.09876135534282,
+        "count": 192
+      },
+      "RISK_CARD": {
+        "value": 111.39304420560036,
+        "count": 109
+      },
+      "BUY_MATERIALS": {
+        "value": 113.79530394377151,
+        "count": 170
+      },
+      "BUY_CHIP": {
+        "value": 60.49015503707818,
+        "count": 8
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 14.680585181814958,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 13.97580271688497,
+        "count": 1
+      },
+      "DO_NOTHING": {
+        "value": 13.937255480268574,
+        "count": 1
+      }
+    },
+    "3L_H_YY_H": {
+      "SELL": {
+        "value": 114.86854719285517,
+        "count": 125
+      },
+      "PRODUCE": {
+        "value": 121.30098390031269,
+        "count": 132
+      },
+      "RISK_CARD": {
+        "value": 111.35050546430539,
+        "count": 41
+      },
+      "BUY_MATERIALS": {
+        "value": 47.664809771057804,
+        "count": 5
+      },
+      "BUY_CHIP": {
+        "value": 41.71769078117696,
+        "count": 5
+      },
+      "HIRE_SALESMAN": {
+        "value": 15.852318084500741,
+        "count": 1
+      }
+    },
+    "3L_M_NY_H": {
+      "BUY_CHIP": {
+        "value": 120.62772620040013,
+        "count": 61
+      },
+      "RISK_CARD": {
+        "value": 115.25801097800569,
+        "count": 231
+      },
+      "SELL": {
+        "value": 119.33284696273337,
+        "count": 372
+      },
+      "BUY_MATERIALS": {
+        "value": 117.34869433126815,
+        "count": 392
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 75.65390645747307,
+        "count": 8
+      },
+      "HIRE_SALESMAN": {
+        "value": 89.29442602786311,
+        "count": 10
+      },
+      "DO_NOTHING": {
+        "value": 17.026680217599374,
+        "count": 1
+      }
+    },
+    "5L_M_NN_H": {
+      "RISK_CARD": {
+        "value": 6.280074890604338,
+        "count": 7
+      }
+    },
+    "2L_L_YN_L": {
+      "SELL": {
+        "value": 121.94296725641156,
+        "count": 197
+      },
+      "PRODUCE": {
+        "value": 130.69834167326255,
+        "count": 459
+      },
+      "RISK_CARD": {
+        "value": 124.81138842792475,
+        "count": 116
+      },
+      "BUY_CHIP": {
+        "value": 64.78898023780603,
+        "count": 5
+      },
+      "HIRE_SALESMAN": {
+        "value": 79.671590516664,
+        "count": 7
+      }
+    },
+    "3L_L_YN_H": {
+      "SELL": {
+        "value": 92.63570640420846,
+        "count": 91
+      },
+      "RISK_CARD": {
+        "value": 97.5137423465121,
+        "count": 46
+      },
+      "BUY_CHIP": {
+        "value": 53.86299614774301,
+        "count": 7
+      },
+      "PRODUCE": {
+        "value": 104.60213369052953,
+        "count": 60
+      },
+      "DO_NOTHING": {
+        "value": 84.40059619472204,
+        "count": 19
+      }
+    },
+    "3M_L_YN_H": {
+      "RISK_CARD": {
+        "value": 92.20096070892177,
+        "count": 37
+      },
+      "PRODUCE": {
+        "value": 110.11979877701438,
+        "count": 82
+      },
+      "SELL": {
+        "value": 103.2896315886646,
+        "count": 71
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 11.345183713147946,
+        "count": 2
+      },
+      "BUY_CHIP": {
+        "value": 81.70108132933717,
+        "count": 14
+      },
+      "HIRE_SALESMAN": {
+        "value": 33.669821187302304,
+        "count": 3
+      },
+      "DO_NOTHING": {
+        "value": 18.655966741665637,
+        "count": 2
+      }
+    },
+    "3M_L_NY_H": {
+      "BUY_MATERIALS": {
+        "value": 120.19298324696365,
+        "count": 714
+      },
+      "BUY_CHIP": {
+        "value": 126.55779910561336,
+        "count": 1062
+      },
+      "RISK_CARD": {
+        "value": 119.85741956054856,
+        "count": 3473
+      },
+      "DO_NOTHING": {
+        "value": 119.61675034065277,
+        "count": 12853
+      },
+      "SELL": {
+        "value": 122.8037372267658,
+        "count": 219
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 45.56736605207989,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 91.23929298598932,
+        "count": 10
+      }
+    },
+    "3M_M_NN_H": {
+      "SELL": {
+        "value": 120.8572846692964,
+        "count": 61
+      },
+      "BUY_CHIP": {
+        "value": 111.67727342564275,
+        "count": 48
+      },
+      "RISK_CARD": {
+        "value": 110.47361306355339,
+        "count": 35
+      },
+      "PRODUCE": {
+        "value": 30.8554054598769,
+        "count": 3
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 14.091150288636715,
+        "count": 1
+      }
+    },
+    "4L_M_NN_H": {
+      "BUY_CHIP": {
+        "value": 87.55244879668435,
+        "count": 130
+      },
+      "SELL": {
+        "value": 82.7542670747338,
+        "count": 59
+      },
+      "RISK_CARD": {
+        "value": 77.75305100847004,
+        "count": 46
+      },
+      "HIRE_SALESMAN": {
+        "value": 28.176647085590478,
+        "count": 4
+      },
+      "PRODUCE": {
+        "value": 9.935399448903254,
+        "count": 2
+      },
+      "DO_NOTHING": {
+        "value": 11.380162409377892,
+        "count": 1
+      }
+    },
+    "3M_M_YY_H": {
+      "SELL": {
+        "value": 113.87642884298265,
+        "count": 507
+      },
+      "BUY_MATERIALS": {
+        "value": 113.29195582758268,
+        "count": 43
+      },
+      "BUY_CHIP": {
+        "value": 115.26704766625136,
+        "count": 33
+      },
+      "PRODUCE": {
+        "value": 120.17398568846733,
+        "count": 482
+      },
+      "RISK_CARD": {
+        "value": 114.60116931096715,
+        "count": 166
+      },
+      "HIRE_SALESMAN": {
+        "value": 86.07806737230099,
+        "count": 12
+      }
+    },
+    "3E_L_NY_H": {
+      "BUY_MATERIALS": {
+        "value": 125.35505336446745,
+        "count": 146
+      },
+      "BUY_CHIP": {
+        "value": 134.27072878796594,
+        "count": 2013
+      },
+      "SELL": {
+        "value": 128.89357802673968,
+        "count": 87
+      },
+      "DO_NOTHING": {
+        "value": 123.8155209571009,
+        "count": 6074
+      },
+      "RISK_CARD": {
+        "value": 128.10985453776868,
+        "count": 1614
+      },
+      "HIRE_SALESMAN": {
+        "value": 77.62381499720948,
+        "count": 6
+      }
+    },
+    "3E_M_NN_H": {
+      "SELL": {
+        "value": 89.18989829228171,
+        "count": 19
+      },
+      "BUY_CHIP": {
+        "value": 117.32868666958848,
+        "count": 44
+      },
+      "RISK_CARD": {
+        "value": 98.27339628911939,
+        "count": 17
+      },
+      "PRODUCE": {
+        "value": 22.230671702305216,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 10.157557577835302,
+        "count": 1
+      }
+    },
+    "3E_L_YN_H": {
+      "BUY_CHIP": {
+        "value": 43.380288273700984,
+        "count": 8
+      },
+      "RISK_CARD": {
+        "value": 40.35488577789033,
+        "count": 9
+      },
+      "SELL": {
+        "value": 53.83379353745365,
+        "count": 28
+      },
+      "PRODUCE": {
+        "value": 72.88581576664207,
+        "count": 23
+      }
+    },
+    "4L_M_YY_H": {
+      "RISK_CARD": {
+        "value": 61.39270075609167,
+        "count": 15
+      },
+      "BUY_MATERIALS": {
+        "value": 68.29294408491651,
+        "count": 14
+      },
+      "PRODUCE": {
+        "value": 88.26633720771828,
+        "count": 41
+      },
+      "BUY_CHIP": {
+        "value": 40.61752108919752,
+        "count": 4
+      },
+      "SELL": {
+        "value": 72.01831483982066,
+        "count": 18
+      },
+      "HIRE_SALESMAN": {
+        "value": 10.226091361326876,
+        "count": 1
+      }
+    },
+    "4M_H_YN_H": {
+      "RISK_CARD": {
+        "value": 53.24293296052845,
+        "count": 10
+      },
+      "PRODUCE": {
+        "value": 55.78070963552188,
+        "count": 25
+      },
+      "SELL": {
+        "value": 25.653177814013187,
+        "count": 9
+      },
+      "HIRE_SALESMAN": {
+        "value": 2.0174523749574607,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 25.82359871891788,
+        "count": 3
+      }
+    },
+    "4M_H_NY_H": {
+      "SELL": {
+        "value": 60.607188306479664,
+        "count": 24
+      },
+      "BUY_MATERIALS": {
+        "value": 57.02814585349536,
+        "count": 44
+      },
+      "RISK_CARD": {
+        "value": 50.446026334310346,
+        "count": 13
+      },
+      "BUY_CHIP": {
+        "value": 18.26744834461264,
+        "count": 2
+      }
+    },
+    "4L_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 72.76320704532858,
+        "count": 723
+      },
+      "RISK_CARD": {
+        "value": 71.64319532094949,
+        "count": 174
+      },
+      "BUY_CHIP": {
+        "value": 80.00488188156925,
+        "count": 76
+      },
+      "HIRE_SALESMAN": {
+        "value": 42.59079331695303,
+        "count": 9
+      },
+      "SELL": {
+        "value": 24.443797413647793,
+        "count": 5
+      },
+      "PRODUCE": {
+        "value": 8.417764202071211,
+        "count": 1
+      }
+    },
+    "4M_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 74.66685248770384,
+        "count": 772
+      },
+      "RISK_CARD": {
+        "value": 75.88361599922384,
+        "count": 228
+      },
+      "BUY_CHIP": {
+        "value": 78.48788050397971,
+        "count": 214
+      },
+      "SELL": {
+        "value": 11.647920096819545,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 42.42536701476802,
+        "count": 7
+      },
+      "PRODUCE": {
+        "value": 10.403622586008371,
+        "count": 1
+      }
+    },
+    "4L_L_YN_H": {
+      "SELL": {
+        "value": 61.93917448451035,
+        "count": 22
+      },
+      "PRODUCE": {
+        "value": 85.2053021237533,
+        "count": 40
+      },
+      "RISK_CARD": {
+        "value": 65.75253278625455,
+        "count": 24
+      },
+      "BUY_CHIP": {
+        "value": 9.017832327924463,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 7.145470498037471,
+        "count": 1
+      }
+    },
+    "3M_H_YN_H": {
+      "SELL": {
+        "value": 78.3913808925694,
+        "count": 32
+      },
+      "PRODUCE": {
+        "value": 91.09248153419453,
+        "count": 46
+      },
+      "RISK_CARD": {
+        "value": 52.44093630809176,
+        "count": 12
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 11.694269900306095,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 11.322610739828324,
+        "count": 1
+      }
+    },
+    "3E_H_YN_H": {
+      "PRODUCE": {
+        "value": 19.803400973597178,
+        "count": 4
+      },
+      "SELL": {
+        "value": 7.480984273945424,
+        "count": 1
+      }
+    },
+    "3E_H_NY_H": {
+      "BUY_CHIP": {
+        "value": 22.98530543910416,
+        "count": 3
+      },
+      "SELL": {
+        "value": 74.4352886269129,
+        "count": 33
+      },
+      "BUY_MATERIALS": {
+        "value": 22.744396231660254,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 37.59576123969996,
+        "count": 6
+      }
+    },
+    "5M_H_NY_L": {
+      "BUY_CHIP": {
+        "value": 1.4575445474022823,
+        "count": 1
+      }
+    },
+    "2E_L_NY_H": {
+      "BUY_CHIP": {
+        "value": 135.34960617104466,
+        "count": 421
+      },
+      "DO_NOTHING": {
+        "value": 123.81807285440325,
+        "count": 29
+      },
+      "RISK_CARD": {
+        "value": 115.41154040361774,
+        "count": 23
+      }
+    },
+    "4E_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 62.45643343876786,
+        "count": 112
+      },
+      "BUY_CHIP": {
+        "value": 63.84167692681257,
+        "count": 79
+      },
+      "RISK_CARD": {
+        "value": 54.63802435181743,
+        "count": 40
+      },
+      "SELL": {
+        "value": 0.42252085347356977,
+        "count": 1
+      }
+    },
+    "3L_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 94.0903749451036,
+        "count": 796
+      },
+      "SELL": {
+        "value": 70.10616538840978,
+        "count": 9
+      },
+      "RISK_CARD": {
+        "value": 92.19448597304255,
+        "count": 192
+      },
+      "BUY_CHIP": {
+        "value": 100.5622860898563,
+        "count": 43
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 8.943866306385093,
+        "count": 2
+      },
+      "PRODUCE": {
+        "value": 25.30644762339775,
+        "count": 3
+      },
+      "HIRE_SALESMAN": {
+        "value": 68.78911838357484,
+        "count": 10
+      }
+    },
+    "3E_L_YY_H": {
+      "PRODUCE": {
+        "value": 125.78854280029942,
+        "count": 334
+      },
+      "RISK_CARD": {
+        "value": 119.781453241511,
+        "count": 149
+      },
+      "SELL": {
+        "value": 116.00211522621287,
+        "count": 312
+      },
+      "BUY_CHIP": {
+        "value": 125.91452929390061,
+        "count": 75
+      },
+      "BUY_MATERIALS": {
+        "value": 53.755212622487065,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 53.41360394484223,
+        "count": 5
+      }
+    },
+    "3M_H_YY_H": {
+      "SELL": {
+        "value": 107.8944122397243,
+        "count": 111
+      },
+      "BUY_MATERIALS": {
+        "value": 56.70223513420252,
+        "count": 8
+      },
+      "PRODUCE": {
+        "value": 117.17236938540587,
+        "count": 121
+      },
+      "RISK_CARD": {
+        "value": 96.8292712667921,
+        "count": 40
+      },
+      "BUY_CHIP": {
+        "value": 39.72086620075,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 22.088858958098626,
+        "count": 2
+      }
+    },
+    "3L_L_YY_H": {
+      "SELL": {
+        "value": 112.23968636396575,
+        "count": 469
+      },
+      "RISK_CARD": {
+        "value": 115.08449279165865,
+        "count": 236
+      },
+      "PRODUCE": {
+        "value": 121.56679314228984,
+        "count": 467
+      },
+      "BUY_CHIP": {
+        "value": 120.44100311736244,
+        "count": 52
+      },
+      "BUY_MATERIALS": {
+        "value": 110.06049795564127,
+        "count": 23
+      },
+      "HIRE_SALESMAN": {
+        "value": 35.72830693029591,
+        "count": 3
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 52.05601863534511,
+        "count": 4
+      },
+      "DO_NOTHING": {
+        "value": 105.5754050420858,
+        "count": 18
+      }
+    },
+    "3L_L_NY_H": {
+      "RISK_CARD": {
+        "value": 117.79734988732399,
+        "count": 2402
+      },
+      "BUY_CHIP": {
+        "value": 124.3931907756217,
+        "count": 254
+      },
+      "DO_NOTHING": {
+        "value": 116.89972754914805,
+        "count": 9469
+      },
+      "BUY_MATERIALS": {
+        "value": 116.8314847287098,
+        "count": 431
+      },
+      "SELL": {
+        "value": 119.87972103883445,
+        "count": 84
+      },
+      "BUY_LARGE_MACHINE": {
+        "value": 41.249551285286095,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 65.77084929443544,
+        "count": 6
+      }
+    },
+    "2M_M_YN_H": {
+      "SELL": {
+        "value": 25.623507951429122,
+        "count": 8
+      },
+      "PRODUCE": {
+        "value": 30.22526381275983,
+        "count": 11
+      },
+      "BUY_CHIP": {
+        "value": 4.519174386245344,
+        "count": 1
+      },
+      "RISK_CARD": {
+        "value": 27.851165132203796,
+        "count": 4
+      }
+    },
+    "2M_L_YN_H": {
+      "PRODUCE": {
+        "value": 86.66955016550453,
+        "count": 43
+      },
+      "SELL": {
+        "value": 61.27551600069115,
+        "count": 30
+      },
+      "RISK_CARD": {
+        "value": 68.19983942194274,
+        "count": 13
+      },
+      "DO_NOTHING": {
+        "value": 1.7479343834973213,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 34.57787054489241,
+        "count": 5
+      }
+    },
+    "2E_L_YY_H": {
+      "PRODUCE": {
+        "value": 14.812514506451263,
+        "count": 2
+      }
+    },
+    "2M_L_YY_H": {
+      "SELL": {
+        "value": 105.84403953594311,
+        "count": 122
+      },
+      "PRODUCE": {
+        "value": 112.02774453636934,
+        "count": 144
+      },
+      "RISK_CARD": {
+        "value": 113.75110302782714,
+        "count": 48
+      },
+      "BUY_CHIP": {
+        "value": 108.46399987962259,
+        "count": 34
+      },
+      "BUY_MATERIALS": {
+        "value": 12.037483820999238,
+        "count": 1
+      }
+    },
+    "2M_M_NN_H": {
+      "RISK_CARD": {
+        "value": 55.28408309176389,
+        "count": 8
+      },
+      "SELL": {
+        "value": 88.02315386731335,
+        "count": 20
+      },
+      "BUY_CHIP": {
+        "value": 88.43067446315177,
+        "count": 12
+      },
+      "PRODUCE": {
+        "value": 25.41442632629533,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 27.50030059442893,
+        "count": 2
+      }
+    },
+    "2L_L_NN_L": {
+      "DO_NOTHING": {
+        "value": 104.57809716494668,
+        "count": 71
+      },
+      "RISK_CARD": {
+        "value": 106.75989384233587,
+        "count": 51
+      },
+      "HIRE_SALESMAN": {
+        "value": 101.10832145327885,
+        "count": 17
+      },
+      "PRODUCE": {
+        "value": 66.82500309664196,
+        "count": 7
+      },
+      "SELL": {
+        "value": 88.11666570240844,
+        "count": 9
+      },
+      "BUY_CHIP": {
+        "value": 116.536490945531,
+        "count": 24
+      }
+    },
+    "4L_L_NY_H": {
+      "BUY_CHIP": {
+        "value": 60.24780329748555,
+        "count": 13
+      },
+      "PRODUCE": {
+        "value": 34.34116705047443,
+        "count": 6
+      },
+      "RISK_CARD": {
+        "value": 82.27718989929105,
+        "count": 32
+      },
+      "DO_NOTHING": {
+        "value": 78.28232839635201,
+        "count": 65
+      },
+      "BUY_MATERIALS": {
+        "value": 87.21314794344372,
+        "count": 77
+      },
+      "SELL": {
+        "value": 9.59180728612157,
+        "count": 1
+      }
+    },
+    "5M_M_YY_L": {
+      "BUY_MATERIALS": {
+        "value": 18.92267329948136,
+        "count": 12
+      },
+      "PRODUCE": {
+        "value": 13.659703290354702,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 0.49116916029944946,
+        "count": 1
+      },
+      "SELL": {
+        "value": 3.242230270228333,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 12.147796643756976,
+        "count": 9
+      }
+    },
+    "3L_M_NN_H": {
+      "RISK_CARD": {
+        "value": 93.4675676038136,
+        "count": 20
+      },
+      "PRODUCE": {
+        "value": 13.503877999360594,
+        "count": 2
+      },
+      "SELL": {
+        "value": 114.77199730358355,
+        "count": 40
+      },
+      "BUY_CHIP": {
+        "value": 36.594961000951486,
+        "count": 4
+      }
+    },
+    "3E_M_NY_H": {
+      "SELL": {
+        "value": 122.41941244601784,
+        "count": 155
+      },
+      "BUY_MATERIALS": {
+        "value": 121.39913177871681,
+        "count": 107
+      },
+      "RISK_CARD": {
+        "value": 121.16808530471504,
+        "count": 79
+      },
+      "BUY_CHIP": {
+        "value": 119.62155805874443,
+        "count": 76
+      },
+      "HIRE_SALESMAN": {
+        "value": 11.153338509954882,
+        "count": 1
+      }
+    },
+    "2L_L_YY_H": {
+      "PRODUCE": {
+        "value": 138.33008712232456,
+        "count": 187
+      },
+      "BUY_MATERIALS": {
+        "value": 68.852523634153,
+        "count": 6
+      },
+      "RISK_CARD": {
+        "value": 128.47723172775105,
+        "count": 49
+      },
+      "SELL": {
+        "value": 127.80998174655795,
+        "count": 160
+      },
+      "BUY_CHIP": {
+        "value": 126.0882494274146,
+        "count": 24
+      },
+      "HIRE_SALESMAN": {
+        "value": 32.40712490717961,
+        "count": 2
+      }
+    },
+    "2L_M_NY_H": {
+      "BUY_CHIP": {
+        "value": 60.675929970052096,
+        "count": 5
+      },
+      "SELL": {
+        "value": 132.84033533934837,
+        "count": 82
+      },
+      "RISK_CARD": {
+        "value": 127.1159204673694,
+        "count": 38
+      },
+      "BUY_MATERIALS": {
+        "value": 128.2854527421086,
+        "count": 57
+      }
+    },
+    "3E_M_YY_H": {
+      "PRODUCE": {
+        "value": 113.31223175388801,
+        "count": 100
+      },
+      "SELL": {
+        "value": 101.55409746220859,
+        "count": 92
+      },
+      "RISK_CARD": {
+        "value": 80.47799568414212,
+        "count": 17
+      },
+      "BUY_CHIP": {
+        "value": 66.9252856827348,
+        "count": 8
+      },
+      "BUY_MATERIALS": {
+        "value": 58.54131492357155,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 40.23887326691218,
+        "count": 3
+      }
+    },
+    "2L_M_YY_H": {
+      "PRODUCE": {
+        "value": 103.56968787557187,
+        "count": 29
+      },
+      "SELL": {
+        "value": 101.56000076325147,
+        "count": 27
+      },
+      "RISK_CARD": {
+        "value": 67.71692693239966,
+        "count": 8
+      },
+      "HIRE_SALESMAN": {
+        "value": 11.162992106890297,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 15.976311822417157,
+        "count": 1
+      },
+      "BUY_MATERIALS": {
+        "value": 19.769541191168603,
+        "count": 1
+      }
+    },
+    "2M_M_NY_H": {
+      "RISK_CARD": {
+        "value": 82.65595423417045,
+        "count": 19
+      },
+      "SELL": {
+        "value": 74.63837821129923,
+        "count": 58
+      },
+      "BUY_CHIP": {
+        "value": 21.680345472988424,
+        "count": 3
+      },
+      "BUY_MATERIALS": {
+        "value": 89.0842068944625,
+        "count": 9
+      },
+      "HIRE_SALESMAN": {
+        "value": 11.21295116138562,
+        "count": 1
+      }
+    },
+    "3E_M_YN_H": {
+      "PRODUCE": {
+        "value": 43.60805019583234,
+        "count": 18
+      },
+      "SELL": {
+        "value": 10.290454478930252,
+        "count": 5
+      },
+      "RISK_CARD": {
+        "value": 34.40012899734641,
+        "count": 6
+      },
+      "BUY_CHIP": {
+        "value": 11.181036323771124,
+        "count": 2
+      }
+    },
+    "3E_H_NN_H": {
+      "SELL": {
+        "value": 46.335889864990854,
+        "count": 9
+      },
+      "BUY_CHIP": {
+        "value": 55.753499354766745,
+        "count": 7
+      },
+      "RISK_CARD": {
+        "value": 28.520134275191353,
+        "count": 3
+      },
+      "PRODUCE": {
+        "value": 15.694208248923298,
+        "count": 1
+      }
+    },
+    "4E_L_YN_H": {
+      "PRODUCE": {
+        "value": 39.102687588889744,
+        "count": 14
+      },
+      "BUY_CHIP": {
+        "value": 4.675216763657891,
+        "count": 1
+      },
+      "RISK_CARD": {
+        "value": 14.395011838669987,
+        "count": 4
+      },
+      "SELL": {
+        "value": 1.8895056468675295,
+        "count": 2
+      }
+    },
+    "4E_L_NY_H": {
+      "RISK_CARD": {
+        "value": 9.369610312871739,
+        "count": 6
+      },
+      "BUY_MATERIALS": {
+        "value": 27.92950235015957,
+        "count": 16
+      },
+      "BUY_CHIP": {
+        "value": 12.029563112392598,
+        "count": 6
+      },
+      "DO_NOTHING": {
+        "value": 5.538481302427646,
+        "count": 2
+      }
+    },
+    "4L_H_YY_H": {
+      "PRODUCE": {
+        "value": 69.36406209884974,
+        "count": 20
+      },
+      "BUY_MATERIALS": {
+        "value": 26.435172422067033,
+        "count": 3
+      },
+      "SELL": {
+        "value": 51.587327112873275,
+        "count": 9
+      },
+      "RISK_CARD": {
+        "value": 47.7133897145967,
+        "count": 7
+      }
+    },
+    "2L_L_YN_H": {
+      "SELL": {
+        "value": 105.28813566505656,
+        "count": 34
+      },
+      "PRODUCE": {
+        "value": 126.35558439209198,
+        "count": 50
+      },
+      "BUY_CHIP": {
+        "value": 35.37945577563765,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 75.73462731013612,
+        "count": 9
+      }
+    },
+    "2L_L_NN_H": {
+      "RISK_CARD": {
+        "value": 54.81223109647567,
+        "count": 11
+      },
+      "SELL": {
+        "value": 18.430618000976416,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 30.818715604103012,
+        "count": 6
+      },
+      "BUY_CHIP": {
+        "value": 76.89061717659675,
+        "count": 7
+      },
+      "DO_NOTHING": {
+        "value": 69.68434594213149,
+        "count": 25
+      },
+      "PRODUCE": {
+        "value": 24.870689104942137,
+        "count": 2
+      }
+    },
+    "4M_H_YY_H": {
+      "PRODUCE": {
+        "value": 42.45651406848431,
+        "count": 12
+      },
+      "SELL": {
+        "value": 22.91556363432721,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 29.826353341048794,
+        "count": 6
+      },
+      "BUY_MATERIALS": {
+        "value": 5.117703154662888,
+        "count": 1
+      }
+    },
+    "4E_M_NN_H": {
+      "BUY_CHIP": {
+        "value": 21.644322601723427,
+        "count": 10
+      },
+      "SELL": {
+        "value": 7.275472040375063,
+        "count": 6
+      },
+      "RISK_CARD": {
+        "value": 7.94221672485689,
+        "count": 3
+      }
+    },
+    "3E_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 104.1741233019819,
+        "count": 335
+      },
+      "RISK_CARD": {
+        "value": 106.58077920594295,
+        "count": 104
+      },
+      "BUY_CHIP": {
+        "value": 113.64397093561281,
+        "count": 182
+      },
+      "SELL": {
+        "value": 45.53793218476976,
+        "count": 4
+      },
+      "HIRE_SALESMAN": {
+        "value": 29.594134023372163,
+        "count": 3
+      }
+    },
+    "4E_M_YN_H": {
+      "PRODUCE": {
+        "value": 6.88230142942418,
+        "count": 5
+      },
+      "SELL": {
+        "value": 0.6892543583480197,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 3.424257863076261,
+        "count": 1
+      }
+    },
+    "4E_M_NY_H": {
+      "RISK_CARD": {
+        "value": 0.4374388827725137,
+        "count": 1
+      },
+      "BUY_MATERIALS": {
+        "value": 4.504053198020336,
+        "count": 7
+      },
+      "SELL": {
+        "value": 1.7570318042024118,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 3.4710779628495825,
+        "count": 1
+      },
+      "HIRE_SALESMAN": {
+        "value": 1.2363042618871745,
+        "count": 1
+      }
+    },
+    "5L_H_YN_H": {
+      "PRODUCE": {
+        "value": 11.322275079429303,
+        "count": 12
+      },
+      "RISK_CARD": {
+        "value": 0.5604750000000001,
+        "count": 2
+      },
+      "BUY_CHIP": {
+        "value": 6.083314999137235,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 1.7566477359004287,
+        "count": 1
+      }
+    },
+    "5M_H_YN_L": {
+      "RISK_CARD": {
+        "value": 0.5181240594605581,
+        "count": 1
+      }
+    },
+    "5M_H_YN_H": {
+      "PRODUCE": {
+        "value": 8.353242516581744,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 4.82552669491162,
+        "count": 2
+      }
+    },
+    "5M_H_YY_H": {
+      "PRODUCE": {
+        "value": 27.27875740245127,
+        "count": 38
+      },
+      "RISK_CARD": {
+        "value": 19.550486061205245,
+        "count": 18
+      },
+      "SELL": {
+        "value": 20.662670619380584,
+        "count": 18
+      },
+      "BUY_MATERIALS": {
+        "value": 24.388412498071926,
+        "count": 18
+      },
+      "HIRE_SALESMAN": {
+        "value": 0.7292536200029206,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 7.918592641465265,
+        "count": 2
+      }
+    },
+    "5M_H_NY_H": {
+      "SELL": {
+        "value": 1.7241322725943484,
+        "count": 2
+      },
+      "BUY_MATERIALS": {
+        "value": 3.0311737854104184,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 5.242684646078087,
+        "count": 6
+      },
+      "HIRE_SALESMAN": {
+        "value": 3.2899891316357093,
+        "count": 1
+      }
+    },
+    "5E_H_NY_H": {
+      "SELL": {
+        "value": 4.471790753815492,
+        "count": 2
+      },
+      "BUY_CHIP": {
+        "value": 6.560238573926189,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 0.5762131492937712,
+        "count": 1
+      }
+    },
+    "5E_M_YY_H": {
+      "BUY_CHIP": {
+        "value": 22.897068529458622,
+        "count": 9
+      },
+      "PRODUCE": {
+        "value": 36.491973473733665,
+        "count": 23
+      },
+      "BUY_MATERIALS": {
+        "value": 13.260100851164363,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 19.434091787355722,
+        "count": 5
+      },
+      "SELL": {
+        "value": 4.249599317529855,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 6.537590375944402,
+        "count": 3
+      }
+    },
+    "4E_H_NN_H": {
+      "SELL": {
+        "value": 2.131647035447297,
+        "count": 1
+      }
+    },
+    "2M_L_NN_H": {
+      "BUY_CHIP": {
+        "value": 96.11374999228781,
+        "count": 26
+      },
+      "RISK_CARD": {
+        "value": 46.58081033430532,
+        "count": 5
+      },
+      "SELL": {
+        "value": 40.164915590141774,
+        "count": 3
+      },
+      "DO_NOTHING": {
+        "value": 14.761282147667725,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 42.63017472011691,
+        "count": 6
+      }
+    },
+    "5E_H_YN_L": {
+      "RISK_CARD": {
+        "value": 21.41686608777024,
+        "count": 4
+      },
+      "INVEST_MINIMAL": {
+        "value": 68.72891582044015,
+        "count": 22
+      },
+      "PRODUCE": {
+        "value": 40.13447099105434,
+        "count": 5
+      },
+      "BUY_CHIP": {
+        "value": 7.951427777775379,
+        "count": 1
+      }
+    },
+    "2L_M_NN_H": {
+      "SELL": {
+        "value": 126.84946255278317,
+        "count": 32
+      },
+      "PRODUCE": {
+        "value": 15.797006209763513,
+        "count": 2
+      },
+      "RISK_CARD": {
+        "value": 76.90182574622548,
+        "count": 9
+      },
+      "HIRE_SALESMAN": {
+        "value": 16.03146823695874,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 94.17556414836399,
+        "count": 9
+      }
+    },
+    "2L_M_YN_H": {
+      "PRODUCE": {
+        "value": 48.31814173990807,
+        "count": 9
+      },
+      "SELL": {
+        "value": 68.709019102452,
+        "count": 15
+      },
+      "RISK_CARD": {
+        "value": 33.13822928189474,
+        "count": 2
+      }
+    },
+    "2M_L_NN_L": {
+      "BUY_CHIP": {
+        "value": 114.93788484893335,
+        "count": 54
+      },
+      "HIRE_SALESMAN": {
+        "value": 122.55133613071077,
+        "count": 31
+      },
+      "RISK_CARD": {
+        "value": 113.64078939341731,
+        "count": 35
+      },
+      "SELL": {
+        "value": 101.00305402811296,
+        "count": 10
+      },
+      "PRODUCE": {
+        "value": 44.26152341490557,
+        "count": 4
+      },
+      "DO_NOTHING": {
+        "value": 96.65640079154412,
+        "count": 21
+      }
+    },
+    "5L_M_NY_H": {
+      "RISK_CARD": {
+        "value": 1.0338265769841006,
+        "count": 5
+      },
+      "BUY_MATERIALS": {
+        "value": 1.6064241810335775,
+        "count": 1
+      }
+    },
+    "2L_H_NY_H": {
+      "SELL": {
+        "value": 59.756146181915,
+        "count": 5
+      },
+      "RISK_CARD": {
+        "value": 24.002531844795772,
+        "count": 2
+      }
+    },
+    "5M_M_NN_H": {
+      "RISK_CARD": {
+        "value": 16.626325635168946,
+        "count": 5
+      }
+    },
+    "5L_M_YN_L": {
+      "RISK_CARD": {
+        "value": 2.211248211552037,
+        "count": 3
+      },
+      "PRODUCE": {
+        "value": 3.4224888353668788,
+        "count": 1
+      }
+    },
+    "5L_H_YY_L": {
+      "PRODUCE": {
+        "value": 4.90177487203125,
+        "count": 4
+      },
+      "SELL": {
+        "value": 3.2431744842410155,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 2.1560289876298553,
+        "count": 3
+      },
+      "BUY_MATERIALS": {
+        "value": 1.977434406147854,
+        "count": 3
+      },
+      "HIRE_SALESMAN": {
+        "value": 0.66227661890625,
+        "count": 1
+      }
+    },
+    "5L_M_YY_L": {
+      "BUY_MATERIALS": {
+        "value": 3.4348509831609153,
+        "count": 5
+      },
+      "PRODUCE": {
+        "value": 6.72053226206892,
+        "count": 5
+      },
+      "RISK_CARD": {
+        "value": 5.807470241470422,
+        "count": 5
+      },
+      "HIRE_SALESMAN": {
+        "value": 1.5572124063802808,
+        "count": 2
+      },
+      "SELL": {
+        "value": 1.1807129988231102,
+        "count": 2
+      }
+    },
+    "5L_H_YN_L": {
+      "PRODUCE": {
+        "value": 1.326038055,
+        "count": 1
+      }
+    },
+    "5M_H_YY_L": {
+      "PRODUCE": {
+        "value": 10.872654012614513,
+        "count": 7
+      },
+      "RISK_CARD": {
+        "value": 1.7838678475886511,
+        "count": 2
+      },
+      "SELL": {
+        "value": 6.998481351462452,
+        "count": 7
+      },
+      "BUY_MATERIALS": {
+        "value": 1.9097014120692588,
+        "count": 2
+      }
+    },
+    "5M_M_YN_L": {
+      "PRODUCE": {
+        "value": 3.727889694690827,
+        "count": 3
+      },
+      "RISK_CARD": {
+        "value": 3.7219811599423664,
+        "count": 2
+      },
+      "HIRE_SALESMAN": {
+        "value": 6.778285122309498,
+        "count": 1
+      }
+    },
+    "5E_L_NN_H": {
+      "DO_NOTHING": {
+        "value": 47.04044140577989,
+        "count": 202
+      },
+      "BUY_CHIP": {
+        "value": 55.12051973700207,
+        "count": 61
+      },
+      "RISK_CARD": {
+        "value": 43.235108080581945,
+        "count": 56
+      },
+      "HIRE_SALESMAN": {
+        "value": 5.714438131916376,
+        "count": 3
+      }
+    },
+    "2L_H_NN_H": {
+      "SELL": {
+        "value": 40.22131726687719,
+        "count": 4
+      },
+      "RISK_CARD": {
+        "value": 25.848717633724707,
+        "count": 2
+      },
+      "PRODUCE": {
+        "value": 29.25664225779869,
+        "count": 2
+      }
+    },
+    "5L_H_NY_H": {
+      "SELL": {
+        "value": 2.6304569560512663,
+        "count": 3
+      },
+      "BUY_CHIP": {
+        "value": 2.1673277782516913,
+        "count": 1
+      },
+      "BUY_MATERIALS": {
+        "value": 3.0272042903397716,
+        "count": 3
+      },
+      "RISK_CARD": {
+        "value": 0.5212442084008659,
+        "count": 1
+      }
+    },
+    "5L_H_NY_L": {
+      "RISK_CARD": {
+        "value": 0.336944674025866,
+        "count": 1
+      }
+    },
+    "5E_H_YY_H": {
+      "PRODUCE": {
+        "value": 10.590931848548873,
+        "count": 7
+      },
+      "SELL": {
+        "value": 0.723694402330984,
+        "count": 1
+      },
+      "BUY_MATERIALS": {
+        "value": 0.9349250059107699,
+        "count": 1
+      },
+      "RISK_CARD": {
+        "value": 7.699651753132361,
+        "count": 6
+      },
+      "BUY_CHIP": {
+        "value": 5.882117486786445,
+        "count": 2
+      }
+    },
+    "4E_L_YY_H": {
+      "BUY_CHIP": {
+        "value": 6.640693409478134,
+        "count": 2
+      },
+      "SELL": {
+        "value": 1.1626820398553581,
+        "count": 2
+      },
+      "PRODUCE": {
+        "value": 1.67192640204893,
+        "count": 1
+      },
+      "BUY_MATERIALS": {
+        "value": 7.635478541744336,
+        "count": 1
+      }
+    },
+    "2M_H_NN_H": {
+      "SELL": {
+        "value": 39.561105330880224,
+        "count": 4
+      }
+    },
+    "2M_M_YY_H": {
+      "SELL": {
+        "value": 47.47766814503036,
+        "count": 8
+      },
+      "PRODUCE": {
+        "value": 86.35494703034402,
+        "count": 19
+      },
+      "RISK_CARD": {
+        "value": 26.524362222119354,
+        "count": 3
+      }
+    },
+    "5E_M_YN_H": {
+      "PRODUCE": {
+        "value": 1.725292604778214,
+        "count": 1
+      }
+    },
+    "5E_M_NN_H": {
+      "RISK_CARD": {
+        "value": 7.471073349803425,
+        "count": 1
+      },
+      "BUY_CHIP": {
+        "value": 10.028057904787639,
+        "count": 1
+      }
+    },
+    "3E_H_YY_H": {
+      "PRODUCE": {
+        "value": 56.939974618738646,
+        "count": 12
+      },
+      "SELL": {
+        "value": 33.069415152862604,
+        "count": 5
+      },
+      "RISK_CARD": {
+        "value": 6.620030774983845,
+        "count": 1
+      }
+    },
+    "4E_M_YY_H": {
+      "PRODUCE": {
+        "value": 16.080877130783854,
+        "count": 2
+      }
+    }
+  }
+}
