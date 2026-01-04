@@ -1,55 +1,55 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-01-04T21:34:22.445Z",
-  "totalSimulations": 12012,
+  "lastUpdated": "2026-01-04T21:47:57.994Z",
+  "totalSimulations": 12021,
   "strategyStats": {
     "PLAYER": {
-      "totalGames": 12012,
+      "totalGames": 12021,
       "totalWins": 2508,
       "winRate": 20.9,
-      "avgEquity": -145,
+      "avgEquity": -94,
       "maxEquity": 124,
-      "totalEquity": -1119807
+      "totalEquity": -1125165
     },
     "AGGRESSIVE": {
-      "totalGames": 12012,
-      "totalWins": 2063,
+      "totalGames": 12021,
+      "totalWins": 2065,
       "winRate": 17.2,
-      "avgEquity": -151,
+      "avgEquity": -97,
       "maxEquity": 105,
-      "totalEquity": -1165998
+      "totalEquity": -1168903
     },
     "BALANCED": {
-      "totalGames": 12012,
-      "totalWins": 2506,
+      "totalGames": 12021,
+      "totalWins": 2508,
       "winRate": 20.9,
-      "avgEquity": -146,
+      "avgEquity": -93,
       "maxEquity": 140,
-      "totalEquity": -1117732
+      "totalEquity": -1121039
     },
     "RESEARCH_FOCUSED": {
-      "totalGames": 12012,
-      "totalWins": 3510,
+      "totalGames": 12021,
+      "totalWins": 3515,
       "winRate": 29.2,
-      "avgEquity": -129,
+      "avgEquity": -81,
       "maxEquity": 133,
-      "totalEquity": -968833
+      "totalEquity": -971194
     },
     "SALES_FOCUSED": {
-      "totalGames": 12012,
+      "totalGames": 12021,
       "totalWins": 1227,
       "winRate": 10.2,
-      "avgEquity": -161,
+      "avgEquity": -105,
       "maxEquity": 84,
-      "totalEquity": -1259082
+      "totalEquity": -1262816
     },
     "LOW_CHIP": {
-      "totalGames": 12012,
+      "totalGames": 12021,
       "totalWins": 274,
       "winRate": 2.3,
-      "avgEquity": -201,
+      "avgEquity": -136,
       "maxEquity": 42,
-      "totalEquity": -1629891
+      "totalEquity": -1633620
     }
   },
   "bestPatterns": [
@@ -117,7 +117,7 @@
   "insights": [
     "最強戦略: RESEARCH_FOCUSED (勝率29.2%)",
     "平均自己資本最高: RESEARCH_FOCUSED",
-    "総シミュレーション回数: 12012回"
+    "総シミュレーション回数: 12021回"
   ],
   "dynamicParams": {
     "bestStrategy": "RESEARCH_FOCUSED",

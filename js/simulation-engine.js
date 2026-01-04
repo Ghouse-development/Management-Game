@@ -4722,6 +4722,7 @@ const MGSimulation = (function() {
                     const available = limit - company.longTermLoan;
 
                     // 長期借入（3期以降）- borrowLongTerm内でログ記録済み
+                    // 運転資金確保のため利用可能額を借りる
                     if (available > 0 && period >= 3) {
                         const borrowAmount = available;
                         ActionEngine.borrowLongTerm(company, borrowAmount, period, equity);
@@ -5388,8 +5389,9 @@ const MGSimulation = (function() {
             // 6. セールスマン採用（販売能力が足りない場合）
             const salesCapacity = company.getSalesCapacity();
             const mfgCapacity = company.getMfgCapacity();
-            // セールスマンは最低2人（販売能力4+教育1=5個/回）
-            const targetSalesmen = period >= 4 ? 3 : 2;  // 4期以降は3人目標
+            // セールスマンは2人を目標（販売能力4+教育=5個程度）
+            // 3人目は人件費対効果が悪いので採用しない
+            const targetSalesmen = 2;
             if (company.salesmen < targetSalesmen && salesCapacity < mfgCapacity && company.cash >= 10) {
                 const hireCount = Math.min(targetSalesmen - company.salesmen, Math.floor(company.cash / 5), 3);
                 if (hireCount > 0) {
