@@ -69,6 +69,7 @@ const IntelligentLearning = (function() {
         discountFactor: 0.95,    // 将来の報酬を重視
         explorationRate: 0.25,   // 探索率
         totalUpdates: 0,
+        totalSimulations: 0,     // 累積シミュレーション回数
 
         getValue(stateKey, actionType) {
             if (!this.data[stateKey]) return 0;
@@ -115,14 +116,20 @@ const IntelligentLearning = (function() {
             return bestAction;
         },
 
-        adjustExplorationRate(totalSimulations) {
-            // 1000回ごとに探索率を下げる（最小5%）
-            this.explorationRate = Math.max(0.05, 0.30 - Math.floor(totalSimulations / 1000) * 0.02);
+        /**
+         * シミュレーション完了時に呼び出し、探索率を調整
+         * 累積シミュレーション回数に基づいて計算
+         */
+        onSimulationComplete() {
+            this.totalSimulations++;
+            // 1000回ごとに探索率を2%下げる（最小5%）
+            this.explorationRate = Math.max(0.05, 0.30 - Math.floor(this.totalSimulations / 1000) * 0.02);
         },
 
         reset() {
             this.data = {};
             this.totalUpdates = 0;
+            this.totalSimulations = 0;
         }
     };
 
@@ -324,10 +331,11 @@ const IntelligentLearning = (function() {
                     }
 
                     const data = {
-                        version: '2.0',
+                        version: '2.1',
                         lastUpdated: new Date().toISOString(),
                         explorationRate: QTable.explorationRate,
                         totalUpdates: QTable.totalUpdates,
+                        totalSimulations: QTable.totalSimulations,
                         stateCount: Object.keys(QTable.data).length,
                         qTable: QTable.data
                     };
@@ -349,9 +357,9 @@ const IntelligentLearning = (function() {
                         const content = fs.readFileSync(this.dataPath, 'utf-8');
                         const data = JSON.parse(content);
 
-                        // バージョンチェック（v1.0のデータはリセット）
-                        if (data.version !== '2.0') {
-                            console.log('Q学習データをv2.0形式にリセット');
+                        // バージョンチェック（v2.0以上のみ対応）
+                        if (!data.version || !data.version.startsWith('2.')) {
+                            console.log('Q学習データを最新形式にリセット');
                             QTable.reset();
                             return false;
                         }
@@ -359,6 +367,7 @@ const IntelligentLearning = (function() {
                         QTable.data = data.qTable || {};
                         QTable.explorationRate = data.explorationRate || 0.25;
                         QTable.totalUpdates = data.totalUpdates || 0;
+                        QTable.totalSimulations = data.totalSimulations || 0;
                         return true;
                     }
                 }
@@ -462,10 +471,17 @@ const IntelligentLearning = (function() {
         },
 
         /**
-         * 探索率を調整
+         * シミュレーション完了を通知（探索率を自動調整）
          */
-        adjustExploration(totalSimulations) {
-            QTable.adjustExplorationRate(totalSimulations);
+        onSimulationComplete() {
+            QTable.onSimulationComplete();
+        },
+
+        /**
+         * 累積シミュレーション回数を取得
+         */
+        getTotalSimulations() {
+            return QTable.totalSimulations;
         },
 
         /**

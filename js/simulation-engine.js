@@ -3357,6 +3357,10 @@ const MGSimulation = (function() {
                             bestResults = bestResults.slice(0, 5);
                         }
                     }
+                    // Q学習: シミュレーション完了を通知（探索率自動調整）
+                    if (IntelligentLearning) {
+                        IntelligentLearning.onSimulationComplete();
+                    }
                 } catch (e) {
                     // ルール違反が発生した場合
                     if (e.message.includes('RuntimeRuleEnforcer')) {
@@ -3367,13 +3371,9 @@ const MGSimulation = (function() {
                     }
                 }
 
-                // 進捗表示（1000回ごと）+ Q学習の探索率調整
+                // 進捗表示（1000回ごと）
                 if ((i + 1) % 1000 === 0) {
                     process.stdout.write(`  進捗: ${i + 1}/${count}回\r`);
-                    // Q学習: 探索率を調整（学習が進むにつれて減少）
-                    if (IntelligentLearning) {
-                        IntelligentLearning.adjustExploration(i + 1);
-                    }
                 }
             }
 

@@ -335,6 +335,87 @@ test('BEH-SALE-004', '入札で1個だけの販売は拒否される', () => {
 });
 
 // ====================================
+// Q学習システムテスト
+// ====================================
+console.log('\n【Q学習システム - 動作確認】');
+
+const IL = require(path.join(__dirname, '..', 'js', 'intelligent-learning.js'));
+
+test('BEH-QL-001', 'Q学習システムが読み込める', () => {
+    assert.ok(IL, 'IntelligentLearningモジュールが存在');
+    assert.ok(IL.QTable, 'QTableが存在');
+    assert.ok(IL.CompanyTrackers, 'CompanyTrackersが存在');
+});
+
+test('BEH-QL-002', '状態エンコードが正しく動作する', () => {
+    const company = new MG.Company(0, 'TestCo', 'BALANCED');
+    company.cash = 150;
+    company.products = 3;
+    company.materials = 2;
+    company.wip = 1;
+    company.chips = { research: 2 };
+    company.currentRow = 15;
+
+    const gameState = { period: 3 };
+    const stateKey = IL.StateEncoder.encode(company, gameState);
+
+    // 期3, 行15/30=50%=中盤(M), 現金150=中(M), 製品3>=2(Y), 材料+仕掛有(Y), 研究2<3(L)
+    assert.strictEqual(stateKey, '3M_M_YY_L', '状態キーが正しい形式');
+});
+
+test('BEH-QL-003', '会社別トラッカーが分離されている', () => {
+    IL.CompanyTrackers.initGame(3);
+
+    // 各社に別々の行動を記録
+    IL.CompanyTrackers.record(0, 'STATE_A', 'BUY', 10);
+    IL.CompanyTrackers.record(1, 'STATE_B', 'SELL', 20);
+    IL.CompanyTrackers.record(2, 'STATE_C', 'PRODUCE', 15);
+
+    // 各社の履歴が分離されているか確認
+    assert.strictEqual(IL.CompanyTrackers.trackers[0].length, 1, '会社0は1件');
+    assert.strictEqual(IL.CompanyTrackers.trackers[1].length, 1, '会社1は1件');
+    assert.strictEqual(IL.CompanyTrackers.trackers[2].length, 1, '会社2は1件');
+    assert.strictEqual(IL.CompanyTrackers.trackers[0][0].actionType, 'BUY', '会社0の行動はBUY');
+    assert.strictEqual(IL.CompanyTrackers.trackers[1][0].actionType, 'SELL', '会社1の行動はSELL');
+});
+
+test('BEH-QL-004', '探索率が累積シミュレーション回数で調整される', () => {
+    // リセット
+    IL.QTable.totalSimulations = 0;
+    IL.QTable.explorationRate = 0.30;
+
+    // 1000回シミュレーション完了をシミュレート
+    for (let i = 0; i < 1000; i++) {
+        IL.QTable.onSimulationComplete();
+    }
+
+    // 1000回後: 0.30 - 1*0.02 = 0.28（浮動小数点誤差考慮）
+    assert.ok(Math.abs(IL.QTable.explorationRate - 0.28) < 0.0001, '1000回後の探索率は約0.28');
+    assert.strictEqual(IL.QTable.totalSimulations, 1000, '累積回数は1000');
+
+    // さらに4000回
+    for (let i = 0; i < 4000; i++) {
+        IL.QTable.onSimulationComplete();
+    }
+
+    // 5000回後: 0.30 - 5*0.02 = 0.20（浮動小数点誤差考慮）
+    assert.ok(Math.abs(IL.QTable.explorationRate - 0.20) < 0.0001, '5000回後の探索率は約0.20');
+});
+
+test('BEH-QL-005', '探索率の最小値は5%', () => {
+    IL.QTable.totalSimulations = 0;
+    IL.QTable.explorationRate = 0.30;
+
+    // 20000回シミュレーション
+    for (let i = 0; i < 20000; i++) {
+        IL.QTable.onSimulationComplete();
+    }
+
+    // 最小5%で停止
+    assert.strictEqual(IL.QTable.explorationRate, 0.05, '探索率は最小5%');
+});
+
+// ====================================
 // 結果出力
 // ====================================
 console.log('\n' + '═'.repeat(60));
