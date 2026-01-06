@@ -647,13 +647,27 @@ function proceedToNextPeriod() {
         gameState.diceRoll = null;
     }
 
-    // 全社の行と金利追跡をリセット
+    // 全社の行と各種フラグ・追跡値をリセット
     gameState.companies.forEach(company => {
         company.currentRow = 1;
         company.rowsUsed = 0;
+
         // 金利追跡をリセット（次期のF計算用）
         company.periodStartInterest = 0;
         company.newLoanInterest = 0;
+
+        // ★★★ 期末に使用済みのコストをリセット ★★★
+        company.additionalFixedCost = 0;  // リスクカードによる追加F
+        company.extraLaborCost = 0;       // 緊急採用・縁故採用コスト
+        company.specialLoss = 0;          // 得意先倒産など特別損失
+
+        // ★★★ ターンスキップ・行動制限フラグをリセット ★★★
+        company.skipTurns = 0;            // 長期労務紛争
+        company.cannotProduce = false;    // 労災
+        company.cannotSell = false;       // 消費者運動
+
+        // ★★★ 期中の購入上限警告フラグをリセット ★★★
+        company.last5RowWarningShown = false;
     });
     gameState.currentRow = 1;
 

@@ -628,37 +628,64 @@ function processCommonPurchase() {
 
     if (playerQty > 0) {
         const playerCompany = gameState.companies[0];
-        const cost = playerQty * 12;
 
-        if (playerCompany.cash >= cost) {
-            let purchased = 0;
+        // ★★★ 3期以降は製造能力が購入上限 ★★★
+        const mfgCapacity = getManufacturingCapacity(playerCompany);
+        const isPeriod2 = gameState.currentPeriod === 2;
+        const maxByMfg = isPeriod2 ? 99 : mfgCapacity;
 
-            for (const market of gameState.markets) {
-                if (purchased >= playerQty) break;
-                if (market.currentStock > 0) {
-                    const qty = Math.min(playerQty - purchased, market.currentStock);
-                    market.currentStock -= qty;
+        // ★★★ 材料容量チェック ★★★
+        const maxMaterialCapacity = getMaterialCapacity(playerCompany);
+        const spaceAvailable = maxMaterialCapacity - playerCompany.materials;
+
+        // 実際に購入できる数量を計算
+        const actualPlayerQty = Math.min(playerQty, maxByMfg, spaceAvailable);
+
+        if (actualPlayerQty <= 0) {
+            if (spaceAvailable <= 0) {
+                purchaseLog.push('あなた: 材料置場が満杯で購入できず');
+            } else if (!isPeriod2 && mfgCapacity === 0) {
+                purchaseLog.push('あなた: 製造能力がないため購入できず');
+            } else {
+                purchaseLog.push('あなた: 購入しない');
+            }
+        } else {
+            const cost = actualPlayerQty * 12;
+
+            if (playerCompany.cash >= cost) {
+                let purchased = 0;
+
+                for (const market of gameState.markets) {
+                    if (purchased >= actualPlayerQty) break;
+                    if (market.currentStock > 0) {
+                        const qty = Math.min(actualPlayerQty - purchased, market.currentStock);
+                        market.currentStock -= qty;
+                        purchased += qty;
+                    }
+                }
+
+                const overseasMarket = gameState.markets.find(m => m.name === '海外');
+                if (purchased < actualPlayerQty && overseasMarket) {
+                    const qty = actualPlayerQty - purchased;
+                    overseasMarket.currentStock = Math.max(0, overseasMarket.currentStock - qty);
                     purchased += qty;
                 }
+
+                playerCompany.cash -= cost;
+                playerCompany.materials += actualPlayerQty;
+                playerCompany.totalMaterialCost += cost;
+                playerPurchased = true;
+
+                logAction(0, '各社共通', `¥12×${actualPlayerQty}個購入`, -cost, true);
+
+                let msg = `あなた: ${actualPlayerQty}個購入（¥${cost}）`;
+                if (actualPlayerQty < playerQty) {
+                    msg += `（上限により${playerQty - actualPlayerQty}個制限）`;
+                }
+                purchaseLog.push(msg);
+            } else {
+                purchaseLog.push('あなた: 現金不足で購入できず');
             }
-
-            const overseasMarket = gameState.markets.find(m => m.name === '海外');
-            if (purchased < playerQty && overseasMarket) {
-                const qty = playerQty - purchased;
-                overseasMarket.currentStock = Math.max(0, overseasMarket.currentStock - qty);
-                purchased += qty;
-            }
-
-            playerCompany.cash -= cost;
-            playerCompany.materials += playerQty;
-            playerCompany.totalMaterialCost += cost;
-            playerPurchased = true;
-
-            logAction(0, '各社共通', `¥12×${playerQty}個購入`, -cost, true);
-
-            purchaseLog.push(`あなた: ${playerQty}個購入（¥${cost}）`);
-        } else {
-            purchaseLog.push('あなた: 現金不足で購入できず');
         }
     } else {
         purchaseLog.push('あなた: 購入しない');
@@ -668,22 +695,34 @@ function processCommonPurchase() {
         const company = gameState.companies[i];
         const maxAffordable = Math.min(3, Math.floor(company.cash / 12));
 
-        if (maxAffordable >= 2) {
-            const aiQty = maxAffordable;
+        // ★★★ 3期以降は製造能力が購入上限 ★★★
+        const aiMfgCapacity = getManufacturingCapacity(company);
+        const isPeriod2 = gameState.currentPeriod === 2;
+        const aiMaxByMfg = isPeriod2 ? 99 : aiMfgCapacity;
+
+        // ★★★ 材料容量チェック ★★★
+        const aiMaxMaterialCapacity = getMaterialCapacity(company);
+        const aiSpaceAvailable = aiMaxMaterialCapacity - company.materials;
+
+        // 実際に購入できる数量を計算
+        const aiWantQty = maxAffordable >= 2 ? maxAffordable : 0;
+        const aiActualQty = Math.min(aiWantQty, aiMaxByMfg, aiSpaceAvailable);
+
+        if (aiActualQty > 0) {
             let purchased = 0;
 
             for (const market of gameState.markets) {
-                if (purchased >= aiQty) break;
+                if (purchased >= aiActualQty) break;
                 if (market.currentStock > 0) {
-                    const qty = Math.min(aiQty - purchased, market.currentStock);
+                    const qty = Math.min(aiActualQty - purchased, market.currentStock);
                     market.currentStock -= qty;
                     purchased += qty;
                 }
             }
 
             const overseasMarket = gameState.markets.find(m => m.name === '海外');
-            if (purchased < aiQty && overseasMarket) {
-                const qty = aiQty - purchased;
+            if (purchased < aiActualQty && overseasMarket) {
+                const qty = aiActualQty - purchased;
                 overseasMarket.currentStock = Math.max(0, overseasMarket.currentStock - qty);
                 purchased += qty;
             }
