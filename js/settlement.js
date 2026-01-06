@@ -391,13 +391,16 @@ function showFBreakdown(companyIndex) {
     }
 
     // チップ
-    if (pcCost > 0 || insuranceCost > 0 || chipCost > 0) {
+    const totalChipCost = pcCost + insuranceCost + chipCost;
+    if (totalChipCost > 0) {
         content += '<div style="font-size: 11px; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">';
-        content += '<div style="display: flex; justify-content: space-between;"><span>チップ費用</span><span></span></div>';
+        content += `<div style="display: flex; justify-content: space-between;"><span>チップ費用</span><span style="font-weight: bold;">¥${totalChipCost}</span></div>`;
         if (pcCost > 0) content += `<div style="padding-left: 10px; color: #666;">　PC: ¥${pcCost}</div>`;
         if (insuranceCost > 0) content += `<div style="padding-left: 10px; color: #666;">　保険: ¥${insuranceCost}</div>`;
         if (chipCost > 0) {
             // 戦略チップ内訳を個別表示
+            const hasDetails = chipDetails.research > 0 || chipDetails.education > 0 || chipDetails.advertising > 0 ||
+                               chipDetails.researchExpress > 0 || chipDetails.educationExpress > 0 || chipDetails.advertisingExpress > 0;
             if (period === 2) {
                 // 2期: 消費枚数表示
                 if (chipDetails.research > 0) content += `<div style="padding-left: 10px; color: #666;">　研究チップ ${chipDetails.research}枚×¥20 = ¥${chipDetails.research * 20}</div>`;
@@ -411,6 +414,10 @@ function showFBreakdown(companyIndex) {
                 if (chipDetails.researchExpress > 0) content += `<div style="padding-left: 10px; color: #666;">　研究チップ（特急）${chipDetails.researchExpress}枚×¥40 = ¥${chipDetails.researchExpress * 40}</div>`;
                 if (chipDetails.educationExpress > 0) content += `<div style="padding-left: 10px; color: #666;">　教育チップ（特急）${chipDetails.educationExpress}枚×¥40 = ¥${chipDetails.educationExpress * 40}</div>`;
                 if (chipDetails.advertisingExpress > 0) content += `<div style="padding-left: 10px; color: #666;">　広告チップ（特急）${chipDetails.advertisingExpress}枚×¥40 = ¥${chipDetails.advertisingExpress * 40}</div>`;
+            }
+            // ★★★ 内訳がない場合でも合計を表示 ★★★
+            if (!hasDetails) {
+                content += `<div style="padding-left: 10px; color: #666;">　戦略チップ: ¥${chipCost}</div>`;
             }
         }
         content += '</div>';

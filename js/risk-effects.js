@@ -74,6 +74,10 @@ function confirmMaterialPurchase(buyQty) {
         company.cash -= cost;
         company.materials += buyQty;
         company.totalMaterialCost += cost;
+
+        // ★★★ VQ詳細表示用ログ ★★★
+        logAction(0, '材料購入', `特別サービス¥10×${buyQty}個`, -cost, true);
+
         incrementRow(gameState.companies.indexOf(company));
         closeModal();
         alert(`特別サービス：材料${buyQty}個を¥${cost}で購入しました`);
@@ -382,6 +386,12 @@ function executeSpecialSaleWithPurchase(cardType, chipType, maxPerChip, salesCap
                 const revenue = totalSell * 32;
                 company.cash += revenue;
                 company.totalSales += revenue;
+                company.totalSoldQuantity = (company.totalSoldQuantity || 0) + totalSell;
+
+                // ★★★ PQ詳細表示用ログ ★★★
+                const actionName = cardType === 'education' ? '教育成功' : cardType === 'advertising' ? '広告成功' : '独占販売';
+                logAction(0, '商品販売', `${actionName}¥32×${totalSell}個`, revenue, true);
+
                 alert(`${cardType === 'education' ? '教育成功' : cardType === 'advertising' ? '広告成功' : '商品の独占販売'}！\n仕入れ${purchasedQty}個（¥${purchaseCost}）→ ${totalSell}個を¥${revenue}で販売\n純利益: ¥${revenue - purchaseCost}`);
                 endTurn();
             } else {
@@ -401,6 +411,11 @@ function executeSpecialSaleWithPurchase(cardType, chipType, maxPerChip, salesCap
             const revenue = totalSell * 32;
             company.cash += revenue;
             company.totalSales += revenue;
+            company.totalSoldQuantity = (company.totalSoldQuantity || 0) + totalSell;
+
+            // ★★★ PQ詳細表示用ログ ★★★
+            const actionName = cardType === 'education' ? '教育成功' : cardType === 'advertising' ? '広告成功' : '独占販売';
+            logAction(0, '商品販売', `${actionName}¥32×${totalSell}個`, revenue, true);
 
             let message = `${cardType === 'education' ? '教育成功' : cardType === 'advertising' ? '広告成功' : '商品の独占販売'}！\n`;
             message += `自社${sellFromOwn}個`;
