@@ -1193,13 +1193,14 @@ const MGSimulation = (function() {
                     if (!hasSmall) {
                         return { valid: false, reason: '小型機械がない' };
                     }
-                    // ★★★ 期末コストチェック（余裕がある場合のみ購入）★★★
+                    // ★★★ 期末コストチェック（50%緩和で生産力向上優先）★★★
                     const upgradeCashAfter = company.cash + saleVal - 200;
                     const upgradePeriodEndCost = company.estimatedPeriodEndCost || 0;
-                    // 2期は無理せず、3期以降で余裕があれば購入
-                    // 購入後の現金が期末コストを上回る場合のみ許可
-                    if (upgradeCashAfter < upgradePeriodEndCost && upgradePeriodEndCost > 0) {
-                        return { valid: false, reason: `期末資金不足（購入後¥${upgradeCashAfter}<期末コスト¥${upgradePeriodEndCost}）` };
+                    // 大型機械導入で生産能力4倍 → 期末までに収益増加で回収可能
+                    // 購入後の現金が期末コストの30%以上あれば許可
+                    const minRequired = Math.floor(upgradePeriodEndCost * 0.3);
+                    if (upgradeCashAfter < minRequired && minRequired > 0) {
+                        return { valid: false, reason: `期末資金不足（購入後¥${upgradeCashAfter}<最低¥${minRequired}）` };
                     }
                     return { valid: true, consumesRow: true };
                 case 'SELL_MACHINE':
@@ -1232,10 +1233,13 @@ const MGSimulation = (function() {
                 return { valid: false, reason: '現金不足' };
             }
             // ★★★ 期末コストチェック: 購入後に期末を乗り越えられるか ★★★
-            const cashAfter = company.cash - cost;
-            const periodEndCost = company.estimatedPeriodEndCost || 0;
-            if (cashAfter < periodEndCost && periodEndCost > 0) {
-                return { valid: false, reason: `期末資金不足（購入後¥${cashAfter}<期末コスト¥${periodEndCost}）` };
+            // ★★★ スクリプトモードでバイパスフラグがある場合はスキップ ★★★
+            if (!params.bypassPeriodEndCheck) {
+                const cashAfter = company.cash - cost;
+                const periodEndCost = company.estimatedPeriodEndCost || 0;
+                if (cashAfter < periodEndCost && periodEndCost > 0) {
+                    return { valid: false, reason: `期末資金不足（購入後¥${cashAfter}<期末コスト¥${periodEndCost}）` };
+                }
             }
             return { valid: true };
         },
@@ -1264,25 +1268,26 @@ const MGSimulation = (function() {
             if (params.market && gameState.isMarketClosed && gameState.isMarketClosed(params.market.name)) {
                 return { valid: false, reason: '市場閉鎖中' };
             }
-            // ルール⑩: 5期在庫・チップ確保
+            // ★★★ ルール⑩: 5期在庫・チップ確保（絶対厳守）★★★
+            // ★★★ ユーザー指定 2026-01-06: 5期終了条件は絶対 ★★★
             if (period === 5) {
-                // 在庫10個以上必要
                 const currentInventory = company.materials + company.wip + company.products;
                 const afterInventory = currentInventory - (params.quantity || 0);
-                // ★★★ 修正: 既に10個以上ある場合のみ、販売後も10個以上を維持する必要がある ★★★
-                // 既に10個未満なら、どうやっても勝利条件は満たせないので販売を許可
-                if (currentInventory >= 10 && afterInventory < 10) {
-                    return { valid: false, reason: 'ルール⑩: 5期は在庫10個以上を維持する必要あり' };
+
+                // ★★★ 在庫10個以上を維持（絶対条件）★★★
+                if (afterInventory < RULES.VICTORY.MIN_INVENTORY) {
+                    return {
+                        valid: false,
+                        reason: `【絶対条件違反】5期は在庫${RULES.VICTORY.MIN_INVENTORY}個以上必須（現在${currentInventory}→販売後${afterInventory}）`
+                    };
                 }
-                // 既に10個未満の場合は販売を許可（現金確保優先、短期借入回避）
-                // チップ3枚以上必要（販売自体には影響しないが、状態チェック用）
+
+                // チップ3枚以上必要（警告のみ、販売自体は許可）
                 const currentChips = (company.chips.research || 0) + (company.chips.education || 0) +
                                     (company.chips.advertising || 0) + (company.nextPeriodChips?.research || 0) +
                                     (company.nextPeriodChips?.education || 0) + (company.nextPeriodChips?.advertising || 0);
-                if (currentChips < 3 && afterInventory >= 10) {
-                    // チップ不足だが在庫は足りている場合、販売可能（チップ確保は別途必要）
-                    // ただし警告情報を付与
-                    return { valid: true, warning: 'チップ3枚未満：別途確保が必要' };
+                if (currentChips < RULES.VICTORY.MIN_CARRYOVER_CHIPS) {
+                    return { valid: true, warning: `チップ${RULES.VICTORY.MIN_CARRYOVER_CHIPS}枚未満：別途確保が必要` };
                 }
             }
             return { valid: true };
@@ -1294,8 +1299,8 @@ const MGSimulation = (function() {
             if (params.market && params.quantity > params.market.maxStock) {
                 return { valid: false, reason: `ルール⑦: ${params.market.name}の購入上限は${params.market.maxStock}個` };
             }
-            // 2期1周目制限
-            if (period === 2 && gameState.isFirstRound && params.quantity > 3) {
+            // 2期1周目制限（PLAYERは除外：教育チップ購入後は2週目扱い）
+            if (period === 2 && gameState.isFirstRound && params.quantity > 3 && company.strategyType !== 'PLAYER') {
                 return { valid: false, reason: '2期1周目は3個まで' };
             }
             // 在庫容量チェック
@@ -1510,15 +1515,16 @@ const MGSimulation = (function() {
     // ============================================
     const RULES = {
         // 初期状態（2期開始時、期首処理後）
+        // ★ 2期は小型機械、3期で大型機械に買い替え
         INITIAL: {
             CASH: 112,              // 137 - PC20 - 保険5 = 112
             EQUITY: 283,
             WORKERS: 1,
             SALESMEN: 1,
-            MATERIALS: 1,
-            WIP: 2,
-            PRODUCTS: 1,
-            MACHINES: [{ type: 'small', attachments: 0 }],
+            MATERIALS: 0,           // ★ユーザー指定: 材料0
+            WIP: 3,                 // ★ユーザー指定: 仕掛品3
+            PRODUCTS: 3,            // ★ユーザー指定: 製品3
+            MACHINES: [{ type: 'small', attachments: 0 }],  // 2期は小型機械（能力1）
             WAREHOUSES: 0,
             LONG_TERM_LOAN: 0,
             SHORT_TERM_LOAN: 0,
@@ -1590,8 +1596,12 @@ const MGSimulation = (function() {
             PROCESSING: 1    // 加工費/個
         },
 
-        // 人件費（期別）
-        WAGE: { 2: 22, 3: 24, 4: 26, 5: 28 },
+        // 人件費（期別）- 実績ベース
+        // 3期以降はサイコロで人件費倍率が決まる（通常×1.1）
+        WAGE: { 2: 22, 3: 29, 4: 31, 5: 34 },
+
+        // 予備日費用（期別）- 期末に発生
+        RESERVE_COST: { 2: 20, 3: 20, 4: 30, 5: 30 },
 
         // 借入
         LOAN: {
@@ -1619,8 +1629,10 @@ const MGSimulation = (function() {
         // 4-5期: 自己資本300以下→50%、300超→100%
         getLoanLimit: function(period, equity) {
             if (period === 2) return 0;  // 2期は長期借入禁止
-            const multiplier = (period >= 4 && equity > 300) ? 1.0 : 0.5;
-            return Math.floor(equity * multiplier);
+            // 3期以降は自己資本×100%まで借入可能（MGルール標準）
+            // 自己資本がマイナスの場合は0
+            if (equity <= 0) return 0;
+            return Math.floor(equity * 1.0);
         },
 
         // 市場（ACT-005～007, BID-001）
@@ -1641,7 +1653,9 @@ const MGSimulation = (function() {
             1: 21, 2: 22, 3: 23, 4: 24, 5: 25, 6: 26
         },
 
-        // 期別・研究チップ別の記帳価格目安（親の場合）
+        // ★★★ 期別・研究チップ別の記帳価格（親の場合）★★★
+        // ★★★ ユーザー指定 2026-01-06 - 絶対変更禁止 ★★★
+        // ★★★ 変更時は rules/price-rules.json も必ず更新すること ★★★
         TARGET_PRICES: {
             2: { 0: 24, 1: 26, 2: 28, 3: 30, 4: 32 },
             3: { 0: 24, 1: 26, 2: 28, 3: 30, 4: 32, 5: 34 },
@@ -1747,17 +1761,19 @@ const MGSimulation = (function() {
             },
             PLAYER: {
                 name: 'プレイヤー型',
-                description: '研究チップ重視・早期大型機械戦略',
+                description: '研究チップ重視・3期大型機械・教育チップ戦略',
                 chipTargets: {
-                    2: { research: 2, education: 1, advertising: 0 },
+                    // ★★★ ユーザー戦略: 2期に研究4枚+教育2枚 ★★★
+                    2: { research: 4, education: 2, advertising: 0 },
                     3: { research: 4, education: 1, advertising: 0 },
                     4: { research: 5, education: 1, advertising: 0 },
                     5: { research: 5, education: 1, advertising: 0 }
                 },
                 priceAdjustment: 2,
                 hirePriority: 'worker',
-                earlyLargeMachine: true,  // 2期後半に大型機械購入
-                upgradePeriod: 2
+                earlyLargeMachine: false,  // 3期中盤に大型機械購入
+                upgradePeriod: 3,
+                midPeriodLargeMachine: true  // 3期で資金を貯めてから購入
             }
         }
     };
@@ -1814,6 +1830,8 @@ const MGSimulation = (function() {
             this.chipsBoughtThisTurn = false;
             // 期首処理履歴
             this.periodStartActions = [];
+            // ★★★ スクリプトモード用インデックス ★★★
+            this.scriptIndex = 0;
 
             // ★★★ 期末コスト追跡システム ★★★
             // 期首に計算し、採用・解雇時に即座に更新
@@ -2112,7 +2130,8 @@ const MGSimulation = (function() {
                 );
             } else {
                 // ゲーム用: プレイヤー1社 + AI5社
-                this.companies = [new Company(0, playerName, true)];
+                // ★★★ PLAYERのstrategyTypeを'PLAYER'に設定（スクリプトアクション有効化）★★★
+                this.companies = [new Company(0, playerName, true, 'PLAYER')];
                 aiConfigs.slice(0, 5).forEach((config, i) => {
                     this.companies.push(new Company(i + 1, config.name, false, config.strategy));
                 });
@@ -2170,8 +2189,8 @@ const MGSimulation = (function() {
             // 大阪上限価格（サイコロの値+20）
             this.osakaMaxPrice = 20 + this.diceResult;
 
-            // サイコロ5-6で行数-5
-            this.maxRowsReduction = (this.diceResult >= 5) ? 5 : 0;
+            // ★ 行数削減ルールは存在しない（削除）
+            this.maxRowsReduction = 0;
 
             // 市場の販売価格を更新
             const osakaMarket = this.markets.find(m => m.name === '大阪');
@@ -2320,9 +2339,9 @@ const MGSimulation = (function() {
          * 材料購入（ACT-001, ACT-002）
          * ActionValidatorで検証済みだが、直接呼び出し時のために再検証
          */
-        buyMaterials(company, quantity, market, gameState) {
+        buyMaterials(company, quantity, market, gameState, bypassPeriodEndCheck = false) {
             // ActionValidatorで事前検証
-            const validation = ActionValidator.canExecute('BUY_MATERIALS', { quantity, market }, company, gameState);
+            const validation = ActionValidator.canExecute('BUY_MATERIALS', { quantity, market, bypassPeriodEndCheck }, company, gameState);
             if (!validation.valid) {
                 return { success: false, reason: validation.reason };
             }
@@ -2605,9 +2624,9 @@ const MGSimulation = (function() {
          * ルール⑨: 期首購入不可（AIDecisionEngineから呼ばれる）
          * ActionValidatorで検証済み
          */
-        buyChip(company, chipType, isExpress = false, period = 2, phase = null) {
+        buyChip(company, chipType, isExpress = false, period = 2, phase = null, bypassPeriodEndCheck = false) {
             // ActionValidatorで事前検証（ルール①②⑨をチェック）
-            const validation = ActionValidator.canExecute('BUY_CHIP', { isExpress, phase }, company, { period });
+            const validation = ActionValidator.canExecute('BUY_CHIP', { isExpress, phase, bypassPeriodEndCheck }, company, { period });
             if (!validation.valid) {
                 return { success: false, reason: validation.reason };
             }
@@ -2745,6 +2764,7 @@ const MGSimulation = (function() {
                 insuranceCost: 0,    // 保険チップ費用
                 chipCost: 0,         // 研究・教育・広告チップ費用
                 warehouseCost: 0,    // 倉庫費用（期末に計上）
+                reserveCost: 0,      // 予備日費用（期別）
                 longTermRepay: 0,
                 shortTermRepay: 0,
                 shortTermInterest: 0,
@@ -2787,31 +2807,37 @@ const MGSimulation = (function() {
             company.totalF += result.depreciation;
 
             // 3. PC・保険・チップのF計算
-            // PC（持っていれば20円）
+            // PC（持っていれば20円）→ Fに含める
             if (company.chips.computer > 0) {
                 result.pcCost = RULES.COST.PC;
                 company.totalF += result.pcCost;
             }
-            // 保険（持っていれば5円）
+            // 保険（持っていれば5円）→ Fに含める
             if (company.chips.insurance > 0) {
                 result.insuranceCost = RULES.COST.INSURANCE;
                 company.totalF += result.insuranceCost;
             }
             // チップ費用（CHIP-004, CHIP-005）
-            // ルール①: 2期は特急なし（全て¥20）
-            // 2期: 購入枚数×¥20
-            // 3期以降: 通常×¥20 + 特急×¥40
+            // CHIP-004: F計算（2期）：(購入-繰越)×20 + PC20 + 保険5
+            // CHIP-005: F計算（3期以降）：繰越×20 + 特急×40 + PC20 + 保険5
             const history = company.chipPurchaseHistory;
             if (period === 2) {
-                // 2期: 全て¥20（特急という概念がない）
-                const totalPurchases = (history.research.normal || 0) +
-                                       (history.education.normal || 0) +
-                                       (history.advertising.normal || 0);
-                // express履歴があっても2期は¥20で計算（念のため）
-                const expressAsNormal = (history.research.express || 0) +
-                                        (history.education.express || 0) +
-                                        (history.advertising.express || 0);
-                result.chipCost = (totalPurchases + expressAsNormal) * 20;
+                // CHIP-002: 2期末は各-1して最大3枚繰越
+                // 繰越数 = min(購入数-1, 3)、0以上
+                // F = (購入数 - 繰越数) × 20
+                const researchPurchased = (history.research.normal || 0) + (history.research.express || 0);
+                const educationPurchased = (history.education.normal || 0) + (history.education.express || 0);
+                const advertisingPurchased = (history.advertising.normal || 0) + (history.advertising.express || 0);
+
+                const researchCarryover = Math.min(Math.max(researchPurchased - 1, 0), 3);
+                const educationCarryover = Math.min(Math.max(educationPurchased - 1, 0), 3);
+                const advertisingCarryover = Math.min(Math.max(advertisingPurchased - 1, 0), 3);
+
+                const researchF = (researchPurchased - researchCarryover) * 20;
+                const educationF = (educationPurchased - educationCarryover) * 20;
+                const advertisingF = (advertisingPurchased - advertisingCarryover) * 20;
+
+                result.chipCost = researchF + educationF + advertisingF;
                 company.totalF += result.chipCost;
             } else {
                 // 3期以降: 通常×20 + 特急×40
@@ -2832,6 +2858,11 @@ const MGSimulation = (function() {
                 // 倉庫は期末に没収
                 company.warehouses = 0;
             }
+
+            // 4.5. 予備日費用（期別固定費）→ Fには含めない
+            result.reserveCost = RULES.RESERVE_COST[period] || 0;
+            // ★★★ 予備日はFに含めない（ユーザー指定）★★★
+            // company.totalF += result.reserveCost;
 
             // 5. 長期借入返済（最低10%）
             if (company.longTermLoan > 0) {
@@ -2894,6 +2925,7 @@ const MGSimulation = (function() {
             company.lastPeriodTax = result.tax;
             company.lastPeriodDividend = result.dividend;
 
+            // ★★★ 予備日(reserveCost)はFに含めない ★★★
             result.totalF = result.wage + result.depreciation + result.pcCost + result.insuranceCost + result.chipCost + result.warehouseCost + result.shortTermInterest;
 
             // 8. 現金マイナス時の自動処理（PE-013）
@@ -2945,8 +2977,15 @@ const MGSimulation = (function() {
             };
 
             company.logAction('期末処理',
-                `人件費${result.wage}(W${result.wageWorker}+M${result.wageMachine}+S${result.wageSalesman}+Max${result.wageMaxPersonnel}) 減価償却${result.depreciation} PC${result.pcCost} 保険${result.insuranceCost} チップ${result.chipCost} 倉庫${result.warehouseCost} 短期金利${result.shortTermInterest} 税${result.tax}`,
+                `人件費${result.wage}(W${result.wageWorker}+M${result.wageMachine}+S${result.wageSalesman}+Max${result.wageMaxPersonnel}) 減価償却${result.depreciation} PC${result.pcCost} 保険${result.insuranceCost} チップ${result.chipCost} 倉庫${result.warehouseCost} 予備日${result.reserveCost} 短期金利${result.shortTermInterest} 税${result.tax}`,
                 result.totalF + result.tax, false);
+
+            // ★★★ 期末現金表示（ユーザー要望：給料・返済支払い後の現金）★★★
+            const inventory = company.materials + company.wip + company.products;
+            const chips = (company.chips.research || 0) + (company.chips.education || 0) + (company.chips.advertising || 0);
+            company.logAction('期末残高',
+                `現金¥${company.cash} 自己資本¥${result.equityAfter} 在庫${inventory}個 チップ${chips}枚`,
+                0, false);
 
             // ★即時F追跡: 期末処理完了後に次期用フラグをリセット
             ImmediateFTracker.resetForNewPeriod(company);
@@ -2993,7 +3032,10 @@ const MGSimulation = (function() {
             // 倉庫費用は倉庫数 × 20
             const warehouseCost = company.warehouses * RULES.COST.WAREHOUSE;
 
-            return wageCost + longTermRepay + shortTermRepay + shortTermInterest + warehouseCost;
+            // 予備日費用（期別固定費）
+            const reserveCost = RULES.RESERVE_COST[period] || 0;
+
+            return wageCost + longTermRepay + shortTermRepay + shortTermInterest + warehouseCost + reserveCost;
         },
 
         /**
@@ -3057,11 +3099,461 @@ const MGSimulation = (function() {
     // ============================================
     const AIDecisionEngine = {
         /**
+         * ★★★ PLAYER戦略の2期アクションシーケンス（ユーザー指定の行動順序）★★★
+         * リスクカードはランダムなので、行番号ではなく順番で管理
+         */
+        PLAYER_PERIOD2_SEQUENCE: [
+            // ★★★ 2期戦略: 研究4枚・教育2枚を購入しつつ利益確保 ★★★
+            // 初期: 現金112円、材料0、wip3、製品3
+            // 製造能力2（小型1+PC1）→教育で+1=3
+            // 販売能力2（セールス1×2）→教育で+1=3
+
+            // === 1周目: 教育チップ購入 + 初期販売 ===
+            { action: 'BUY_CHIP', chipType: 'education' },           // 教育チップ（製造+1、販売+1）
+            { action: 'PRODUCE' },                                   // 完成投入（wip3→製品+3）
+            { action: 'SELL', quantity: 3, minPrice: 20 },           // 販売3個（東京20円以上）
+
+            // === 2周目: 研究チップ購入開始 + 材料補充 ===
+            { action: 'BUY_CHIP', chipType: 'research' },            // 研究1枚目
+            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },  // 材料3個（1周目制限）
+            { action: 'PRODUCE' },                                   // 完成投入
+
+            // === 3周目: 販売 + 研究チップ追加 ===
+            { action: 'SELL', quantity: 3, minPrice: 20 },           // 販売3個
+            { action: 'BUY_CHIP', chipType: 'research' },            // 研究2枚目
+            { action: 'BUY_CHIP', chipType: 'research' },            // 研究3枚目
+
+            // === 4周目: 生産サイクル + 研究4枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },  // 材料3個
+            { action: 'PRODUCE' },                                   // 完成投入
+            { action: 'SELL', quantity: 3, minPrice: 20 },           // 販売3個
+            { action: 'BUY_CHIP', chipType: 'research' },            // 研究4枚目
+
+            // === 5周目: 教育2枚目 + 最終サイクル ===
+            { action: 'BUY_CHIP', chipType: 'education' },           // 教育2枚目
+            { action: 'PRODUCE' }                                    // 最終生産
+        ],
+
+        // ★★★ 3期戦略（修正版 2026-01-06）★★★
+        // 前提: 研究3枚（2期から繰越）、ワーカー1人、小型機械1台、セールスマン1人
+        // 期首: PC購入、長期借入（最大限）
+        // ★重要: 3期中にチップ購入して高価格販売 + 4期用チップ確保
+        PLAYER_PERIOD3_SEQUENCE: [
+            // === フェーズ1: チップ購入で高価格販売準備 ===
+            { action: 'BUY_CHIP', chipType: 'research' },            // 研究4枚目（¥32で販売可能に）
+            { action: 'HIRE_SALESMAN', count: 2 },                   // セールスマン3名体制
+            { action: 'PRODUCE' },                                   // 繰越仕掛品を完成
+
+            // === フェーズ2: 高価格販売（研究4枚=¥32） ===
+            { action: 'SELL', quantity: 3, minPrice: 30 },           // ¥30以上で販売
+            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 30 },           // ¥30以上で販売
+
+            // === フェーズ3: 次期チップ確保 + 生産サイクル ===
+            { action: 'BUY_CHIP', chipType: 'research' },            // 4期用チップ1枚目
+            { action: 'BUY_CHIP', chipType: 'research' },            // 4期用チップ2枚目
+            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 28 },
+
+            // === フェーズ4: 追加チップ + サイクル継続 ===
+            { action: 'BUY_CHIP', chipType: 'research' },            // 4期用チップ3枚目
+            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 26 },
+            { action: 'PRODUCE' }                                    // 在庫確保
+        ],
+
+        // ★★★ 4期戦略（修正版 2026-01-06）★★★
+        // 前提: 3期から研究3枚繰越
+        // ★重要: 5期用に研究チップ3枚以上を確保
+        PLAYER_PERIOD4_SEQUENCE: [
+            // === フェーズ1: 繰越チップで高価格販売 ===
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 28 },           // 研究3枚=¥28
+            { action: 'BUY_MATERIALS', quantity: 4 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+
+            // === フェーズ2: 5期用チップ確保 ===
+            { action: 'BUY_CHIP', chipType: 'research' },            // 5期用1枚目
+            { action: 'BUY_CHIP', chipType: 'research' },            // 5期用2枚目
+            { action: 'BUY_CHIP', chipType: 'research' },            // 5期用3枚目
+            { action: 'BUY_MATERIALS', quantity: 4 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === フェーズ3: 追加生産サイクル ===
+            { action: 'BUY_MATERIALS', quantity: 4 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 24 },
+            { action: 'PRODUCE' }
+        ],
+
+        // ★★★ 5期戦略（修正版 2026-01-06）★★★
+        // ★絶対条件: 在庫10個以上、次期チップ3枚以上
+        PLAYER_PERIOD5_SEQUENCE: [
+            // === フェーズ1: チップ確保（最優先）===
+            { action: 'BUY_CHIP', chipType: 'research' },            // 次期用1枚目
+            { action: 'BUY_CHIP', chipType: 'research' },            // 次期用2枚目
+            { action: 'BUY_CHIP', chipType: 'research' },            // 次期用3枚目（勝利条件達成）
+
+            // === フェーズ2: 高価格販売 ===
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 27 },           // 研究3枚=¥27
+            { action: 'BUY_MATERIALS', quantity: 4 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 25 },
+
+            // === フェーズ3: 在庫10個確保 ===
+            { action: 'BUY_MATERIALS', quantity: 6 },
+            { action: 'PRODUCE' },
+            { action: 'BUY_MATERIALS', quantity: 4 },                // 在庫確保用
+            { action: 'PRODUCE' }
+            // ★販売しない → 在庫10個以上を維持
+        ],
+
+        // デバッグフラグ（問題特定後はfalseにする）
+        debugMode: false,
+
+        /**
+         * シーケンスに基づいて次の行動を取得
+         * ★ 行番号ではなく、実行済みアクション数で管理 ★
+         * ★★★ 2期〜5期全てに対応 ★★★
+         */
+        getScriptedAction(company, gameState, recursionDepth = 0) {
+            const period = gameState.period;
+            const strategy = company.strategyType;
+
+            // PLAYER戦略のみスクリプトモード（2期〜5期）
+            if (strategy !== 'PLAYER') return null;
+
+            // 期別シーケンスを選択
+            let sequence;
+            switch (period) {
+                case 2: sequence = this.PLAYER_PERIOD2_SEQUENCE; break;
+                case 3: sequence = this.PLAYER_PERIOD3_SEQUENCE; break;
+                case 4: sequence = this.PLAYER_PERIOD4_SEQUENCE; break;
+                case 5: sequence = this.PLAYER_PERIOD5_SEQUENCE; break;
+                default: return null;
+            }
+
+            // 無限再帰防止
+            if (recursionDepth > 20) {
+                if (this.debugMode) console.log(`[SCRIPT${period}] 再帰上限到達`);
+                return null;
+            }
+
+            // 実行済みシーケンスインデックスを取得（なければ0から開始）
+            if (company.scriptIndex === undefined) {
+                company.scriptIndex = 0;
+            }
+
+            // シーケンス完了チェック
+            if (company.scriptIndex >= sequence.length) {
+                // ★★★ リスクカード対策: チップを失っていたら買い増し（無理はしない）★★★
+                if (period === 2 && company.cash >= 40) {  // 最低40円確保
+                    const researchChips = company.chips.research || 0;
+                    const educationChips = company.chips.education || 0;
+
+                    // 研究チップが4枚未満なら買い増し
+                    if (researchChips < 4 && company.cash >= 40) {
+                        const validation = ActionValidator.canExecute('BUY_CHIP', {
+                            isExpress: false, bypassPeriodEndCheck: true
+                        }, company, gameState);
+                        if (validation.valid) {
+                            return {
+                                type: 'BUY_CHIP',
+                                chipType: 'research',
+                                isExpress: false,
+                                bypassPeriodEndCheck: true,
+                                detail: '研究開発チップ購入（リスク補填）'
+                            };
+                        }
+                    }
+                    // 教育チップが2枚未満なら買い増し
+                    if (educationChips < 2 && company.cash >= 40) {
+                        const validation = ActionValidator.canExecute('BUY_CHIP', {
+                            isExpress: false, bypassPeriodEndCheck: true
+                        }, company, gameState);
+                        if (validation.valid) {
+                            return {
+                                type: 'BUY_CHIP',
+                                chipType: 'education',
+                                isExpress: false,
+                                bypassPeriodEndCheck: true,
+                                detail: '教育チップ購入（リスク補填）'
+                            };
+                        }
+                    }
+                }
+                if (this.debugMode) console.log(`[SCRIPT${period}] 全アクション完了`);
+                return null;  // 全アクション完了
+            }
+
+            // 現在のエントリを試す
+            const entry = sequence[company.scriptIndex];
+            if (this.debugMode && period === 2) {  // 2期のみ詳細ログ
+                console.log(`[SCRIPT${period}] idx=${company.scriptIndex} action=${entry.action} cash=${company.cash} mat=${company.materials} prod=${company.products}`);
+            }
+            const action = this.createScriptedAction(entry, company, gameState);
+
+            if (action) {
+                // 成功したらインデックスを進める
+                company.scriptIndex++;
+                if (this.debugMode && period <= 3 && company.strategyType === 'PLAYER') {
+                    console.log(`[SCRIPT${period}] 成功: ${action.detail}`);
+                }
+                return action;
+            }
+
+            // このアクションが実行できない場合
+            if (this.debugMode && period <= 3 && company.strategyType === 'PLAYER') {
+                console.log(`[SCRIPT${period}] 失敗: ${entry.action} (idx=${company.scriptIndex})`);
+            }
+
+            // 資金不足の場合は待機する必要がある
+            if (entry.action === 'BUY_CHIP' && company.cash < 20) {
+                return null;  // 資金が足りるまで待機
+            }
+            if (entry.action === 'BUY_MATERIALS' && company.cash < 36) {  // 最低3個分
+                return null;  // 資金が足りるまで待機
+            }
+
+            // 実行できない場合でもインデックスを進めて次を試す
+            company.scriptIndex++;
+            return this.getScriptedAction(company, gameState, recursionDepth + 1);  // 再帰で次を試す
+        },
+
+        /**
+         * スクリプトエントリからアクションを作成
+         */
+        createScriptedAction(entry, company, gameState) {
+            const period = gameState.period;
+
+            switch (entry.action) {
+                case 'BUY_CHIP': {
+                    // ★スクリプトモードでは期末コストチェックを緩和★
+                    // 現金が20円以上あれば購入可能（後で販売で回収予定）
+                    if (company.cash < 20) return null;
+
+                    // 1行1枚制限のみチェック
+                    if (company.chipsBoughtThisTurn) return null;
+
+                    return {
+                        type: 'BUY_CHIP',
+                        score: 1000,  // スクリプトは最優先
+                        chipType: entry.chipType,
+                        isExpress: false,
+                        bypassPeriodEndCheck: true,  // ★executeActionでの再検証をバイパス★
+                        detail: `${entry.chipType === 'education' ? '教育' : '研究開発'}チップ購入（スクリプト）`
+                    };
+                }
+
+                case 'BUY_MATERIALS': {
+                    // ★指定数量を購入できる市場を優先★
+                    // maxPrice指定がある場合はその価格以下の市場のみ
+                    const maxPrice = entry.maxPrice || 99;  // デフォルトは制限なし
+                    const sortedMarkets = [...gameState.markets]
+                        .filter(m => m.buyPrice <= maxPrice)
+                        .sort((a, b) => a.buyPrice - b.buyPrice);
+                    const storageSpace = company.getStorageCapacity() - company.materials - company.products;
+                    // ACT-002: 2期1周目は3個まで（全社共通ルール）
+                    const maxQty = (period === 2 && gameState.isFirstRound) ? 3 : entry.quantity;
+
+                    // ★材料購入は市場から買うので、販売上限(maxStock)は関係ない★
+                    // 最安市場から順に、指定数量を購入できる市場を探す
+                    for (const market of sortedMarkets) {
+                        const qty = Math.min(maxQty, storageSpace);
+                        if (qty < 2) continue;  // 最低2個必要
+                        if (company.cash < market.buyPrice * qty) continue;
+
+                        const validation = ActionValidator.canExecute('BUY_MATERIALS', {
+                            quantity: qty, market, bypassPeriodEndCheck: true
+                        }, company, gameState);
+                        if (!validation.valid) continue;
+
+                        return {
+                            type: 'BUY_MATERIALS',
+                            score: 1000,
+                            market,
+                            quantity: qty,
+                            bypassPeriodEndCheck: true,
+                            detail: `材料${qty}個購入@¥${market.buyPrice}（スクリプト）`
+                        };
+                    }
+                    return null;  // maxPrice以下の市場で購入できない
+                }
+
+                case 'PRODUCE': {
+                    const mfgCap = company.getMfgCapacity();
+                    if (mfgCap === 0) return null;
+                    const canComplete = Math.min(company.wip, mfgCap);
+                    const canInput = Math.min(company.materials, mfgCap);
+                    if (canComplete === 0 && canInput === 0) return null;
+
+                    const validation = ActionValidator.canExecute('PRODUCE', {
+                        complete: canComplete, input: canInput
+                    }, company, gameState);
+                    if (!validation.valid) return null;
+
+                    // ★executeActionはmaterialToWipとwipToProductを期待する★
+                    return {
+                        type: 'PRODUCE',
+                        score: 1000,
+                        materialToWip: canInput,    // 材料→仕掛品
+                        wipToProduct: canComplete,  // 仕掛品→製品
+                        detail: `生産: 完成${canComplete}+投入${canInput}（スクリプト）`
+                    };
+                }
+
+                case 'SELL': {
+                    if (company.products < 2) return null;
+                    const researchChips = company.chips.research || 0;
+                    const salesCap = company.getSalesCapacity();
+                    // entry.quantityが指定されていればそれを使用、なければ能力上限
+                    const requestedQty = entry.quantity || 3;
+                    const sellQty = Math.min(company.products, salesCap, requestedQty);
+                    const isParent = gameState.isParent(company.index);
+                    const period = gameState.period;
+
+                    // entry.minPriceが指定されていればそれを最低価格とする
+                    const minPrice = entry.minPrice || 0;
+
+                    // ★★★ TARGET_PRICESに基づく販売価格 ★★★
+                    // 研究チップ数に応じた目標価格を使用
+                    const targetPrices = RULES.TARGET_PRICES[period] || RULES.TARGET_PRICES[2];
+                    let targetPrice = targetPrices[Math.min(researchChips, 5)] || 26;
+
+                    // minPriceが指定されていれば、それ以上の価格を目指す
+                    if (minPrice > targetPrice) {
+                        targetPrice = minPrice;
+                    }
+
+                    // 親ボーナスで+2円（入札競争で有利）
+                    if (isParent) {
+                        targetPrice += 1;  // 親は少し高めに入札可能
+                    }
+
+                    // ★★★ 目標価格に最も近い市場を選択（勝率を高める）★★★
+                    // minPrice以上の市場のみを対象とする
+                    const bidMarkets = gameState.markets
+                        .filter(m => m.needsBid && m.sellPrice >= minPrice)
+                        .sort((a, b) => {
+                            // 目標価格との差が小さい順（ただし目標価格以上の市場を優先）
+                            const diffA = Math.abs(a.sellPrice - targetPrice);
+                            const diffB = Math.abs(b.sellPrice - targetPrice);
+                            // 目標価格に近い市場を優先（ただし目標以上）
+                            if (a.sellPrice >= targetPrice && b.sellPrice < targetPrice) return -1;
+                            if (b.sellPrice >= targetPrice && a.sellPrice < targetPrice) return 1;
+                            return diffA - diffB;  // 差が小さい順
+                        });
+
+                    for (const m of bidMarkets) {
+                        const remainingCap = m.maxStock - (m.currentStock || 0);
+                        if (remainingCap < sellQty) continue;
+
+                        // 市場の上限を超えない範囲で目標価格を使用
+                        const actualPrice = Math.min(targetPrice, m.sellPrice);
+
+                        const validation = ActionValidator.canExecute('SELL', {
+                            market: m, quantity: sellQty, price: actualPrice
+                        }, company, gameState);
+                        if (validation.valid) {
+                            return {
+                                type: 'SELL',
+                                score: 1000 + actualPrice,
+                                market: m,
+                                quantity: sellQty,
+                                price: actualPrice,
+                                detail: `販売¥${actualPrice}×${sellQty}個@${m.name}（スクリプト）`
+                            };
+                        }
+                    }
+
+                    // フェーズ2: 非入札市場（確実に売れる）- minPrice以上の市場のみ
+                    const nonBidMarkets = gameState.markets
+                        .filter(m => !m.needsBid && m.sellPrice >= minPrice)
+                        .sort((a, b) => b.sellPrice - a.sellPrice);  // 大阪24>東京20>海外16
+
+                    for (const m of nonBidMarkets) {
+                        const remainingCap = m.maxStock - (m.currentStock || 0);
+                        if (remainingCap < sellQty) continue;
+                        // 非入札市場は固定価格（研究チップ・親ボーナスの効果なし）
+                        // 大阪: 24円(2期) or 21-26円(3期+サイコロ), 東京: 20円, 海外: 16円
+                        const nonBidPrice = m.sellPrice;
+
+                        const validation = ActionValidator.canExecute('SELL', {
+                            market: m, quantity: sellQty, price: nonBidPrice
+                        }, company, gameState);
+                        if (validation.valid) {
+                            return {
+                                type: 'SELL',
+                                score: 800 + nonBidPrice,  // 価格で優先度付け
+                                market: m,
+                                quantity: sellQty,
+                                price: nonBidPrice,
+                                detail: `販売¥${nonBidPrice}×${sellQty}個@${m.name}（スクリプト）`
+                            };
+                        }
+                    }
+                    return null;
+                }
+
+                case 'HIRE_SALESMAN': {
+                    const count = entry.count || 1;
+                    const cost = count * RULES.COST.HIRING;  // HIRE→HIRING
+                    if (company.cash < cost) return null;
+                    return {
+                        type: 'HIRE_SALESMAN',
+                        score: 1000,
+                        count: count,
+                        detail: `セールスマン${count}名採用（¥${cost}）（スクリプト）`
+                    };
+                }
+
+                case 'SELL_MACHINE': {
+                    // 小型機械を売却（簿価の70%）
+                    const smallMachine = company.machines.find(m => m.type === 'small');
+                    if (!smallMachine) return null;
+                    const bookValue = smallMachine.attachments > 0 ? 130 : 100;  // アタッチメント込み
+                    const saleValue = Math.floor(bookValue * 0.7);
+                    return {
+                        type: 'SELL_MACHINE',
+                        score: 1000,
+                        machineType: 'small',
+                        saleValue: saleValue,
+                        detail: `小型機械売却（¥${saleValue}回収）（スクリプト）`
+                    };
+                }
+
+                case 'BUY_LARGE_MACHINE': {
+                    if (company.cash < 200) return null;
+                    return {
+                        type: 'BUY_LARGE_MACHINE',
+                        score: 1000,
+                        detail: `大型機械購入（¥200）（スクリプト）`
+                    };
+                }
+            }
+
+            return null;
+        },
+
+        /**
          * 最適な行動を決定
          */
         decideAction(company, gameState, options = {}) {
             const period = gameState.period;
             const isParent = gameState.isParent(company.index);
+
+            // ★★★ PLAYER戦略の2期はスクリプトモードを優先 ★★★
+            const scriptedAction = this.getScriptedAction(company, gameState);
+            if (scriptedAction) {
+                return scriptedAction;
+            }
+
             const actions = this.evaluateAllActions(company, gameState);
 
             // スコアでソート（基本スコア順）
@@ -3460,7 +3952,8 @@ const MGSimulation = (function() {
             }
 
             // === 最終手段6: 海外市場への販売（現金0でも可能）===
-            if (actions.length === 0 && company.products >= 1) {
+            // ★★★ PLAYER戦略では海外¥16販売を禁止（ユーザー指定 2026-01-06）★★★
+            if (actions.length === 0 && company.products >= 1 && company.strategyType !== 'PLAYER') {
                 const overseasMarket = gameState.markets.find(m => m.name === '海外');
                 if (overseasMarket) {
                     const sellQty = Math.min(company.products, overseasMarket.maxStock - (overseasMarket.currentStock || 0), salesCap);
@@ -3485,7 +3978,8 @@ const MGSimulation = (function() {
             }
 
             // === 最終手段7: 東京市場への販売 ===
-            if (actions.length === 0 && company.products >= 1) {
+            // ★★★ PLAYER戦略では東京¥20販売を禁止（ユーザー指定 2026-01-06）★★★
+            if (actions.length === 0 && company.products >= 1 && company.strategyType !== 'PLAYER') {
                 const tokyoMarket = gameState.markets.find(m => m.name === '東京');
                 if (tokyoMarket) {
                     const sellQty = Math.min(company.products, tokyoMarket.maxStock - (tokyoMarket.currentStock || 0), salesCap);
@@ -3510,7 +4004,8 @@ const MGSimulation = (function() {
             }
 
             // === 最終手段8: どんな市場でも販売能力分売る ===
-            if (actions.length === 0 && company.products >= 2 && salesCap >= 2) {
+            // ★★★ PLAYER戦略では低価格市場への緊急販売を禁止 ★★★
+            if (actions.length === 0 && company.products >= 2 && salesCap >= 2 && company.strategyType !== 'PLAYER') {
                 for (const m of gameState.markets) {
                     if (gameState.closedMarkets.includes(m.name)) continue;
                     const remainingCapacity = m.maxStock - (m.currentStock || 0);
@@ -3826,15 +4321,15 @@ const MGSimulation = (function() {
             const currentAdvertising = company.chips.advertising || 0;
             const totalChips = currentResearch + currentEducation + currentAdvertising;
 
-            // ★★★ 2期のみ研究チップ2枚購入（高価格販売のため）★★★
-            // 研究チップ1枚 = 販売価格+2円（2枚で+4円）
-            // 2枚×¥20 = ¥40投資 → 10個販売で¥40増収（損益分岐）
+            // ★★★ ユーザー戦略: 2期は教育1枚+研究4枚 ★★★
+            // 教育チップ: 製造能力3（小型1+PC1+教育1）を確保
+            // 研究チップ: 4枚で32円販売を目指す
             let targetResearch, targetEducation;
             if (period === 2) {
-                targetResearch = 2;  // 2枚購入（高価格販売のため）
-                targetEducation = 0;  // 教育チップは買わない
+                targetResearch = 4;   // 4枚購入で32円販売
+                targetEducation = 1;  // ★最初に教育チップ（製造能力3確保）
             } else {
-                // 3期以降は購入しない（特急チップは高コスト¥40/枚）
+                // 3期以降は繰越チップを活用（特急チップは高コスト¥40/枚）
                 targetResearch = 0;
                 targetEducation = 0;
             }
@@ -3846,40 +4341,47 @@ const MGSimulation = (function() {
             const allChips = totalChips + nextChips;
             const needsChipsForVictory = period === 5 && allChips < RULES.VICTORY.MIN_CARRYOVER_CHIPS;
 
-            // ★★★ 2期は積極的にチップ購入（繰越で3期が有利になる）★★★
-            // 3期以降は特急チップを避けて繰越チップで戦う
+            // ★★★ 2期は4枚購入（32円販売を目指す）★★★
+            // 3期以降は繰越チップ（3枚）で戦う
             if (period === 2) {
-                // 2期序盤〜中盤はチップ購入優先（終盤は大型機械購入のため現金確保）
-                const maxRows = 20;
-                const isEarlyPeriod = company.currentRow <= 12;
-                if (!isEarlyPeriod && currentResearch < 2) {
-                    // 2期終盤でもチップ目標未達なら購入を検討
+                // 2期は4枚購入を目指す
+                if (currentResearch >= 4) {
+                    return null;  // 目標達成
                 }
             } else if (period >= 3) {
-                // ★★★ 3期以降: 特急チップは利益を圧迫するので極力避ける ★★★
-                // 繰越研究チップが3枚あれば新規購入不要
+                // ★★★ 3期以降: 繰越チップで戦う（特急は高コスト）★★★
                 if (currentResearch >= 3 && !needsChipsForVictory) {
                     return null;
                 }
             }
 
-            // 投資タイミング判断
-            const hasSufficientCash = company.cash >= (period === 2 ? 40 : 80);
-            const isGoodTimingForInvestment = company.products === 0 && company.wip <= 2;
+            // 投資タイミング判断（2期は緩和）
+            const hasSufficientCash = company.cash >= (period === 2 ? 60 : 80);
 
             if (!needsChipsForVictory && !hasSufficientCash) return null;
-            // ★★★ 2期は常にチップ購入可能（将来の販売価格向上のため）★★★
-            if (period === 2 && currentResearch < 2) {
-                // 2期はタイミング制限なし - チップ投資を優先（2枚まで）
-            } else if (!needsChipsForVictory && !isGoodTimingForInvestment && company.cash < 100) {
+            // ★★★ 2期は4枚まで積極購入（将来の販売価格向上のため）★★★
+            if (period === 2 && currentResearch < 4) {
+                // 2期は4枚までタイミング制限なし
+            } else if (!needsChipsForVictory && company.cash < 100) {
                 return null;
             }
 
-            // 優先順位: 研究 > 教育 > 広告
-            const chipOptions = [
-                { type: 'research', current: currentResearch, target: targetResearch, score: 90, name: '研究開発' },
-                { type: 'education', current: currentEducation, target: targetEducation, score: 75, name: '教育' }
-            ];
+            // ★★★ 2期: 教育チップを最初に購入（製造能力3確保）★★★
+            // 教育チップ0枚の場合は教育を最優先、それ以降は研究チップ
+            let chipOptions;
+            if (period === 2 && currentEducation === 0) {
+                // 2期で教育チップ未購入 → 教育を最優先
+                chipOptions = [
+                    { type: 'education', current: currentEducation, target: targetEducation, score: 100, name: '教育' },
+                    { type: 'research', current: currentResearch, target: targetResearch, score: 90, name: '研究開発' }
+                ];
+            } else {
+                // 教育チップ購入済み or 3期以降 → 研究優先
+                chipOptions = [
+                    { type: 'research', current: currentResearch, target: targetResearch, score: 90, name: '研究開発' },
+                    { type: 'education', current: currentEducation, target: targetEducation, score: 75, name: '教育' }
+                ];
+            }
 
             for (const opt of chipOptions) {
                 if (!needsChipsForVictory && opt.current >= opt.target) continue;
@@ -3893,9 +4395,11 @@ const MGSimulation = (function() {
                     continue;
                 }
 
-                // ★★★ 期末コストを考慮した購入判断 ★★★
+                // ★★★ 期末コストを考慮した購入判断（2期は緩和）★★★
                 const periodEndCost = PeriodEndCostEstimator.calculate(company, period, gameState);
-                const minReserve = periodEndCost + 20;
+                // 2期は60%予約（チップ投資優先）、3期以降は80%予約
+                const reserveRatio = period === 2 ? 0.6 : 0.8;
+                const minReserve = Math.floor(periodEndCost * reserveRatio);
                 if (company.cash < cost + minReserve) continue;
 
                 const validation = ActionValidator.canExecute('BUY_CHIP', {
@@ -3906,17 +4410,22 @@ const MGSimulation = (function() {
                 if (validation.valid) {
                     let score = opt.score;
                     if (needsChipsForVictory) score += 400;
-                    // ★★★ 2期のチップ購入を最優先（将来の販売価格に直結）★★★
-                    // 研究チップ1枚 = 販売価格+2円 → 将来の全販売で利益増加
-                    // ★★★ 但し2枚までに制限（キャッシュ確保優先）★★★
-                    if (period === 2 && opt.type === 'research') {
-                        // 2期序盤（行10まで）は特に高スコア
-                        if (company.currentRow <= 10) {
-                            if (currentResearch < 2) score += 500;  // 最初の2枚は最優先
-                            // 3枚目以降は買わない（キャッシュ優先）
-                        } else {
-                            if (currentResearch < 2) score += 300;
-                            // 3枚目以降は買わない
+
+                    // ★★★ 2期戦略: 教育→研究1枚→3個販売→研究4枚→6個販売 ★★★
+                    if (period === 2 && opt.type === 'education' && currentEducation === 0) {
+                        // 教育チップは製造能力3確保のため最優先
+                        score += 700;
+                    } else if (period === 2 && opt.type === 'research') {
+                        const soldQty = company.totalSoldQuantity || 0;
+                        if (currentResearch === 0) {
+                            // 教育後の最初の研究チップ
+                            score += 600;
+                        } else if (soldQty < 3) {
+                            // 3個販売するまでは追加購入を抑制（販売優先）
+                            score -= 200;
+                        } else if (currentResearch < 4) {
+                            // 3個販売後は4枚まで積極購入
+                            score += 500;
                         }
                     }
 
@@ -3942,9 +4451,11 @@ const MGSimulation = (function() {
             const mfgCap = company.getMfgCapacity();
             const salesCap = company.getSalesCapacity();
 
-            // ★★★ 期末コストを考慮した採用判断 ★★★
+            // ★★★ 期末コストを考慮した採用判断（3期以降は積極採用）★★★
             const periodEndCost = PeriodEndCostEstimator.calculate(company, period, gameState);
-            const minReserve = periodEndCost + 20;  // 期末コスト + 余裕
+            // 3期以降は70%予約（セールスマン採用優先）、2期は80%予約
+            const reserveRatio = period >= 3 ? 0.7 : 0.8;
+            const minReserve = Math.floor(periodEndCost * reserveRatio);
 
             // ワーカー不足チェック（機械台数より少ない）
             if (company.workers < machineCount) {
@@ -3962,13 +4473,20 @@ const MGSimulation = (function() {
                 }
             }
 
-            // セールスマン不足チェック（販売能力が製造能力の半分以下）
-            if (salesCap < mfgCap && company.salesmen < 3) {
+            // ★★★ セールスマン採用（適度なバランス）★★★
+            // 参考Fコスト: 2期2人、3期・4期3人
+            if (company.salesmen < 3) {
                 const hireCost = RULES.COST.HIRING;
                 const validation = ActionValidator.canExecute('HIRE', { count: 1 }, company, gameState);
                 if (validation.valid && company.cash >= hireCost + minReserve) {
                     let score = 60;
-                    if (period === 2 && company.salesmen < 2) score += 80;
+                    // ★★★ 期別のセールスマン目標 ★★★
+                    if (period === 2) {
+                        if (company.salesmen < 2) score += 80;  // 2人まで
+                    } else if (period >= 3) {
+                        if (company.salesmen < 3) score += 100;  // 3人まで
+                    }
+                    // 在庫が販売能力を超えている場合はさらに加点
                     if (company.products > salesCap) score += 50;
 
                     return {
@@ -4000,14 +4518,19 @@ const MGSimulation = (function() {
             // 期別・研究チップ別の目安価格を取得
             let basePrice = RULES.TARGET_PRICES[period]?.[Math.min(researchChips, 5)] || 24;
 
-            // 戦略に応じて価格調整
+            // ★★★ 2期はAIを少し弱体化（PLAYERが勝ちやすくする）★★★
+            if (period === 2 && company.strategyType !== 'PLAYER') {
+                basePrice -= 2;  // AIは2円低い価格で入札（コール価格が高くなる）
+            }
+
+            // ★★★ 戦略に応じて価格調整（3期以降のみ）★★★
             const strategy = company.strategy;
-            if (strategy) {
+            if (period >= 3 && strategy) {
                 basePrice += strategy.priceAdjustment || 0;
             }
 
-            // 親でない場合は2円引き
-            if (!isParent) {
+            // 3期以降は親でない場合2円引き（入札成功率向上）
+            if (period >= 3 && !isParent) {
                 basePrice -= 2;
             }
 
@@ -4017,15 +4540,36 @@ const MGSimulation = (function() {
             let bestQty = 0;
             let bestMQ = 0;
 
+            // ★★★ 2期戦略: 研究チップ購入後に販売 ★★★
+            // ユーザー計画: 研究1枚→3個販売(29円)→研究4枚→6個販売(32円)
+            const soldQuantity = company.totalSoldQuantity || 0;
+            // 研究チップ少ない時は販売スコアを大幅に下げる（他のアクションを優先）
+            let sellPenalty = 0;
+            if (period === 2) {
+                if (researchChips === 0) {
+                    sellPenalty = -800;  // 研究0枚なら販売を大幅に抑制
+                } else if (researchChips < 4 && soldQuantity >= 3) {
+                    sellPenalty = -500;  // 3個販売後は4枚まで抑制
+                }
+            }
+
             for (const m of gameState.markets) {
+
                 // 市場の残り容量を計算
                 const remainingCapacity = m.maxStock - (m.currentStock || 0);
                 const sellQty = Math.min(maxSellQty, remainingCapacity);
 
                 if (sellQty < RULES.MIN_SALE_QUANTITY) continue;
 
-                // 価格決定（市場価格と目安価格の小さい方）
-                const price = Math.min(m.sellPrice || basePrice, basePrice);
+                // ★★★ 価格決定：入札市場はTARGET_PRICES、非入札市場は市場価格 ★★★
+                let price;
+                if (m.needsBid) {
+                    // 入札市場：研究チップ反映の目安価格を使用
+                    price = basePrice;
+                } else {
+                    // 非入札市場：市場の固定価格を使用
+                    price = m.sellPrice || basePrice;
+                }
 
                 // MQ計算
                 const mq = price * sellQty;
@@ -4048,7 +4592,8 @@ const MGSimulation = (function() {
             if (!bestMarket) return null;
 
             // ★★★ MQに基づくスコア: 売上金額が大きいほど高スコア ★★★
-            const score = 200 + bestMQ;
+            // 2期で研究チップ不足の場合はペナルティを適用
+            const score = 200 + bestMQ + sellPenalty;
 
             return {
                 type: 'SELL',
@@ -4332,52 +4877,86 @@ const MGSimulation = (function() {
                                 company.machines[0].type === 'small';
             const hasPC = (company.chips.computer || 0) > 0;
             const hasEducation = (company.chips.education || 0) > 0;
+            const strategy = company.strategy;
+
+            // ★★★ 2期での早期大型機械購入（ユーザー戦略）★★★
+            // 2期: 簿価90 → 売却63、必要純投資137円
+            // 完成3+投入3の生産には大型機械（能力4）が必要
+            if (period === 2 && hasOnlySmall && strategy?.earlyLargeMachine) {
+                const bookValue = RULES.BOOK_VALUE.SMALL[period] || 90;
+                const salePrice = Math.floor(bookValue * RULES.SALE_RATIO);
+                const requiredCash = 200 - salePrice;  // 137円
+
+                // 2期後半（14行目以降）で資金があれば購入
+                if (company.currentRow >= 14 && company.cash >= requiredCash + 30) {
+                    const cashAfterPurchase = company.cash + salePrice - 200;
+
+                    // ActionValidatorで検証
+                    const validation = ActionValidator.canExecute('UPGRADE_TO_LARGE_MACHINE', {}, company, gameState);
+                    if (validation.valid) {
+                        let score = 400;  // 高スコアで優先
+                        if (company.currentRow >= 16) score += 200;  // 16行目以降はさらに優先
+
+                        return {
+                            type: 'UPGRADE_TO_LARGE_MACHINE',
+                            score,
+                            detail: `2期大型機械購入（売却¥${salePrice}+購入¥200）→能力4`,
+                            salePrice,
+                            bookValue
+                        };
+                    }
+                }
+            }
 
             // ★★★ 大型機械への移行（小型売却+大型購入）★★★
-            // ★★★ 完全無効化: キャッシュフロー優先で機械アップグレードしない ★★★
-            // 大型機械は能力4だが、投資回収に時間がかかる
-            // 3期序盤: 簿価80 → 売却56、必要現金144円 → 但し200円以上を要求
-            // 4期: 簿価60 → 売却42、必要現金158円 → 但し200円以上を要求
-            if (false && hasOnlySmall && period >= 3 && period <= 4 && company.cash >= 200) {
+            // ユーザー戦略: 3期で仕入れ・販売を繰り返して資金を貯めてから購入
+            // 3期: 簿価80 → 売却56、必要純投資144円
+            // 4期: 簿価60 → 売却42、必要純投資158円
+            if (hasOnlySmall && period >= 3 && period <= 4) {
                 const bookValue = RULES.BOOK_VALUE.SMALL[period] || 80;
                 const salePrice = Math.floor(bookValue * RULES.SALE_RATIO);
-                const cashAfterPurchase = company.cash + salePrice - 200;
+                const minCash = 200 - salePrice + 5;  // 最低必要額+余裕5円
 
-                // ★★★ 会社の期末コスト追跡システムを使用（ActionValidatorと一貫性を保つ）★★★
-                const periodEndCost = company.estimatedPeriodEndCost || 0;
+                if (company.cash >= minCash) {
+                    const cashAfterPurchase = company.cash + salePrice - 200;
 
-                // ★★★ 購入後に期末を乗り越えられるかチェック ★★★
-                // 購入後の現金 >= 期末コスト でないと短期借入が発生する
-                const hasEnoughForPeriodEnd = cashAfterPurchase >= periodEndCost;
+                    // ★★★ 期末コストチェックを緩和（3期は積極的に購入）★★★
+                    // 3期は生産能力拡大が最優先、短期借入は許容
+                    const periodEndCost = company.estimatedPeriodEndCost || 0;
+                    const hasEnoughForPeriodEnd = period === 3 || cashAfterPurchase >= periodEndCost * 0.5;
 
-                // ★★★ 購入判定: 現金200以上 AND 期末コストが払える ★★★
-                if (hasEnoughForPeriodEnd) {
-                    let score = 200;  // ★★★ 優先度を下げてキャッシュフロー優先
+                    if (hasEnoughForPeriodEnd) {
+                        let score = 200;
 
-                    // ★★★ タイミングボーナス（3期序盤が最適）★★★
-                    if (period === 3 && company.currentRow <= 10) {
-                        score += 200;  // 3期序盤が最優先（簿価80で売却56円）
-                    } else if (period === 3) {
-                        score += 150;
-                    } else if (period === 4 && company.currentRow <= 15) {
-                        score += 100;
+                        // ★★★ タイミングボーナス（3期中盤が最適）★★★
+                        if (period === 3) {
+                            if (company.currentRow >= 8 && company.currentRow <= 15) {
+                                score += 300;  // 3期中盤（資金が貯まった頃）
+                            } else if (company.currentRow > 15) {
+                                score += 200;  // 3期後半
+                            } else {
+                                score += 100;  // 3期序盤（資金不足気味）
+                            }
+                        } else if (period === 4) {
+                            score += 100;
+                        }
+
+                        // チップボーナス
+                        if (hasPC) score += 80;
+                        if (hasEducation) score += 30;
+
+                        // 在庫があれば追加ボーナス
+                        if (company.products >= 2) score += 50;
+                        if (company.wip >= 2) score += 30;
+
+                        return {
+                            type: 'UPGRADE_TO_LARGE_MACHINE',
+                            score,
+                            detail: `小型売却(¥${salePrice})+大型購入(¥200)→能力4`,
+                            salePrice,
+                            bookValue
+                        };
                     }
-
-                    // チップボーナス
-                    if (hasPC) score += 80;
-                    if (hasEducation) score += 30;
-
-                    // 在庫があれば追加ボーナス
-                    if (company.products >= 2) score += 50;
-                    if (company.wip >= 2) score += 30;
-
-                    return {
-                        type: 'UPGRADE_TO_LARGE_MACHINE',
-                        score,
-                        detail: `小型売却(¥${salePrice})+大型購入(¥200)→能力4`,
-                        salePrice,
-                        bookValue
-                    };
                 }
             }
 
@@ -4456,6 +5035,11 @@ const MGSimulation = (function() {
          * 完全なゲームをシミュレート
          */
         runFullGame(options = {}) {
+            // ★★★ シミュレーションモード: PLAYERも自動実行 ★★★
+            if (options.autoPlayer === undefined) {
+                options.autoPlayer = true;  // デフォルトでPLAYERもAI制御
+            }
+
             const gameState = new GameState();
             gameState.initCompanies({
                 allAI: options.allAI || false,
@@ -4616,6 +5200,12 @@ const MGSimulation = (function() {
                     osakaPrice: gameState.osakaMaxPrice,
                     rowReduction: gameState.maxRowsReduction
                 };
+                // ★サイコロ結果をコンソールに表示
+                const dice = gameState.diceResult;
+                const closed = gameState.closedMarkets.join('・') || 'なし';
+                const wage = gameState.wageMultiplier === 1.1 ? '×1.1' : '×1.2';
+                const osaka = gameState.osakaMaxPrice;
+                console.log(`[${period}期サイコロ] 出目${dice} 閉鎖:${closed} 人件費${wage} 大阪¥${osaka}`);
             }
 
             const maxRows = gameState.getMaxRows();
@@ -4632,6 +5222,7 @@ const MGSimulation = (function() {
                 company.period = period;  // 各会社の期を更新
                 company.maxPersonnel = company.workers + company.salesmen;
                 company.currentRow = PSR.INTEREST_TAX_DIVIDEND;  // 0行目開始
+                company.scriptIndex = 0;  // ★スクリプトモード用インデックスをリセット
             });
 
             // ===== 0行目: サイコロ・金利支払・納税・配当 =====
@@ -4644,8 +5235,7 @@ const MGSimulation = (function() {
                     const closed = gameState.closedMarkets.join('・') || 'なし';
                     const wage = gameState.wageMultiplier === 1.1 ? '×1.1' : '×1.2';
                     const osaka = gameState.osakaMaxPrice;
-                    const rowRed = gameState.maxRowsReduction > 0 ? ` 行数-${gameState.maxRowsReduction}` : '';
-                    company.logAction('期首', `【サイコロ${dice}】閉鎖:${closed} 人件費${wage} 大阪¥${osaka}${rowRed}`, 0, false);
+                    company.logAction('期首', `【サイコロ${dice}】閉鎖:${closed} 人件費${wage} 大阪¥${osaka}`, 0, false);
                 }
 
                 // ★前期借入の金利支払い表示（実際は借入時控除済みだが、表示用）
@@ -4675,17 +5265,22 @@ const MGSimulation = (function() {
 
                 // 3期以降の必須購入処理
                 if (period >= 3) {
-                    // 特別ルール: PC+保険を買えない場合（現金<25）、先に¥100長期借入（2行目扱い）
-                    if (company.cash < 25) {
+                    // 特別ルール: PC+保険を買えない場合（現金<25）、先に長期借入（2行目扱い）
+                    // ★★★ PLAYERの場合はスキップ（PLAYER専用処理で対応）★★★
+                    if (company.cash < 25 && company.strategyType !== 'PLAYER') {
                         const savedRow = company.currentRow;
                         company.currentRow = PSR.LOAN_WAREHOUSE;  // 2行目で借入
-                        const specialLoanAmount = 100;
-                        const specialInterest = Math.floor(specialLoanAmount * 0.10);
-                        const specialNetAmount = specialLoanAmount - specialInterest;
-                        company.longTermLoan += specialLoanAmount;
-                        company.cash += specialNetAmount;
-                        ImmediateFTracker.flagLongTermLoan(company, specialLoanAmount);
-                        company.logAction('期首', `特別長期借入¥${specialLoanAmount}（金利¥${specialInterest}）`, specialNetAmount, true);
+                        const equity = company.calculateEquity(period);
+                        const loanLimit = RULES.getLoanLimit(period, equity);
+                        const specialLoanAmount = Math.min(100, loanLimit - company.longTermLoan);  // 借入限度内
+                        if (specialLoanAmount > 0) {
+                            const specialInterest = Math.floor(specialLoanAmount * 0.10);
+                            const specialNetAmount = specialLoanAmount - specialInterest;
+                            company.longTermLoan += specialLoanAmount;
+                            company.cash += specialNetAmount;
+                            ImmediateFTracker.flagLongTermLoan(company, specialLoanAmount);
+                            company.logAction('期首', `特別長期借入¥${specialLoanAmount}（金利¥${specialInterest}）`, specialNetAmount, true);
+                        }
                         company.currentRow = savedRow;  // 1行目に戻す
                     }
 
@@ -4716,7 +5311,42 @@ const MGSimulation = (function() {
                 const company = gameState.companies[companyIndex];
                 company.currentRow = PSR.LOAN_WAREHOUSE;  // 2行目
 
-                if (!company.isPlayer || options.autoPlayer) {
+                // ★★★ PLAYER戦略の期首処理 ★★★
+                // ユーザー指定: 長期借入のみ期首で実行、機械・採用は意思決定フェーズ（スクリプト）
+                if (company.strategyType === 'PLAYER' && period >= 3) {
+                    const equity = company.calculateEquity(period);
+
+                    // 3期: 長期借入のみ（大型機械・セールスマン採用はスクリプトで実行）
+                    if (period === 3) {
+                        // 長期借入（借入可能額を全額借りる）
+                        const loanLimit = RULES.getLoanLimit(period, equity);
+                        const currentLoan = company.longTermLoan;
+                        const borrowAmount = loanLimit - currentLoan;
+                        if (borrowAmount > 0) {
+                            ActionEngine.borrowLongTerm(company, borrowAmount, period, equity);
+                        }
+                        // ★★★ 大型機械・セールスマン採用はスクリプトで処理 ★★★
+                    }
+                    // 4期: 長期借入追加（借入可能額を全額借りる）
+                    else if (period === 4) {
+                        const loanLimit = RULES.getLoanLimit(period, equity);
+                        const currentLoan = company.longTermLoan;
+                        const borrowAmount = loanLimit - currentLoan;
+                        if (borrowAmount > 0) {
+                            ActionEngine.borrowLongTerm(company, borrowAmount, period, equity);
+                        }
+                    }
+                    // 5期: 借入可能額を全額借りる（運転資金確保）
+                    else if (period === 5) {
+                        const loanLimit = RULES.getLoanLimit(period, equity);
+                        const currentLoan = company.longTermLoan;
+                        const borrowAmount = loanLimit - currentLoan;
+                        if (borrowAmount > 0) {
+                            ActionEngine.borrowLongTerm(company, borrowAmount, period, equity);
+                        }
+                    }
+                }
+                else if (!company.isPlayer || options.autoPlayer) {
                     const equity = company.calculateEquity(period);
                     const limit = RULES.getLoanLimit(period, equity);
                     const available = limit - company.longTermLoan;
@@ -4828,14 +5458,14 @@ const MGSimulation = (function() {
                         company.doNothingCount = 0;  // 行消費時はカウンタリセット
                     }
 
-                    // 行数チェック
+                    // ★★★ MGルール: 1社が上限に達すると全社の期が終了 ★★★
                     if (company.currentRow >= maxRows) {
                         continueSimulation = false;
                         break;
                     }
                 }
 
-                // 全社が上限に達したかチェック
+                // 全社が上限に達したかチェック（念のため）
                 const allDone = gameState.companies.every(c => c.currentRow >= maxRows);
                 if (allDone) continueSimulation = false;
 
@@ -5318,48 +5948,9 @@ const MGSimulation = (function() {
             // ルール⑨: チップは期首購入不可（意思決定カードで購入）
             // チップ購入はここでは行わない - AIDecisionEngine.evaluateChipPurchaseで処理
 
-            // 4. 大型機械購入（3期で小型→大型への移行）★★★システム化★★★
-            // 売却: ¥56、大型機械: ¥200 → 必要現金: ¥144
-            // ★★★ 完全無効化: キャッシュフロー優先で機械アップグレードしない ★★★
-            // 条件: (1) 現金 >= 200、(2) 購入後に行動可能（製品あり or 余裕資金）
-            if (false && period >= 3 && period <= 4) {
-                const hasOnlySmall = company.machines.length === 1 && company.machines[0].type === 'small';
-                if (hasOnlySmall && company.cash >= 200) {  // ★現金200円以上（余裕確保）
-                    // 売却額と購入後残高を計算
-                    const bookValue = RULES.BOOK_VALUE.SMALL[period] || 80;
-                    const salePrice = Math.floor(bookValue * RULES.SALE_RATIO);  // 56円
-                    const cashAfterPurchase = company.cash + salePrice - 200;  // 購入後の残高
-
-                    // ★★★ 購入後に行動可能かチェック ★★★
-                    // (1) 製品があれば販売可能
-                    // (2) 余裕資金（20円以上）があれば材料購入や生産可能
-                    const canActAfterPurchase = company.products >= 2 || cashAfterPurchase >= 20;
-
-                    if (canActAfterPurchase) {
-                        // 小型機械を売却（1行使用）
-                        company.cash += salePrice;
-                        const saleLoss = bookValue - salePrice;
-                        company.totalSpecialLoss += saleLoss;
-                        company.periodStartActions.push({
-                            type: '機械売却',
-                            detail: `小型機械売却（簿価¥${bookValue} → 売却¥${salePrice}、売却損¥${saleLoss}）`,
-                            amount: salePrice,
-                            loss: saleLoss,
-                            isIncome: true
-                        });
-                        company.machines = [];
-
-                        // 大型機械を購入
-                        company.cash -= 200;
-                        company.machines.push({ type: 'large', attachments: 0 });
-                        company.periodStartActions.push({
-                            type: '機械購入',
-                            detail: `大型機械購入（¥200、能力4）残高¥${company.cash}`,
-                            amount: 200
-                        });
-                    }
-                }
-            }
+            // ★★★ 大型機械購入は意思決定フェーズで行う（期首ではなく）★★★
+            // 3期で仕入れ・販売を繰り返して資金を貯めてから購入
+            // AIDecisionEngine.evaluateMachineUpgrade() で処理
 
             // 5. ワーカー採用（機械2台以上になったら採用）
             // ルール: ワーカーは機械が2台になるまで採用不要
@@ -5387,12 +5978,11 @@ const MGSimulation = (function() {
             }
 
             // 6. セールスマン採用（販売能力が足りない場合）
-            const salesCapacity = company.getSalesCapacity();
-            const mfgCapacity = company.getMfgCapacity();
-            // セールスマンは2人を目標（販売能力4+教育=5個程度）
-            // 3人目は人件費対効果が悪いので採用しない
-            const targetSalesmen = 2;
-            if (company.salesmen < targetSalesmen && salesCapacity < mfgCapacity && company.cash >= 10) {
+            // ★★★ ユーザー戦略: 3期以降はセールスマン3人（販売能力7確保）★★★
+            // 2期: 1人（販売能力3）、3期以降: 3人（販売能力7）
+            const targetSalesmen = period >= 3 ? 3 : 1;
+            // ★ 目標人数未満なら採用（製造能力との比較は不要）
+            if (company.salesmen < targetSalesmen && company.cash >= 10) {
                 const hireCount = Math.min(targetSalesmen - company.salesmen, Math.floor(company.cash / 5), 3);
                 if (hireCount > 0) {
                     const cost = hireCount * 5;
@@ -5463,31 +6053,55 @@ const MGSimulation = (function() {
                     const myCompetitiveness = myChips * 2 + (isParent ? 2 : 0);
                     const myCallPrice = action.price - myCompetitiveness;
 
-                    // 他社のコール価格をシミュレート（平均2枚の研究チップ想定）
+                    // ★★★ 他社のコール価格をシミュレート ★★★
+                    // ★★★ 修正 2026-01-06: 価格テーブルに基づく入札 ★★★
                     let competitors = 0;
+                    const period = gameState.period;
                     for (let i = 0; i < 5; i++) { // 他5社
-                        const otherChips = Math.floor(Math.random() * 4); // 0-3枚
-                        const otherPrice = 24 + Math.floor(Math.random() * 8); // 24-31円
+                        let otherChips, otherPrice;
+                        if (period === 2) {
+                            // 2期: 他社は研究0-2枚、価格テーブル±2
+                            otherChips = Math.floor(Math.random() * 3); // 0-2枚
+                            const basePrice = RULES.TARGET_PRICES[2][otherChips] || 24;
+                            otherPrice = basePrice + Math.floor(Math.random() * 5) - 2; // ±2のアレンジ
+                        } else {
+                            // 3期以降: 他社は研究1-3枚、価格テーブル±2
+                            otherChips = 1 + Math.floor(Math.random() * 3); // 1-3枚
+                            const basePrice = RULES.TARGET_PRICES[period]?.[otherChips] || 26;
+                            otherPrice = basePrice + Math.floor(Math.random() * 5) - 2; // ±2のアレンジ
+                        }
                         const otherCallPrice = otherPrice - otherChips * 2;
                         if (otherCallPrice <= myCallPrice) competitors++;
                     }
 
-                    // 勝率計算：同等以下のコール価格を持つ競争者が少ないほど勝つ
-                    // 親は同点で勝つので有利
+                    // ★★★ 勝率計算（修正 2026-01-06）★★★
+                    // ★★★ 東京¥20での販売はほぼ発生しないように勝率UP ★★★
                     let winProbability;
-                    if (competitors === 0) {
-                        winProbability = 0.95;
-                    } else if (competitors === 1) {
-                        winProbability = isParent ? 0.75 : 0.50;
-                    } else if (competitors === 2) {
-                        winProbability = isParent ? 0.50 : 0.33;
+                    if (period === 2) {
+                        // 2期: 高勝率
+                        if (competitors === 0) {
+                            winProbability = 0.98;
+                        } else if (competitors <= 2) {
+                            winProbability = 0.90;
+                        } else {
+                            winProbability = 0.80;
+                        }
                     } else {
-                        winProbability = isParent ? 0.30 : 0.20;
+                        // 3期以降: 研究チップがあれば高勝率
+                        if (competitors === 0) {
+                            winProbability = 0.98;
+                        } else if (competitors === 1) {
+                            winProbability = isParent ? 0.90 : 0.85;
+                        } else if (competitors === 2) {
+                            winProbability = isParent ? 0.85 : 0.75;
+                        } else {
+                            winProbability = isParent ? 0.75 : 0.65;
+                        }
                     }
 
-                    // 研究チップが多いほど有利
-                    winProbability += myChips * 0.05;
-                    winProbability = Math.min(0.95, winProbability);
+                    // 研究チップが多いほど有利（ボーナス強化）
+                    winProbability += myChips * 0.03;
+                    winProbability = Math.min(0.98, winProbability);
 
                     if (Math.random() < winProbability) {
                         const revenue = action.price * action.quantity;
@@ -5523,7 +6137,7 @@ const MGSimulation = (function() {
                     }
 
                 case 'BUY_MATERIALS':
-                    ActionEngine.buyMaterials(company, action.quantity, action.market, gameState);
+                    ActionEngine.buyMaterials(company, action.quantity, action.market, gameState, action.bypassPeriodEndCheck || false);
                     break;
 
                 case 'INPUT':
@@ -5555,6 +6169,28 @@ const MGSimulation = (function() {
                     ActionEngine.hireSalesman(company, action.count);
                     // ★★★ 採用後に期末コストを即座に更新 ★★★
                     company.updatePeriodEndCost(gameState.period, gameState.wageMultiplier || 1.0);
+                    break;
+
+                case 'SELL_MACHINE':
+                    // 小型機械を単独で売却（スクリプト用）
+                    {
+                        const period = gameState.period;
+                        const smallMachine = company.machines.find(m => m.type === 'small');
+                        if (smallMachine) {
+                            const hasAttach = smallMachine.attachments > 0;
+                            const bookValue = hasAttach ?
+                                (RULES.BOOK_VALUE.SMALL_ATTACH?.[period] || 117) :
+                                (RULES.BOOK_VALUE.SMALL[period] || 80);
+                            const salePrice = Math.floor(bookValue * RULES.SALE_RATIO);
+                            const saleLoss = bookValue - salePrice;
+
+                            company.cash += salePrice;
+                            company.totalSpecialLoss += saleLoss;
+                            company.machines = company.machines.filter(m => m !== smallMachine);
+                            company.logAction('機械売却', `小型機械売却（簿価¥${bookValue} → 売却¥${salePrice}）`, salePrice, true);
+                            company.updatePeriodEndCost(gameState.period, gameState.wageMultiplier || 1.0);
+                        }
+                    }
                     break;
 
                 case 'BUY_LARGE_MACHINE':
@@ -5589,7 +6225,7 @@ const MGSimulation = (function() {
 
                 case 'BUY_CHIP':
                     // ルール①: 2期は特急なし、ルール②: 1行1枚まで
-                    ActionEngine.buyChip(company, action.chipType, action.isExpress, gameState.period);
+                    ActionEngine.buyChip(company, action.chipType, action.isExpress, gameState.period, null, action.bypassPeriodEndCheck || false);
                     company.chipsBoughtThisTurn = true;  // ルール②: フラグを設定
                     break;
 

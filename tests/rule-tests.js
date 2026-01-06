@@ -448,10 +448,11 @@ test('PE-004', 'F計算', () => {
 });
 
 test('PE-005', '人件費計算', () => {
+    // 人件費レート（実績ベース、3期以降は人件費×1.1を反映）
     assert.strictEqual(MG.RULES.WAGE[2], 22, '2期人件費22');
-    assert.strictEqual(MG.RULES.WAGE[3], 24, '3期人件費24');
-    assert.strictEqual(MG.RULES.WAGE[4], 26, '4期人件費26');
-    assert.strictEqual(MG.RULES.WAGE[5], 28, '5期人件費28');
+    assert.strictEqual(MG.RULES.WAGE[3], 29, '3期人件費29');
+    assert.strictEqual(MG.RULES.WAGE[4], 31, '4期人件費31');
+    assert.strictEqual(MG.RULES.WAGE[5], 34, '5期人件費34');
 });
 
 test('PE-006', '人件費倍率', () => {
@@ -525,23 +526,24 @@ test('P5-004', '6社中1位', () => {
 console.log('\n【研究開発チップと販売価格 RP】');
 
 test('RP-001', '2期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[2][0], 24, '2期0枚→24');
+    // ★★★ ユーザー戦略: 2期は29円(1枚)→32円(4枚)で販売 ★★★
+    assert.strictEqual(MG.RULES.TARGET_PRICES[2][0], 26, '2期0枚→26');
     assert.strictEqual(MG.RULES.TARGET_PRICES[2][4], 32, '2期4枚→32');
 });
 
 test('RP-002', '3期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[3][0], 24, '3期0枚→24');
-    assert.strictEqual(MG.RULES.TARGET_PRICES[3][5], 34, '3期5枚→34');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[3][0], 26, '3期0枚→26');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[3][5], 33, '3期5枚→33');
 });
 
 test('RP-003', '4期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[4][0], 22, '4期0枚→22');
-    assert.strictEqual(MG.RULES.TARGET_PRICES[4][5], 32, '4期5枚→32');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[4][0], 24, '4期0枚→24');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[4][5], 31, '4期5枚→31');
 });
 
 test('RP-004', '5期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[5][0], 21, '5期0枚→21');
-    assert.strictEqual(MG.RULES.TARGET_PRICES[5][5], 31, '5期5枚→31');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[5][0], 23, '5期0枚→23');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[5][5], 30, '5期5枚→30');
 });
 
 // ====================================

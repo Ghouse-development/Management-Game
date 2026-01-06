@@ -1,0 +1,213 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-01-06T05:40:57.164Z",
+  "totalSimulations": 90,
+  "successCount": 0,
+  "stateActionValues": {
+    "P2_BUY_CHIP": {
+      "BUY_CHIP": {
+        "totalReward": 69447,
+        "count": 450,
+        "avgReward": 154.32666666666665
+      }
+    },
+    "P2_PRODUCE": {
+      "PRODUCE": {
+        "totalReward": 56052,
+        "count": 346,
+        "avgReward": 162
+      }
+    },
+    "P2_SELL": {
+      "SELL": {
+        "totalReward": 45789,
+        "count": 291,
+        "avgReward": 157.35051546391753
+      }
+    },
+    "P2_HIRE": {
+      "HIRE": {
+        "totalReward": 11953,
+        "count": 89,
+        "avgReward": 134.30337078651687
+      }
+    },
+    "P2_BUY_MATERIALS": {
+      "BUY_MATERIALS": {
+        "totalReward": 16703,
+        "count": 108,
+        "avgReward": 154.65740740740742
+      }
+    },
+    "P2_OTHER": {
+      "OTHER": {
+        "totalReward": 20690,
+        "count": 138,
+        "avgReward": 149.92753623188406
+      }
+    },
+    "P3_OTHER": {
+      "OTHER": {
+        "totalReward": -187914,
+        "count": 1874,
+        "avgReward": -100.2742796157951
+      }
+    },
+    "P3_HIRE": {
+      "HIRE": {
+        "totalReward": -4050,
+        "count": 65,
+        "avgReward": -62.30769230769231
+      }
+    },
+    "P3_BUY_MATERIALS": {
+      "BUY_MATERIALS": {
+        "totalReward": -5316,
+        "count": 171,
+        "avgReward": -31.087719298245613
+      }
+    },
+    "P3_PRODUCE": {
+      "PRODUCE": {
+        "totalReward": -19765,
+        "count": 461,
+        "avgReward": -42.87418655097614
+      }
+    },
+    "P3_SELL": {
+      "SELL": {
+        "totalReward": -21415,
+        "count": 372,
+        "avgReward": -57.56720430107527
+      }
+    },
+    "P4_OTHER": {
+      "OTHER": {
+        "totalReward": -157392,
+        "count": 397,
+        "avgReward": -396.4534005037783
+      }
+    },
+    "P4_PRODUCE": {
+      "PRODUCE": {
+        "totalReward": -173572,
+        "count": 579,
+        "avgReward": -299.77892918825563
+      }
+    },
+    "P4_SELL": {
+      "SELL": {
+        "totalReward": -181964,
+        "count": 624,
+        "avgReward": -291.60897435897436
+      }
+    },
+    "P4_BUY_MATERIALS": {
+      "BUY_MATERIALS": {
+        "totalReward": -62097,
+        "count": 205,
+        "avgReward": -302.91219512195124
+      }
+    },
+    "P4_DO_NOTHING": {
+      "DO_NOTHING": {
+        "totalReward": -677114,
+        "count": 1396,
+        "avgReward": -485.0386819484241
+      }
+    },
+    "P5_OTHER": {
+      "OTHER": {
+        "totalReward": -348593,
+        "count": 397,
+        "avgReward": -878.0680100755668
+      }
+    },
+    "P5_PRODUCE": {
+      "PRODUCE": {
+        "totalReward": -327641,
+        "count": 428,
+        "avgReward": -765.5163551401869
+      }
+    },
+    "P5_SELL": {
+      "SELL": {
+        "totalReward": -216851,
+        "count": 299,
+        "avgReward": -725.2541806020067
+      }
+    },
+    "P5_BUY_MATERIALS": {
+      "BUY_MATERIALS": {
+        "totalReward": -135207,
+        "count": 174,
+        "avgReward": -777.051724137931
+      }
+    },
+    "P3_SELL_MACHINE": {
+      "SELL_MACHINE": {
+        "totalReward": -546,
+        "count": 28,
+        "avgReward": -19.5
+      }
+    },
+    "P3_BUY_MACHINE": {
+      "BUY_MACHINE": {
+        "totalReward": -546,
+        "count": 28,
+        "avgReward": -19.5
+      }
+    },
+    "P4_HIRE": {
+      "HIRE": {
+        "totalReward": -4995,
+        "count": 16,
+        "avgReward": -312.1875
+      }
+    },
+    "P5_DO_NOTHING": {
+      "DO_NOTHING": {
+        "totalReward": -3697355,
+        "count": 4020,
+        "avgReward": -919.7400497512438
+      }
+    },
+    "P5_HIRE": {
+      "HIRE": {
+        "totalReward": -16290,
+        "count": 18,
+        "avgReward": -905
+      }
+    },
+    "P3_DO_NOTHING": {
+      "DO_NOTHING": {
+        "totalReward": -9786,
+        "count": 36,
+        "avgReward": -271.8333333333333
+      }
+    }
+  },
+  "successPatterns": [],
+  "periodStats": {
+    "2": {
+      "avgEquity": 155.43333333333328,
+      "bestEquity": 282,
+      "samples": 90
+    },
+    "3": {
+      "avgEquity": -84.24444444444444,
+      "bestEquity": 76,
+      "samples": 90
+    },
+    "4": {
+      "avgEquity": -395.011111111111,
+      "bestEquity": -52,
+      "samples": 90
+    },
+    "5": {
+      "avgEquity": -874,
+      "bestEquity": -315,
+      "samples": 90
+    }
+  }
+}

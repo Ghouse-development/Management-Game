@@ -1,0 +1,29 @@
+{
+  "_comment": "勝利条件 - 絶対変更禁止・絶対厳守",
+  "_source": "ユーザー指定 2026-01-06",
+
+  "PERIOD_5_END_CONDITIONS": {
+    "minCarryoverChips": 3,
+    "minInventory": 10,
+    "minEquity": 450,
+
+    "_details": {
+      "chips": "次期繰り越しチップ3枚以上（研究・教育・広告の合計）",
+      "inventory": "在庫10個以上（材料+仕掛品+製品）",
+      "equity": "自己資本¥450以上"
+    }
+  },
+
+  "ENFORCEMENT": {
+    "autoCheck": true,
+    "blockViolation": true,
+    "comment": "5期終盤で条件を満たせない行動は自動的にブロック"
+  },
+
+  "PRIORITY": {
+    "1": "チップ3枚確保",
+    "2": "在庫10個確保",
+    "3": "自己資本最大化",
+    "comment": "この優先順位で行動を決定"
+  }
+}

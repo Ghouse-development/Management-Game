@@ -656,15 +656,117 @@ function proceedToNextPeriod() {
     // 行動ログをリセット
     resetActionLog();
 
-    // UIを更新
-    updateDisplay();
-
     // 5期まで続行、6期になったらゲーム終了
     if (gameState.currentPeriod > 5) {
         endGame();
+    } else if (gameState.currentPeriod >= 3) {
+        // 3期以降はサイコロを振る
+        showDiceRollModal();
     } else {
+        // 2期は直接進む
+        updateDisplay();
         showToast(`第${gameState.currentPeriod}期に進みました`, 'success', 3000);
     }
+}
+
+// ============================================
+// サイコロを振るモーダル
+// ============================================
+function showDiceRollModal() {
+    const html = `
+        <div style="text-align: center; padding: 20px;">
+            <h2 style="margin-bottom: 20px;">第${gameState.currentPeriod}期 期首サイコロ</h2>
+            <div id="diceAnimation" style="font-size: 80px; margin: 30px 0; min-height: 100px;">🎲</div>
+            <p style="color: #666; margin-bottom: 20px;">サイコロを振って景気を決定します</p>
+            <button class="submit-btn" onclick="rollAndShowDice()" style="padding: 15px 40px; font-size: 18px;">
+                🎲 サイコロを振る
+            </button>
+        </div>
+    `;
+    showModal('期首処理', html);
+}
+
+// ============================================
+// サイコロを振って結果を表示
+// ============================================
+function rollAndShowDice() {
+    const diceContainer = document.getElementById('diceAnimation');
+    if (!diceContainer) return;
+
+    // アニメーション
+    let count = 0;
+    const diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    const animInterval = setInterval(() => {
+        diceContainer.textContent = diceEmojis[Math.floor(Math.random() * 6)];
+        count++;
+        if (count >= 15) {
+            clearInterval(animInterval);
+            // 最終結果を決定
+            const diceResult = Math.floor(Math.random() * 6) + 1;
+            diceContainer.textContent = diceEmojis[diceResult - 1];
+
+            // 結果を適用
+            applyDiceResult(diceResult);
+        }
+    }, 100);
+}
+
+// ============================================
+// サイコロ結果を適用
+// ============================================
+function applyDiceResult(diceResult) {
+    gameState.diceRoll = diceResult;
+    gameState.diceRolled = true;
+
+    // 出目に応じて設定
+    let closedMarkets = [];
+    if (diceResult <= 3) {
+        // 1-3: 仙台閉鎖、人件費×1.1
+        closedMarkets = ['仙台'];
+        gameState.wageMultiplier = 1.1;
+    } else {
+        // 4-6: 仙台・札幌閉鎖、人件費×1.2
+        closedMarkets = ['仙台', '札幌'];
+        gameState.wageMultiplier = 1.2;
+    }
+
+    // 大阪価格 = サイコロ + 20
+    gameState.osakaMaxPrice = 20 + diceResult;
+
+    // 行数削減（5-6で-5）
+    const rowReduction = (diceResult >= 5) ? 5 : 0;
+
+    // 結果表示
+    setTimeout(() => {
+        const wageText = gameState.wageMultiplier === 1.1 ? '×1.1' : '×1.2';
+        const closedText = closedMarkets.join('・') || 'なし';
+        const rowText = rowReduction > 0 ? `、行数-${rowReduction}` : '';
+
+        const resultHtml = `
+            <div style="text-align: center; padding: 20px;">
+                <h2 style="margin-bottom: 10px;">サイコロ結果</h2>
+                <div style="font-size: 80px; margin: 20px 0;">${diceResult}</div>
+                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: left; margin: 20px 0;">
+                    <p><strong>閉鎖市場:</strong> ${closedText}</p>
+                    <p><strong>人件費倍率:</strong> ${wageText}</p>
+                    <p><strong>大阪上限価格:</strong> ¥${gameState.osakaMaxPrice}</p>
+                    ${rowReduction > 0 ? `<p><strong>行数削減:</strong> -${rowReduction}行</p>` : ''}
+                </div>
+                <button class="submit-btn" onclick="closeModal(); finishPeriodStart();" style="padding: 15px 40px;">
+                    期首処理へ進む
+                </button>
+            </div>
+        `;
+        showModal(`第${gameState.currentPeriod}期 サイコロ結果`, resultHtml);
+    }, 500);
+}
+
+// ============================================
+// 期首処理完了
+// ============================================
+function finishPeriodStart() {
+    updateDisplay();
+    showToast(`第${gameState.currentPeriod}期に進みました（サイコロ: ${gameState.diceRoll}）`, 'success', 3000);
 }
 
 // ============================================
