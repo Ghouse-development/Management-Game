@@ -353,6 +353,21 @@ const WAGE_MULTIPLIER_BY_DICE = {
     6: 1.2
 };
 
+/**
+ * サイコロ効果の統合定義（3期以降）
+ * - wageMultiplier: 人件費倍率
+ * - closedMarkets: 閉鎖される市場インデックス（0=仙台, 1=札幌）
+ * - osakaPrice: 大阪の上限価格
+ */
+const DICE_EFFECTS = {
+    1: { wageMultiplier: 1.1, closedMarkets: [0], osakaPrice: 21 },
+    2: { wageMultiplier: 1.1, closedMarkets: [0], osakaPrice: 22 },
+    3: { wageMultiplier: 1.1, closedMarkets: [0], osakaPrice: 23 },
+    4: { wageMultiplier: 1.2, closedMarkets: [0, 1], osakaPrice: 24 },
+    5: { wageMultiplier: 1.2, closedMarkets: [0, 1], osakaPrice: 25 },
+    6: { wageMultiplier: 1.2, closedMarkets: [0, 1], osakaPrice: 26 }
+};
+
 // ============================================
 // v8シミュレーション結果（57,000回テスト）
 // ============================================
@@ -434,6 +449,7 @@ if (typeof window !== 'undefined') {
         INITIAL_COMPANY_STATE,
         OSAKA_PRICE_BY_DICE,
         WAGE_MULTIPLIER_BY_DICE,
+        DICE_EFFECTS,
         // v8シミュレーション結果
         BID_WIN_RATES,
         OPTIMAL_STRATEGIES,

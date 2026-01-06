@@ -2,6 +2,33 @@
 // turns.js - ターン・期間管理モジュール
 // ==============================================
 
+// ============================================
+// サイコロ効果適用（constants.jsのDICE_EFFECTSを使用）
+// ============================================
+function applyDiceEffects(diceRoll) {
+    const effects = window.MG_CONSTANTS?.DICE_EFFECTS?.[diceRoll];
+    if (!effects) {
+        console.error(`DICE_EFFECTS not found for roll: ${diceRoll}`);
+        return;
+    }
+
+    // 人件費倍率
+    gameState.wageMultiplier = effects.wageMultiplier;
+
+    // 市場閉鎖（まず全市場を開放してから閉鎖）
+    gameState.markets[0].closed = false;  // 仙台
+    gameState.markets[1].closed = false;  // 札幌
+    effects.closedMarkets.forEach(idx => {
+        gameState.markets[idx].closed = true;
+    });
+
+    // 大阪上限価格
+    gameState.osakaMaxPrice = effects.osakaPrice;
+    gameState.markets[4].sellPrice = effects.osakaPrice;
+
+    console.log(`サイコロ${diceRoll}: 倍率${effects.wageMultiplier}, 閉鎖${effects.closedMarkets}, 大阪¥${effects.osakaPrice}`);
+}
+
 // Start period
 function startPeriod() {
     if (gameState.periodStarted) return;
@@ -82,21 +109,13 @@ function rollPeriodDice() {
             gameState.diceRoll = Math.floor(Math.random() * 6) + 1;
             diceDisplay.textContent = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][gameState.diceRoll - 1];
 
-            if (gameState.diceRoll <= 3) {
-                gameState.wageMultiplier = 1.1;
-                gameState.markets[0].closed = true;
-                gameState.markets[1].closed = false;
-            } else {
-                gameState.wageMultiplier = 1.2;
-                gameState.markets[0].closed = true;
-                gameState.markets[1].closed = true;
-            }
+            // ★★★ DICE_EFFECTSから効果を適用 ★★★
+            applyDiceEffects(gameState.diceRoll);
 
-            gameState.osakaMaxPrice = 20 + gameState.diceRoll;
-            gameState.markets[4].sellPrice = gameState.osakaMaxPrice;
-
+            // UI更新
+            const closedText = gameState.diceRoll <= 3 ? '仙台のみ' : '仙台・札幌';
             document.getElementById('dice-number').textContent = gameState.diceRoll;
-            document.getElementById('closed-markets').textContent = gameState.diceRoll <= 3 ? '仙台のみ' : '仙台・札幌';
+            document.getElementById('closed-markets').textContent = closedText;
             document.getElementById('wage-multiplier').textContent = `×${gameState.wageMultiplier}`;
             document.getElementById('osaka-max').textContent = `¥${gameState.osakaMaxPrice}`;
 
@@ -335,6 +354,7 @@ function initGame() {
 
 // グローバル公開
 if (typeof window !== 'undefined') {
+    window.applyDiceEffects = applyDiceEffects;
     window.startPeriod = startPeriod;
     window.showDiceRollModal = showDiceRollModal;
     window.rollPeriodDice = rollPeriodDice;
