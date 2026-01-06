@@ -1277,7 +1277,13 @@ function showBuyConfirmModal(marketIndex) {
     // 材料倉庫の空き容量をチェック
     const maxMaterialCapacity = getMaterialCapacity(company);
     const spaceAvailable = maxMaterialCapacity - company.materials;
-    const actualMax = Math.min(maxQuantity, spaceAvailable);
+
+    // ★★★ 3期以降は製造能力が購入上限 ★★★
+    const mfgCapacity = getManufacturingCapacity(company);
+    const isPeriod2 = gameState.currentPeriod === 2;
+    const maxPerMarket = isPeriod2 ? 99 : mfgCapacity;
+
+    const actualMax = Math.min(maxQuantity, spaceAvailable, maxPerMarket);
 
     const content = `
         <div style="background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 2px solid #22c55e;">
@@ -1307,6 +1313,12 @@ function showBuyConfirmModal(marketIndex) {
                 <div style="font-size: 22px; font-weight: bold; color: #1e293b;">${company.materials}個</div>
             </div>
         </div>
+
+        ${!isPeriod2 ? `
+        <div style="background: #dbeafe; border-radius: 8px; padding: 8px; margin-bottom: 12px; text-align: center; font-size: 12px; color: #1e40af;">
+            ⚠️ 製造能力: ${mfgCapacity} → 1市場あたり${mfgCapacity}個まで
+        </div>
+        ` : ''}
 
         <div class="form-group">
             <label class="form-label" style="text-align: center;">📦 購入数量</label>
@@ -1427,18 +1439,22 @@ function processSale() {
         const actualQty = isOverseas ? quantity : Math.min(quantity, market.maxStock - market.currentStock);
 
         if (actualQty > 0) {
-            company.cash += market.sellPrice * actualQty;
+            const revenue = market.sellPrice * actualQty;
+            company.cash += revenue;
             company.products -= actualQty;
-            company.totalSales += market.sellPrice * actualQty;
+            company.totalSales += revenue;
             company.totalSoldQuantity = (company.totalSoldQuantity || 0) + actualQty;
             // 海外以外は市場在庫を増やす（販売枠の消費）
             if (!isOverseas) {
                 market.currentStock += actualQty;
             }
 
+            // ★★★ 販売ログ記録（PQ詳細表示用）★★★
+            logAction(0, '商品販売', `${market.name}に¥${market.sellPrice}×${actualQty}個`, revenue, true);
+
             closeModal();
             updateDisplay();
-            alert(`${market.name}に製品${actualQty}個を¥${market.sellPrice * actualQty}で販売しました`);
+            alert(`${market.name}に製品${actualQty}個を¥${revenue}で販売しました`);
             endTurn();
         } else {
             alert('この市場はこれ以上販売できません');

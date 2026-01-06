@@ -206,6 +206,7 @@ function endTurn() {
     const company = gameState.companies[gameState.currentPlayerIndex];
 
     company.cannotProduce = false;
+    company.cannotSell = false;  // ★消費者運動フラグをリセット
 
     if (incrementRow(gameState.currentPlayerIndex)) {
         return;
