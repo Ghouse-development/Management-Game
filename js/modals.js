@@ -803,10 +803,20 @@ function showLast5RowWarning(company) {
 
 // 期末告知モーダル
 function showPeriodEndAnnouncement(triggerCompany) {
+    console.log('★★★ showPeriodEndAnnouncement called ★★★');
+
+    // 全てのAIタイムアウトをクリア
     if (window.currentAITurnTimeout) {
         clearTimeout(window.currentAITurnTimeout);
         window.currentAITurnTimeout = null;
     }
+
+    // 進行中のsetTimeoutをキャンセル（AIターン用）
+    if (window.pendingAITurns) {
+        window.pendingAITurns.forEach(t => clearTimeout(t));
+        window.pendingAITurns = [];
+    }
+
     const companies = gameState.companies;
 
     let rowsHtml = companies.map((c, i) => {
@@ -836,7 +846,9 @@ function showPeriodEndAnnouncement(triggerCompany) {
         </div>
     `;
 
+    // 即座にモーダルを表示（periodEndingチェックにより他のモーダルは上書きされない）
     showModal('期終了', content);
+    console.log('★★★ Period end modal displayed ★★★');
 }
 
 // スタートメニュー

@@ -478,6 +478,12 @@ function processAICommonPurchase() {
 // ============================================
 
 function showAIActionModal(company, actionType, actionIcon, actionDetail, resultData = null, cashChange = 0) {
+    // ★★★ 期末処理中はAI行動モーダルを表示しない ★★★
+    if (gameState.periodEnding) {
+        console.log('Period is ending - AI action modal suppressed');
+        return;
+    }
+
     // AI行動をactionLogに記録
     const companyIndex = gameState.companies.indexOf(company);
     if (companyIndex >= 0) {
@@ -545,14 +551,14 @@ function closeAIActionModal() {
         clearTimeout(window.currentAITurnTimeout);
         window.currentAITurnTimeout = null;
     }
-    document.getElementById('modalContainer').innerHTML = '';
 
-    // 期末処理中の場合は次のターンへ進まない
+    // ★★★ 期末処理中の場合はモーダルを閉じない（期末モーダルが表示されている可能性） ★★★
     if (gameState.periodEnding) {
-        console.log('Period is ending - not proceeding to next turn');
+        console.log('Period is ending - keeping modal, not proceeding to next turn');
         return;
     }
 
+    document.getElementById('modalContainer').innerHTML = '';
     nextTurn();
 }
 

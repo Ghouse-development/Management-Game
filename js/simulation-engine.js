@@ -3111,7 +3111,7 @@ const MGSimulation = (function() {
             // === 1周目: 教育チップ購入 + 初期販売 ===
             { action: 'BUY_CHIP', chipType: 'education' },           // 教育チップ（製造+1、販売+1）
             { action: 'PRODUCE' },                                   // 完成投入（wip3→製品+3）
-            { action: 'SELL', quantity: 3, minPrice: 20 },           // 販売3個（東京20円以上）
+            { action: 'SELL', quantity: 3, minPrice: 22 },           // 販売3個（大阪24円以上、東京禁止）
 
             // === 2周目: 研究チップ購入開始 + 材料補充 ===
             { action: 'BUY_CHIP', chipType: 'research' },            // 研究1枚目
@@ -3119,14 +3119,14 @@ const MGSimulation = (function() {
             { action: 'PRODUCE' },                                   // 完成投入
 
             // === 3周目: 販売 + 研究チップ追加 ===
-            { action: 'SELL', quantity: 3, minPrice: 20 },           // 販売3個
+            { action: 'SELL', quantity: 3, minPrice: 22 },           // 販売3個（大阪24円以上、東京禁止）
             { action: 'BUY_CHIP', chipType: 'research' },            // 研究2枚目
             { action: 'BUY_CHIP', chipType: 'research' },            // 研究3枚目
 
             // === 4周目: 生産サイクル + 研究4枚目 ===
             { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },  // 材料3個
             { action: 'PRODUCE' },                                   // 完成投入
-            { action: 'SELL', quantity: 3, minPrice: 20 },           // 販売3個
+            { action: 'SELL', quantity: 3, minPrice: 22 },           // 販売3個（大阪24円以上、東京禁止）
             { action: 'BUY_CHIP', chipType: 'research' },            // 研究4枚目
 
             // === 5周目: 教育2枚目 + 最終サイクル ===

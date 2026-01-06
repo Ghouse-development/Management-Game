@@ -225,6 +225,12 @@ function nextTurn() {
         window.currentAITurnTimeout = null;
     }
 
+    // ★★★ 期末処理中は次のターンに進まない ★★★
+    if (gameState.periodEnding) {
+        console.log('nextTurn: periodEnding=true, skipping');
+        return;
+    }
+
     if (gameState.turnReversed) {
         gameState.currentPlayerIndex--;
         if (gameState.currentPlayerIndex < 0) {
