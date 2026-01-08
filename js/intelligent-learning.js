@@ -245,6 +245,12 @@ const IntelligentLearning = (function() {
             const successPattern = SuccessPatterns.getBestPattern(stateKey);
             const patternActions = successPattern ? successPattern.actionSequence : [];
 
+            // ★★★ 勝利条件達成パターンを優先的に参照 ★★★
+            const victoryPatterns = SuccessPatterns.getVictoryPatterns();
+            const victoryActions = victoryPatterns.length > 0
+                ? victoryPatterns.flatMap(p => p.actionSequence)
+                : [];
+
             for (const action of actions) {
                 const qValue = QTable.getValue(stateKey, action.type);
 
@@ -252,10 +258,21 @@ const IntelligentLearning = (function() {
                 let patternBonus = 0;
                 if (patternActions.includes(action.type)) {
                     patternBonus = 50 + (successPattern.equityGain > 0 ? 30 : 0);
+
+                    // ★★★ 勝利条件達成パターンからの行動には追加ボーナス ★★★
+                    if (successPattern.victoryData) {
+                        if (successPattern.victoryData.meetsInventory) patternBonus += 40;
+                        if (successPattern.victoryData.meetsChips) patternBonus += 20;
+                        if (successPattern.victoryData.isVictory) patternBonus += 100;
+                    }
                 }
 
-                // 基本スコア（40%）+ Q値（40%）+ パターンボーナス（20%）
-                const totalValue = action.score * 0.4 + qValue * 0.4 + patternBonus * 0.2;
+                // ★★★ 勝利達成パターンに頻出する行動にもボーナス ★★★
+                const victoryActionCount = victoryActions.filter(a => a === action.type).length;
+                const victoryBonus = Math.min(victoryActionCount * 5, 50);
+
+                // 基本スコア（35%）+ Q値（35%）+ パターンボーナス（20%）+ 勝利ボーナス（10%）
+                const totalValue = action.score * 0.35 + qValue * 0.35 + patternBonus * 0.2 + victoryBonus * 0.1;
 
                 if (totalValue > bestValue) {
                     bestValue = totalValue;
@@ -514,8 +531,8 @@ const IntelligentLearning = (function() {
     };
 
     // ============================================
-    // 成功パターン記録 v1.0
-    // 高収益だった行動パターンを永続的に記録
+    // 成功パターン記録 v2.0
+    // 高収益・勝利条件達成パターンを永続的に記録
     // ============================================
     const SuccessPatterns = {
         dataPath: 'data/success-patterns.json',
@@ -523,18 +540,42 @@ const IntelligentLearning = (function() {
         maxPatterns: 500,
 
         /**
-         * 成功パターンを記録
+         * 成功パターンを記録（勝利条件対応版）
+         * @param {string} stateKey - 状態キー
+         * @param {Array} actionSequence - 行動シーケンス
+         * @param {number} equityGain - 自己資本変化
+         * @param {number} rank - 順位
+         * @param {Object} victoryData - 勝利条件データ（オプション）
          */
-        record(stateKey, actionSequence, equityGain, rank) {
+        record(stateKey, actionSequence, equityGain, rank, victoryData = null) {
+            // 勝利条件スコアを計算（達成度に応じたボーナス）
+            let victoryScore = 0;
+            if (victoryData) {
+                // 在庫10個達成: +1000
+                if (victoryData.inventory >= 10) victoryScore += 1000;
+                // チップ3枚達成: +500
+                if (victoryData.chips >= 3) victoryScore += 500;
+                // 自己資本450達成: +2000
+                if (victoryData.equity >= 450) victoryScore += 2000;
+                // 1位: +300
+                if (rank === 1) victoryScore += 300;
+            }
+
             // 既存の同じパターンがあれば更新
             const existing = this.patterns.find(p =>
                 p.stateKey === stateKey && JSON.stringify(p.actionSequence) === JSON.stringify(actionSequence)
             );
 
+            // 総合スコア = 自己資本変化 + 勝利条件スコア
+            const totalScore = equityGain + victoryScore;
+
             if (existing) {
-                if (equityGain > existing.equityGain) {
+                const existingScore = existing.equityGain + (existing.victoryScore || 0);
+                if (totalScore > existingScore) {
                     existing.equityGain = equityGain;
                     existing.rank = rank;
+                    existing.victoryScore = victoryScore;
+                    existing.victoryData = victoryData;
                     existing.count++;
                     existing.lastUpdated = new Date().toISOString();
                 }
@@ -544,15 +585,21 @@ const IntelligentLearning = (function() {
                     actionSequence,
                     equityGain,
                     rank,
+                    victoryScore,
+                    victoryData,
                     count: 1,
                     timestamp: new Date().toISOString(),
                     lastUpdated: new Date().toISOString()
                 });
             }
 
-            // 上限を超えたら低収益パターンを削除
+            // 上限を超えたら低スコアパターンを削除（勝利条件スコア考慮）
             if (this.patterns.length > this.maxPatterns) {
-                this.patterns.sort((a, b) => b.equityGain - a.equityGain);
+                this.patterns.sort((a, b) => {
+                    const scoreA = a.equityGain + (a.victoryScore || 0);
+                    const scoreB = b.equityGain + (b.victoryScore || 0);
+                    return scoreB - scoreA;
+                });
                 this.patterns = this.patterns.slice(0, this.maxPatterns);
             }
 
@@ -560,12 +607,28 @@ const IntelligentLearning = (function() {
         },
 
         /**
-         * 状態に対する最良パターンを取得
+         * 状態に対する最良パターンを取得（勝利条件考慮）
          */
         getBestPattern(stateKey) {
             const matching = this.patterns.filter(p => p.stateKey === stateKey);
             if (matching.length === 0) return null;
-            return matching.reduce((best, p) => p.equityGain > best.equityGain ? p : best);
+            // 総合スコアで最良を選択
+            return matching.reduce((best, p) => {
+                const scoreP = p.equityGain + (p.victoryScore || 0);
+                const scoreBest = best.equityGain + (best.victoryScore || 0);
+                return scoreP > scoreBest ? p : best;
+            });
+        },
+
+        /**
+         * 勝利条件達成パターンのみを取得
+         */
+        getVictoryPatterns() {
+            return this.patterns.filter(p =>
+                p.victoryData &&
+                p.victoryData.inventory >= 10 &&
+                p.victoryData.chips >= 3
+            );
         },
 
         save() {
@@ -833,7 +896,7 @@ const IntelligentLearning = (function() {
 
         /**
          * ゲーム終了時に各社の学習を実行
-         * ★★★ 失敗・成功パターンも記録 ★★★
+         * ★★★ 失敗・成功パターン + 勝利条件も記録 ★★★
          */
         learnFromGame(company, initialEquity, finalEquity, rank) {
             const equityChange = finalEquity - initialEquity;
@@ -851,11 +914,39 @@ const IntelligentLearning = (function() {
                 FailurePatterns.record(stateKey, lastActions.join(','), Math.abs(equityChange), '大幅な自己資本減少');
             }
 
-            // ★★★ 強化: 上位3位または自己資本0以上の場合も成功パターンとして記録 ★★★
-            if (rank <= 3 || finalEquity >= 0) {
+            // ★★★ 勝利条件データを収集 ★★★
+            const totalInventory = (company.materials || 0) + (company.wip || 0) + (company.products || 0);
+            const totalChips = (company.chips?.research || 0) + (company.chips?.education || 0) +
+                              (company.chips?.ad || 0) + (company.chips?.pc || 0);
+            const victoryData = {
+                inventory: totalInventory,
+                chips: totalChips,
+                equity: finalEquity,
+                meetsInventory: totalInventory >= 10,
+                meetsChips: totalChips >= 3,
+                meetsEquity: finalEquity >= 450,
+                isVictory: totalInventory >= 10 && totalChips >= 3 && finalEquity >= 450 && rank === 1
+            };
+
+            // ★★★ 成功パターンの記録条件を強化 ★★★
+            // 条件1: 上位3位以内
+            // 条件2: 自己資本プラス
+            // 条件3: 在庫10達成
+            // 条件4: チップ3枚達成
+            const shouldRecord = rank <= 3 || finalEquity >= 0 ||
+                                victoryData.meetsInventory || victoryData.meetsChips;
+
+            if (shouldRecord) {
                 const actionSequence = actionHistory.map(a => a.actionType);
-                if (actionSequence.length > 0) {  // 空でない場合のみ記録
-                    SuccessPatterns.record(stateKey, actionSequence, equityChange, rank);
+                if (actionSequence.length > 0) {
+                    SuccessPatterns.record(stateKey, actionSequence, equityChange, rank, victoryData);
+
+                    // ★★★ 勝利条件達成時は特別ログ ★★★
+                    if (victoryData.isVictory) {
+                        console.log(`[学習] ★★★ 完全勝利パターン記録: ${company.name} - 在庫${totalInventory}個, チップ${totalChips}枚, 自己資本¥${finalEquity}`);
+                    } else if (victoryData.meetsInventory && victoryData.meetsChips) {
+                        console.log(`[学習] 勝利条件達成パターン記録: ${company.name} - 在庫${totalInventory}個, チップ${totalChips}枚`);
+                    }
                 }
             }
         },
@@ -922,6 +1013,45 @@ const IntelligentLearning = (function() {
          */
         getStats() {
             return Persistence.getStatistics();
+        },
+
+        /**
+         * 勝利条件達成パターンの統計を取得
+         */
+        getVictoryStats() {
+            const victoryPatterns = SuccessPatterns.getVictoryPatterns();
+            const allPatterns = SuccessPatterns.patterns;
+
+            // 在庫達成率
+            const inventoryAchievers = allPatterns.filter(p =>
+                p.victoryData && p.victoryData.meetsInventory
+            ).length;
+
+            // チップ達成率
+            const chipsAchievers = allPatterns.filter(p =>
+                p.victoryData && p.victoryData.meetsChips
+            ).length;
+
+            // 完全勝利
+            const fullVictory = allPatterns.filter(p =>
+                p.victoryData && p.victoryData.isVictory
+            ).length;
+
+            return {
+                totalPatterns: allPatterns.length,
+                victoryPatterns: victoryPatterns.length,
+                inventoryAchievers,
+                chipsAchievers,
+                fullVictory,
+                // 最高スコアパターン
+                bestPattern: allPatterns.length > 0
+                    ? allPatterns.reduce((best, p) => {
+                        const scoreP = p.equityGain + (p.victoryScore || 0);
+                        const scoreBest = best.equityGain + (best.victoryScore || 0);
+                        return scoreP > scoreBest ? p : best;
+                    })
+                    : null
+            };
         },
 
         /**

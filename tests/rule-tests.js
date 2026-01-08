@@ -526,24 +526,28 @@ test('P5-004', '6社中1位', () => {
 console.log('\n【研究開発チップと販売価格 RP】');
 
 test('RP-001', '2期価格テーブル', () => {
-    // ★★★ ユーザー戦略: 2期は29円(1枚)→32円(4枚)で販売 ★★★
-    assert.strictEqual(MG.RULES.TARGET_PRICES[2][0], 26, '2期0枚→26');
+    // ★★★ CLAUDE.md「絶対変更禁止ルール」に基づく正しい価格 ★★★
+    // | 2期| ¥24 | ¥26 | ¥28 | ¥30 | ¥32 |  -  |
+    assert.strictEqual(MG.RULES.TARGET_PRICES[2][0], 24, '2期0枚→24');
     assert.strictEqual(MG.RULES.TARGET_PRICES[2][4], 32, '2期4枚→32');
 });
 
 test('RP-002', '3期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[3][0], 26, '3期0枚→26');
-    assert.strictEqual(MG.RULES.TARGET_PRICES[3][5], 33, '3期5枚→33');
+    // | 3期| ¥24 | ¥26 | ¥28 | ¥30 | ¥32 | ¥34 |
+    assert.strictEqual(MG.RULES.TARGET_PRICES[3][0], 24, '3期0枚→24');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[3][5], 34, '3期5枚→34');
 });
 
 test('RP-003', '4期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[4][0], 24, '4期0枚→24');
-    assert.strictEqual(MG.RULES.TARGET_PRICES[4][5], 31, '4期5枚→31');
+    // | 4期| ¥22 | ¥24 | ¥26 | ¥28 | ¥30 | ¥32 |
+    assert.strictEqual(MG.RULES.TARGET_PRICES[4][0], 22, '4期0枚→22');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[4][5], 32, '4期5枚→32');
 });
 
 test('RP-004', '5期価格テーブル', () => {
-    assert.strictEqual(MG.RULES.TARGET_PRICES[5][0], 23, '5期0枚→23');
-    assert.strictEqual(MG.RULES.TARGET_PRICES[5][5], 30, '5期5枚→30');
+    // | 5期| ¥21 | ¥23 | ¥25 | ¥27 | ¥29 | ¥31 |
+    assert.strictEqual(MG.RULES.TARGET_PRICES[5][0], 21, '5期0枚→21');
+    assert.strictEqual(MG.RULES.TARGET_PRICES[5][5], 31, '5期5枚→31');
 });
 
 // ====================================

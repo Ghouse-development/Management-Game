@@ -1,126 +1,126 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-01-06T03:23:06.487Z",
-  "totalSimulations": 251628,
+  "lastUpdated": "2026-01-08T05:15:18.894Z",
+  "totalSimulations": 295667,
   "strategyStats": {
     "PLAYER": {
-      "totalGames": 251628,
-      "totalWins": 51161,
-      "winRate": 20.3,
-      "avgEquity": -234,
-      "maxEquity": 124,
-      "totalEquity": -58849985
+      "totalGames": 295667,
+      "totalWins": 70007,
+      "winRate": 23.7,
+      "avgEquity": -243,
+      "maxEquity": 381,
+      "totalEquity": -71978639
     },
     "AGGRESSIVE": {
-      "totalGames": 251628,
-      "totalWins": 40477,
-      "winRate": 16.1,
-      "avgEquity": -239,
-      "maxEquity": 105,
-      "totalEquity": -60053927
+      "totalGames": 295667,
+      "totalWins": 45250,
+      "winRate": 15.3,
+      "avgEquity": -245,
+      "maxEquity": 170,
+      "totalEquity": -72434085
     },
     "BALANCED": {
-      "totalGames": 251628,
-      "totalWins": 43439,
-      "winRate": 17.3,
-      "avgEquity": -237,
-      "maxEquity": 140,
-      "totalEquity": -59624569
+      "totalGames": 295667,
+      "totalWins": 48728,
+      "winRate": 16.5,
+      "avgEquity": -243,
+      "maxEquity": 206,
+      "totalEquity": -71731722
     },
     "RESEARCH_FOCUSED": {
-      "totalGames": 251628,
-      "totalWins": 59222,
-      "winRate": 23.5,
-      "avgEquity": -227,
-      "maxEquity": 133,
-      "totalEquity": -57231477
+      "totalGames": 295667,
+      "totalWins": 65244,
+      "winRate": 22.1,
+      "avgEquity": -233,
+      "maxEquity": 175,
+      "totalEquity": -69022105
     },
     "SALES_FOCUSED": {
-      "totalGames": 251628,
-      "totalWins": 36527,
-      "winRate": 14.5,
-      "avgEquity": -240,
-      "maxEquity": 84,
-      "totalEquity": -60430233
+      "totalGames": 295667,
+      "totalWins": 41574,
+      "winRate": 14.1,
+      "avgEquity": -246,
+      "maxEquity": 175,
+      "totalEquity": -72727423
     },
     "LOW_CHIP": {
-      "totalGames": 251628,
-      "totalWins": 22048,
-      "winRate": 8.8,
-      "avgEquity": -256,
-      "maxEquity": 42,
-      "totalEquity": -64450524
+      "totalGames": 295667,
+      "totalWins": 26312,
+      "winRate": 8.9,
+      "avgEquity": -261,
+      "maxEquity": 171,
+      "totalEquity": -77116165
     }
   },
   "bestPatterns": [
     {
-      "equity": 140,
-      "strategy": "BALANCED",
-      "name": "バランス物産",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 140,
-      "strategy": "BALANCED",
-      "name": "バランス物産",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 134,
-      "strategy": "BALANCED",
-      "name": "バランス物産",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 134,
-      "strategy": "BALANCED",
-      "name": "バランス物産",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 133,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 129,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 129,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 126,
-      "strategy": "RESEARCH_FOCUSED",
-      "name": "研究商事",
-      "date": "2026-01-04"
-    },
-    {
-      "equity": 124,
+      "equity": 381,
       "strategy": "PLAYER",
       "name": "プレイヤー型",
-      "date": "2026-01-04"
+      "date": "2026-01-06"
     },
     {
-      "equity": 122,
+      "equity": 381,
       "strategy": "PLAYER",
       "name": "プレイヤー型",
-      "date": "2026-01-04"
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 296,
+      "strategy": "PLAYER",
+      "name": "プレイヤー型",
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 256,
+      "strategy": "PLAYER",
+      "name": "プレイヤー型",
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 219,
+      "strategy": "PLAYER",
+      "name": "プレイヤー型",
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 204,
+      "strategy": "PLAYER",
+      "name": "プレイヤー型",
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 203,
+      "strategy": "PLAYER",
+      "name": "プレイヤー型",
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 191,
+      "strategy": "PLAYER",
+      "name": "プレイヤー型",
+      "date": "2026-01-06"
+    },
+    {
+      "equity": 190,
+      "strategy": "BALANCED",
+      "name": "バランス物産",
+      "date": "2026-01-08"
+    },
+    {
+      "equity": 190,
+      "strategy": "BALANCED",
+      "name": "バランス物産",
+      "date": "2026-01-08"
     }
   ],
   "insights": [
-    "最強戦略: RESEARCH_FOCUSED (勝率23.5%)",
+    "最強戦略: PLAYER (勝率23.7%)",
     "平均自己資本最高: RESEARCH_FOCUSED",
-    "総シミュレーション回数: 251628回"
+    "総シミュレーション回数: 295667回"
   ],
   "dynamicParams": {
-    "bestStrategy": "RESEARCH_FOCUSED",
+    "bestStrategy": "PLAYER",
     "bestWinRate": 24
   }
 }

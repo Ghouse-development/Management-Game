@@ -804,6 +804,29 @@ class SimulationManager {
             });
         console.log('');
         console.log(`  学習データ保存: data/learned-strategies.json`);
+
+        // ★★★ 勝利条件パターン統計を表示 ★★★
+        try {
+            const IntelligentLearning = require('./js/intelligent-learning.js');
+            const victoryStats = IntelligentLearning.getVictoryStats();
+            if (victoryStats && victoryStats.totalPatterns > 0) {
+                console.log('');
+                console.log('【勝利条件パターン学習】');
+                console.log(`  成功パターン総数: ${victoryStats.totalPatterns}件`);
+                console.log(`  在庫10個達成パターン: ${victoryStats.inventoryAchievers}件`);
+                console.log(`  チップ3枚達成パターン: ${victoryStats.chipsAchievers}件`);
+                console.log(`  勝利条件両方達成: ${victoryStats.victoryPatterns}件`);
+                console.log(`  完全勝利: ${victoryStats.fullVictory}件`);
+                if (victoryStats.bestPattern) {
+                    const bp = victoryStats.bestPattern;
+                    const score = bp.equityGain + (bp.victoryScore || 0);
+                    console.log(`  最高スコアパターン: ${score}点 (自己資本${bp.equityGain >= 0 ? '+' : ''}${bp.equityGain})`);
+                }
+            }
+        } catch (e) {
+            // 学習システムがない場合は無視
+        }
+        console.log('');
     }
 }
 
