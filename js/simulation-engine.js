@@ -1794,19 +1794,19 @@ const MGSimulation = (function() {
             },
             PLAYER: {
                 name: 'プレイヤー型',
-                description: '研究チップ重視・3期大型機械・教育チップ戦略',
+                description: '【高価格版】研究チップで入札有利+高価格販売',
                 chipTargets: {
-                    // ★★★ ユーザー戦略: 2期に研究4枚+教育2枚 ★★★
-                    2: { research: 4, education: 2, advertising: 0 },
-                    3: { research: 4, education: 1, advertising: 0 },
-                    4: { research: 5, education: 1, advertising: 0 },
-                    5: { research: 5, education: 1, advertising: 0 }
+                    // ★★★ 高価格版: 研究チップで入札競争に勝つ ★★★
+                    2: { research: 2, education: 1, advertising: 0 },  // 研究2枚+教育1枚
+                    3: { research: 3, education: 0, advertising: 0 },  // 研究3枚目
+                    4: { research: 3, education: 0, advertising: 0 },  // 維持
+                    5: { research: 1, education: 1, advertising: 1 }   // 勝利条件用3枚
                 },
-                priceAdjustment: 2,
-                hirePriority: 'worker',
-                earlyLargeMachine: false,  // 3期中盤に大型機械購入
+                priceAdjustment: 2,  // 高価格を狙う
+                hirePriority: 'salesman',
+                earlyLargeMachine: false,
                 upgradePeriod: 3,
-                midPeriodLargeMachine: true  // 3期で資金を貯めてから購入
+                midPeriodLargeMachine: true
             }
         }
     };
@@ -2395,6 +2395,10 @@ const MGSimulation = (function() {
             // 検証済みなので直接実行
             company.cash -= cost;
             company.materials += quantity;
+
+            // ★★★ 行数トップ制限用：購入市場を記録 ★★★
+            company.lastMaterialMarket = market.name;
+
             company.logAction('材料購入', `${market.name}から¥${market.buyPrice}×${quantity}個`, cost, false);
 
             // ルール強制チェック
@@ -3136,115 +3140,170 @@ const MGSimulation = (function() {
          * リスクカードはランダムなので、行番号ではなく順番で管理
          */
         PLAYER_PERIOD2_SEQUENCE: [
-            // ★★★ 2期戦略: 研究4枚・教育2枚を購入しつつ利益確保 ★★★
-            // 初期: 現金112円、材料0、wip3、製品3
-            // 製造能力2（小型1+PC1）→教育で+1=3
-            // 販売能力2（セールス1×2）→教育で+1=3
+            // ★★★ 2期戦略【高価格・低VQ版】: チップ4枚で高価格販売 ★★★
+            // VQ目標¥15以下（材料¥12以下）、販売¥26以上で高利益
 
-            // === 1周目: 教育チップ購入 + 初期販売 ===
-            { action: 'BUY_CHIP', chipType: 'education' },           // 教育チップ（製造+1、販売+1）
-            { action: 'PRODUCE' },                                   // 完成投入（wip3→製品+3）
-            { action: 'SELL', quantity: 3, minPrice: 22 },           // 販売3個（大阪24円以上、東京禁止）
-
-            // === 2周目: 研究チップ購入開始 + 材料補充 ===
-            { action: 'BUY_CHIP', chipType: 'research' },            // 研究1枚目
-            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },  // 材料3個（1周目制限）
-            { action: 'PRODUCE' },                                   // 完成投入
-
-            // === 3周目: 販売 + 研究チップ追加 ===
-            { action: 'SELL', quantity: 3, minPrice: 22 },           // 販売3個（大阪24円以上、東京禁止）
-            { action: 'BUY_CHIP', chipType: 'research' },            // 研究2枚目
-            { action: 'BUY_CHIP', chipType: 'research' },            // 研究3枚目
-
-            // === 4周目: 生産サイクル + 研究4枚目 ===
-            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },  // 材料3個
-            { action: 'PRODUCE' },                                   // 完成投入
-            { action: 'SELL', quantity: 3, minPrice: 22 },           // 販売3個（大阪24円以上、東京禁止）
-            { action: 'BUY_CHIP', chipType: 'research' },            // 研究4枚目
-
-            // === 5周目: 教育2枚目 + 最終サイクル ===
-            { action: 'BUY_CHIP', chipType: 'education' },           // 教育2枚目
-            { action: 'PRODUCE' }                                    // 最終生産
-        ],
-
-        // ★★★ 3期戦略（修正版 2026-01-06）★★★
-        // 前提: 研究3枚（2期から繰越）、ワーカー1人、小型機械1台、セールスマン1人
-        // 期首: PC購入、長期借入（最大限）
-        // ★重要: 3期中にチップ購入して高価格販売 + 4期用チップ確保
-        PLAYER_PERIOD3_SEQUENCE: [
-            // === フェーズ1: チップ購入で高価格販売準備 ===
-            { action: 'BUY_CHIP', chipType: 'research' },            // 研究4枚目（¥32で販売可能に）
-            { action: 'HIRE_SALESMAN', count: 2 },                   // セールスマン3名体制
-            { action: 'PRODUCE' },                                   // 繰越仕掛品を完成
-
-            // === フェーズ2: 高価格販売（研究4枚=¥32） ===
-            { action: 'SELL', quantity: 3, minPrice: 30 },           // ¥30以上で販売
-            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },
-            { action: 'PRODUCE' },
-            { action: 'SELL', quantity: 3, minPrice: 30 },           // ¥30以上で販売
-
-            // === フェーズ3: 次期チップ確保 + 生産サイクル ===
-            { action: 'BUY_CHIP', chipType: 'research' },            // 4期用チップ1枚目
-            { action: 'BUY_CHIP', chipType: 'research' },            // 4期用チップ2枚目
-            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },
-            { action: 'PRODUCE' },
-            { action: 'SELL', quantity: 3, minPrice: 28 },
-
-            // === フェーズ4: 追加チップ + サイクル継続 ===
-            { action: 'BUY_CHIP', chipType: 'research' },            // 4期用チップ3枚目
-            { action: 'BUY_MATERIALS', quantity: 3, maxPrice: 14 },
+            // === サイクル1: 生産→販売→チップ1枚目 ===
             { action: 'PRODUCE' },
             { action: 'SELL', quantity: 3, minPrice: 26 },
-            { action: 'PRODUCE' }                                    // 在庫確保
+            { action: 'BUY_CHIP', chipType: 'research' },            // 1枚目
+
+            // === サイクル2: チップ2枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 4, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 28 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 2枚目
+
+            // === サイクル3: チップ3枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 4, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 30 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 3枚目
+
+            // === サイクル4: チップ4枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 4, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 3, minPrice: 32 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 4枚目
+
+            // === サイクル5: 在庫確保 ===
+            { action: 'BUY_MATERIALS', quantity: 4, maxPrice: 14 },
+            { action: 'PRODUCE' }
         ],
 
-        // ★★★ 4期戦略（修正版 2026-01-06）★★★
-        // 前提: 3期から研究3枚繰越
-        // ★重要: 5期用に研究チップ3枚以上を確保
-        PLAYER_PERIOD4_SEQUENCE: [
-            // === フェーズ1: 繰越チップで高価格販売 ===
+        // ★★★ 3期戦略【高価格・低VQ版】: チップ4枚+親ボーナスで¥30以上 ★★★
+        // VQ目標¥15以下（材料¥12以下）、販売¥28以上で高利益
+        PLAYER_PERIOD3_SEQUENCE: [
+            // === サイクル1: 高価格販売（チップ4枚→+¥8、親→+¥2）===
             { action: 'PRODUCE' },
-            { action: 'SELL', quantity: 3, minPrice: 28 },           // 研究3枚=¥28
-            { action: 'BUY_MATERIALS', quantity: 4 },
+            { action: 'SELL', quantity: 4, minPrice: 30 },
+
+            // === サイクル2 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 30 },
+
+            // === サイクル3 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' },
             { action: 'SELL', quantity: 4, minPrice: 28 },
 
-            // === フェーズ2: 5期用チップ確保 ===
-            { action: 'BUY_CHIP', chipType: 'research' },            // 5期用1枚目
-            { action: 'BUY_CHIP', chipType: 'research' },            // 5期用2枚目
-            { action: 'BUY_CHIP', chipType: 'research' },            // 5期用3枚目
-            { action: 'BUY_MATERIALS', quantity: 4 },
+            // === サイクル4 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+
+            // === サイクル5 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' },
             { action: 'SELL', quantity: 4, minPrice: 26 },
 
-            // === フェーズ3: 追加生産サイクル ===
-            { action: 'BUY_MATERIALS', quantity: 4 },
+            // === サイクル6 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' },
-            { action: 'SELL', quantity: 4, minPrice: 24 },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル7 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル8 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル9: 在庫確保 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' }
         ],
 
-        // ★★★ 5期戦略（修正版 2026-01-06）★★★
-        // ★絶対条件: 在庫10個以上、次期チップ3枚以上
-        PLAYER_PERIOD5_SEQUENCE: [
-            // === フェーズ1: チップ確保（最優先）===
-            { action: 'BUY_CHIP', chipType: 'research' },            // 次期用1枚目
-            { action: 'BUY_CHIP', chipType: 'research' },            // 次期用2枚目
-            { action: 'BUY_CHIP', chipType: 'research' },            // 次期用3枚目（勝利条件達成）
+        // ★★★ 4期戦略【高価格・低VQ版】: チップ3枚購入＋高価格販売 ★★★
+        // VQ目標¥15以下（材料¥12以下）、販売¥26以上
+        PLAYER_PERIOD4_SEQUENCE: [
+            // === サイクル1: 販売→チップ1枚目 ===
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 1枚目
 
-            // === フェーズ2: 高価格販売 ===
+            // === サイクル2: 販売→チップ2枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' },
-            { action: 'SELL', quantity: 3, minPrice: 27 },           // 研究3枚=¥27
-            { action: 'BUY_MATERIALS', quantity: 4 },
-            { action: 'PRODUCE' },
-            { action: 'SELL', quantity: 3, minPrice: 25 },
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 2枚目
 
-            // === フェーズ3: 在庫10個確保 ===
-            { action: 'BUY_MATERIALS', quantity: 6 },
+            // === サイクル3: 販売→チップ3枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' },
-            { action: 'BUY_MATERIALS', quantity: 4 },                // 在庫確保用
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 3枚目
+
+            // === サイクル4 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+
+            // === サイクル5 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル6 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル7 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル8: 在庫確保 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+
+            // === サイクル9: 在庫確保 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
             { action: 'PRODUCE' }
-            // ★販売しない → 在庫10個以上を維持
+        ],
+
+        // ★★★ 5期戦略【高価格・低VQ版】: チップ3枚必須＋在庫10個＋高価格 ★★★
+        // VQ目標¥15以下（材料¥12以下）、販売¥26以上
+        PLAYER_PERIOD5_SEQUENCE: [
+            // === サイクル1: 販売→チップ1枚目 ===
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 1枚目
+
+            // === サイクル2: 販売→チップ2枚目 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 2枚目
+
+            // === サイクル3: 販売→チップ3枚目（勝利条件達成）===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 28 },
+            { action: 'BUY_CHIP', chipType: 'research' },            // 3枚目
+
+            // === サイクル4: 追加販売 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === サイクル5: 追加販売 ===
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'SELL', quantity: 4, minPrice: 26 },
+
+            // === 在庫確保（10個以上必須）===
+            { action: 'BUY_MATERIALS', quantity: 6, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'BUY_MATERIALS', quantity: 6, maxPrice: 14 },
+            { action: 'PRODUCE' },
+            { action: 'BUY_MATERIALS', quantity: 5, maxPrice: 14 },
+            { action: 'PRODUCE' }
         ],
 
         // デバッグフラグ（問題特定後はfalseにする）
@@ -3317,6 +3376,31 @@ const MGSimulation = (function() {
                                 isExpress: false,
                                 bypassPeriodEndCheck: true,
                                 detail: '教育チップ購入（リスク補填）'
+                            };
+                        }
+                    }
+                }
+                // ★★★ 5期チップ保証【強化版】: 3枚未満なら追加購入 ★★★
+                if (period === 5) {
+                    const researchChips = company.chips.research || 0;
+                    const educationChips = company.chips.education || 0;
+                    const totalChips = researchChips + educationChips;
+
+                    // チップが3枚未満なら何としても購入
+                    if (totalChips < 3 && company.cash >= 20) {
+                        // 1行1枚制限をリセット（シーケンス完了後は例外）
+                        company.chipsBoughtThisTurn = false;
+
+                        const validation = ActionValidator.canExecute('BUY_CHIP', {
+                            isExpress: false, bypassPeriodEndCheck: true
+                        }, company, gameState);
+                        if (validation.valid) {
+                            return {
+                                type: 'BUY_CHIP',
+                                chipType: 'research',
+                                isExpress: false,
+                                bypassPeriodEndCheck: true,
+                                detail: `研究開発チップ購入（5期保証: ${totalChips + 1}枚目）`
                             };
                         }
                     }
@@ -3793,13 +3877,19 @@ const MGSimulation = (function() {
             const minInventory = RULES.VICTORY.MIN_INVENTORY;  // 10個
             const needsMoreInventory = isPeriod5 && currentInventory < minInventory;
 
-            // === 優先度1: 販売（どんな価格でも売る）===
+            // === 優先度1: 販売（¥21以上の市場のみ）===
+            // ★★★ 東京(¥20)・海外(¥16)は低価格なので販売しない ★★★
             // ★★★ 5期で在庫10個未満なら販売禁止、10個以上でも販売後10個残す ★★★
             const canSellInFallback = !needsMoreInventory;
             // 5期で販売可能な最大数量（10個は残す）
             const maxSellQty5Fallback = isPeriod5 ? Math.max(0, currentInventory - minInventory) : 999;
+            const fallbackMinPrice = 21;  // 最低販売価格（東京¥20、海外¥16を除外）
             if (company.products >= 1 && salesCap >= 1 && canSellInFallback && maxSellQty5Fallback >= 1) {
-                for (const m of gameState.markets) {
+                // 価格順にソート（高い順）、東京・海外は除外
+                const fallbackMarkets = gameState.markets
+                    .filter(m => m.sellPrice >= fallbackMinPrice)
+                    .sort((a, b) => b.sellPrice - a.sellPrice);
+                for (const m of fallbackMarkets) {
                     const remainingCapacity = m.maxStock - (m.currentStock || 0);
                     const sellQty = Math.min(company.products, remainingCapacity, salesCap, maxSellQty5Fallback);
                     if (sellQty >= 1) {
@@ -3972,8 +4062,11 @@ const MGSimulation = (function() {
             }
 
             // === 最終手段2: 在庫満杯でも製品があれば売る（5期在庫条件無視）===
+            // ★★★ PLAYER戦略では¥21未満の市場（東京¥20、海外¥16）への販売を禁止 ★★★
             if (actions.length === 0 && company.products >= 1 && salesCap >= 1) {
+                const minSellPrice2 = company.strategyType === 'PLAYER' ? 21 : 0;
                 for (const m of gameState.markets) {
+                    if (m.sellPrice < minSellPrice2) continue;  // PLAYER用の価格制限
                     const remainingCapacity = m.maxStock - (m.currentStock || 0);
                     const sellQty = Math.min(company.products, remainingCapacity, salesCap);
                     if (sellQty >= 1) {
@@ -4133,9 +4226,12 @@ const MGSimulation = (function() {
 
             // === 最終手段9: 最低2個でも販売（DO_NOTHING絶対回避）===
             // ★★★ BUG FIX: MIN_SALE_QUANTITY=2なので1個販売は無効。最低2個で販売試行 ★★★
+            // ★★★ PLAYER戦略では¥21未満の市場（東京¥20、海外¥16）への販売を禁止 ★★★
             if (actions.length === 0 && company.products >= 2 && salesCap >= 2) {
+                const minSellPrice = company.strategyType === 'PLAYER' ? 21 : 0;
                 for (const m of gameState.markets) {
                     if (gameState.closedMarkets.includes(m.name)) continue;
+                    if (m.sellPrice < minSellPrice) continue;  // PLAYER用の価格制限
                     const remainingCapacity = m.maxStock - (m.currentStock || 0);
                     if (remainingCapacity >= 2) {
                         const sellValidation = ActionValidator.canExecute('SELL', {
@@ -4388,9 +4484,15 @@ const MGSimulation = (function() {
                 }
             }
 
+            // ★★★ 行数トップの会社は2市場同時購入禁止 ★★★
+            const isTopRowPlayer = gameState.companies.every(c =>
+                c.index === company.index || c.currentRow <= company.currentRow
+            );
+            const lastPurchaseMarket = company.lastMaterialMarket;
+
             // ★★★ 最大個数を買える市場を優先（1行の価値を最大化）★★★
             // maxStockが大きい市場を優先、同じなら安い方を選ぶ
-            const marketsWithCapacity = gameState.markets
+            let marketsWithCapacity = gameState.markets
                 .filter(m => m.maxStock >= 3)
                 .sort((a, b) => {
                     // 1. まずmaxStock大きい順
@@ -4398,6 +4500,11 @@ const MGSimulation = (function() {
                     // 2. 同じなら価格安い順
                     return a.buyPrice - b.buyPrice;
                 });
+
+            // ★★★ 行数トップなら前回と同じ市場のみ許可 ★★★
+            if (isTopRowPlayer && lastPurchaseMarket) {
+                marketsWithCapacity = marketsWithCapacity.filter(m => m.name === lastPurchaseMarket);
+            }
 
             if (marketsWithCapacity.length === 0) return null;  // 3個以上買える市場なし
 
@@ -5483,6 +5590,7 @@ const MGSimulation = (function() {
                 company.maxPersonnel = company.workers + company.salesmen;
                 company.currentRow = PSR.INTEREST_TAX_DIVIDEND;  // 0行目開始
                 company.scriptIndex = 0;  // ★スクリプトモード用インデックスをリセット
+                company.lastMaterialMarket = null;  // ★行数トップ制限用：期首でリセット
             });
 
             // ===== 0行目: サイコロ・金利支払・納税・配当 =====
@@ -5622,7 +5730,8 @@ const MGSimulation = (function() {
                 }
             });
 
-            // ★★★ 全社共通: 3期・4期で大型機械に切り替え（プレイヤー含む）★★★
+            // ★★★ 全社共通: 3期・4期で大型機械に切り替え ★★★
+            // PLAYERも大型機械必須（生産能力のため）
             turnOrder.forEach(companyIndex => {
                 const company = gameState.companies[companyIndex];
                 const hasOnlySmall = company.machines.length === 1 && company.machines[0].type === 'small';
